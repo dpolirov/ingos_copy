@@ -6,6 +6,9 @@ declare
     v_field_list           varchar[]; -- list of table fields (array) for main
     v_field_list_csv       varchar;   -- comma-separated list of fields for main
     v_connect_id           int; 
+    v_skip_hist            varchar;
+    v_renamed_fields       varchar[];
+    v_blob_fields          varchar[];
 begin
     select id into v_connect_id
         from replicais.replication_connection_id;
@@ -17,15 +20,30 @@ begin
         from replicais.replication_tasks_full
         where replication_task_isn = p_task_isn;
         
-    select replication_table_schema 
-        into v_schema
+    select   replication_table_schema, SkipHist,    renamed_fields,   blob_fields
+        into v_schema,                 v_skip_hist, v_renamed_fields, v_blob_fields
         from replicais.replication_tables
         where replication_table_name = v_table_details.replication_table;
     
-    select shared_system.get_field_list(v_schema || '.' || v_table_details.replication_table)
-        into v_field_list;
-    select shared_system.put_to_str(v_field_list)
-        into v_field_list_csv;   
+    -- Generate field list for main table
+    select  array_to_string(array_agg(
+                    case 
+                        when position('|' || upper(q.column_name) || '|' in upper('|' || array_to_string(v_blob_fields,'|') || '|')) > 0 then 'EMPTY_CLOB() ' || shared_system.field_rename(v_renamed_fields, q.column_name)
+                        else shared_system.field_rename(v_renamed_fields, q.column_name)
+                    end
+                ),
+                ','
+            )
+        into v_field_list
+        from (
+            select case
+                       when c.column_name like '%#%' then '"' || c.column_name || '"'
+                       else c.column_name
+                   end as column_name
+                from information_schema.columns as c
+                where c.table_schema || '.' || c.table_name = lower(v_schema || '.' || p_table_name)
+                order by ordinal_position
+        ) as q;
         
     -- Create external table for main table
     -- Truncate and insert into main table    
@@ -33,12 +51,35 @@ begin
                                         'replicais.ext_full_'||v_table_details.replication_table,
                                         v_connect_id,
                                         'select '||v_field_list_csv||' from '||v_schema || '.' || v_table_details.replication_table);
-    -- Truncate and insert into hist table
-    -- Create external table for hist table    
-    perform shared_system.load_from_ora('hist.' || v_table_details.replication_table,
-                                        'replicais.ext_full_hist_'||v_table_details.replication_table,
-                                        v_connect_id,
-                                        'select '||v_field_list_csv||', histisn from hist.' || v_table_details.replication_table);                                              
+    if v_skip_hist = 'N' then
+        -- Generate field list for hist table
+        select  array_to_string(array_agg(
+                    case 
+                        when position('|' || upper(q.column_name) || '|' in upper('|' || array_to_string(v_blob_fields,'|') || '|')) > 0 then 'EMPTY_CLOB() ' || shared_system.field_rename(v_renamed_fields, q.column_name)
+                        else shared_system.field_rename(v_renamed_fields, q.column_name)
+                    end
+                ),
+                ','
+            )
+        into v_field_list
+        from (
+            select case
+                       when c.column_name like '%#%' then '"' || c.column_name || '"'
+                       else c.column_name
+                   end as column_name
+                from information_schema.columns as c
+                where 'hist.' || c.table_name = lower(v_schema || '.' || p_table_name)
+                order by ordinal_position
+        ) as q;
+        
+        -- Truncate and insert into hist table
+        -- Create external table for hist table
+        perform shared_system.load_from_ora('hist.' || v_table_details.replication_table,
+                                            'replicais.ext_full_hist_'||v_table_details.replication_table,
+                                            v_connect_id,
+                                            'select '||v_field_list_csv||' from hist.' || v_table_details.replication_table);
+    end if;
+    
     -- Update replication_tasks_full
     execute 'update replicais.replication_tasks_full
                 set replication_status = ''DONE'', started_dttm = '''||v_replication_start||''',
