@@ -1,0 +1,8 @@
+# DOMS_JOBS management tasks
+*    * * * * /home/gpadmin/utilities/job_starter.sh
+*/15 * * * * /home/gpadmin/utilities/job_clear_failed.sh
+
+# Replication related tasks
+*/30 * * * * /home/gpadmin/utilities/replication_iteration.sh >>/home/gpadmin/utilities/logs/replication_iteration_starter.log 2>&1
+*/30 * * * * /home/gpadmin/utilities/replication_notification.sh >>/home/gpadmin/utilities/logs/replication_notification_starter.log 2>&1
+0    * * * * /home/gpadmin/utilities/replication_clear_failed.sh >>/home/gpadmin/utilities/logs/replication_clear_failed_starter.log 2>&1

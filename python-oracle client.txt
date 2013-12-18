@@ -1,0 +1,31 @@
+1. download sources
+http://prdownloads.sourceforge.net/cx-oracle/cx_Oracle-5.1.tar.gz?download
+unpack in any dir
+
+2. Install Oracle soft: 
+http://www.oracle.com/technetwork/topics/linuxx86-64soft-092277.html
+Version 11.2.0.4.0 
+Instant Client Package - Basic
+Instant Client Package - SQL*Plus
+Instant Client Package - SDK
+
+3. Set in .bashrc
+for all users who uses module!
+export ORACLE_HOME=/usr/lib/oracle/11.2/client64
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$ORACLE_HOME/lib
+
+4. Install python-devel
+sudo yum install python-devel
+
+Installing:
+ python-devel                              x86_64                              2.6.6-37.el6_4                                updates                              168 k
+Updating for dependencies:
+ expat                                     x86_64                              2.0.1-11.el6_2                                base                                  76 k
+ python                                    x86_64                              2.6.6-37.el6_4                                updates                              4.8 M
+ python-libs                               x86_64                              2.6.6-37.el6_4                                updates                              595 k
+ zlib                                      x86_64                              1.2.3-29.el6                                  base                                  73 k
+ 
+ 
+Pay attention to which python runs
+5. python setup.py build
+6. python setup.py install
