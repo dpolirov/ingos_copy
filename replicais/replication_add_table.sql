@@ -81,7 +81,7 @@ begin
     end if;
     
     -- Add table to the list of the tables being replicated
-    /*insert into replicais.replication_tables(
+    insert into replicais.replication_tables(
                                              replication_table_isn,
                                              replication_table_schema,
                                              replication_table_name,
@@ -102,7 +102,7 @@ begin
                 p_pkeys,
                 p_blob_fields,
                 p_renamed_fields
-            );*/
+            );
 
     -- Generate select with blob replacements
     select  array_to_string(array_agg(
@@ -130,7 +130,7 @@ begin
         ) as q;
     
     -- Create temp table in Oracle (main)
-    /*select shared_system.execute_oracle(v_connect_id, 'create table gp_user.temp_'||v_table_name||' tablespace "TRNDATA"
+    select shared_system.execute_oracle(v_connect_id, 'create table gp_user.temp_'||v_table_name||' tablespace "TRNDATA"
                                              as (select ' || v_select_list || ' from '||v_schema_name||'.'||v_table_name||' where 1 = 0)') into v_ret_code;
     if v_ret_code <> 'success' then
         raise exception 'Error %', v_ret_code;
@@ -143,7 +143,7 @@ begin
         if v_ret_code <> 'success' then
             raise exception 'Error %', v_ret_code;
         end if;
-    end if;*/
+    end if;
 
     -- Create external table in GreenPlum (main)
     perform shared_system.create_ext_table( v_schema_name||'.'||v_table_name,
