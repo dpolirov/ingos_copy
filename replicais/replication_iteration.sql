@@ -38,7 +38,8 @@ begin
               'isn3                           NUMERIC',
               'sessionid                      NUMERIC(38,0)',
               'transid                        VARCHAR(30)',
-              'unloadisn                      NUMERIC'],
+              'unloadisn                      NUMERIC',
+              'operation                      VARCHAR(1)'],
 		v_connect_id, 
         'select histisn,
                 node,
@@ -48,7 +49,8 @@ begin
                 isn3,
                 sessionid,
                 transid,
-                unloadisn 
+                unloadisn,
+                operation
 			from gp_user.histunloaded where unloadisn > '||v_max_unloadisn||'
 			and bitand(flagslow,'||v_flag||') <> 0'
     );
@@ -75,7 +77,7 @@ begin
                sessionid,
                transid,
                null,
-               null,
+               operation,
                current_timestamp,
                null,
                unloadisn
