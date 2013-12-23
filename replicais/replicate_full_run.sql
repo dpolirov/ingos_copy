@@ -25,7 +25,6 @@ begin
         from replicais.replication_tables
         where replication_table_name = v_table_details.replication_table;
     
-    raise notice 'here, %, %', v_renamed_fields, v_blob_fields;
     -- Generate field list for main table
     select  array_to_string(array_agg(
                     case 
@@ -46,7 +45,6 @@ begin
                 order by ordinal_position
         ) as q;
     
-    raise notice 'here2';
     -- Create external table for main table
     -- Truncate and insert into main table    
     perform shared_system.load_from_ora(v_schema || '.' || v_table_details.replication_table,
