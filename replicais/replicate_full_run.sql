@@ -68,7 +68,7 @@ begin
                        else c.column_name
                    end as column_name
                 from information_schema.columns as c
-                where 'hist.' || c.table_name = lower('hist.' || v_table)
+                where c.table_name = lower(v_table) and c.table_schema = 'hist'
                 order by ordinal_position
         ) as q;
         
