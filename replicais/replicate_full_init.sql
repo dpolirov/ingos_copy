@@ -33,7 +33,12 @@ begin
     end if;    
     
     --Initialize full replication for tables in p_table_list
-    for v_table_from_list in (select unnest(p_table_list))
+    for v_table_from_list in (
+        select replication_table_name
+            from replicais.replication_tables
+            where array[replication_table_name] <@ p_table_list
+            order by FullReloadPriority
+    )
     loop
         select nextval('replicais.replication_full_seq') into v_rep_full_seq;
             

@@ -142,7 +142,8 @@ CREATE TABLE REPLICAIS.REPLICATION_TABLES (
     renamed_fields              VARCHAR[],
     SendBlob                    VARCHAR(1),
     SkipHist                    VARCHAR(1),
-    SkipHistlog                 VARCHAR(1)
+    SkipHistlog                 VARCHAR(1),
+    FullReloadPriority          smallint
 )
 DISTRIBUTED BY (replication_table_isn);
 
