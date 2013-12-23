@@ -36,7 +36,7 @@ begin
                                     'NEW',
                                     1,
                                     p_job_attempts,
-                                    current_timestamp,
+                                    shared_system.current_timestamp_py(),
                                     p_job_group,
                                     p_job_code);
     return v_new_job_isn;
