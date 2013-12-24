@@ -1,6 +1,6 @@
 CREATE TABLE aisadm.subuser (
     isn                              NUMERIC,
-    userpassword                     VARCHAR(40)VARCHAR(40),
+    userpassword                     VARCHAR(80),
     status                           VARCHAR(1),
     dateend                          TIMESTAMP,
     updated                          TIMESTAMP DEFAULT current_timestamp,
