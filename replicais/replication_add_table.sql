@@ -19,6 +19,7 @@ declare
     v_connect_id    int;
     v_select_list   varchar;
     v_cnt           int;
+    v_tmp_hist      int;
 begin
     select id into v_connect_id
         from replicais.replication_connection_id;
@@ -62,6 +63,15 @@ begin
         
     if v_rep_table > 0 then    
         raise exception 'Table % already exists in replicais.replication_tables!', v_full_name;
+    end if;
+
+    -- Create table for HIST table data chunks loaded in process of replication
+    if p_SkipHist = 'N' then
+        select count(*) into v_tmp_hist
+            from information_schema.tables where upper(table_schema) = 'REPLICAIS_INCR' and upper(table_name) = 'HIST_' || v_table_name;
+        if v_tmp_hist = 0 then
+            execute 'create table replicais_incr.hist_' || v_table_name || ' (like HIST.' || v_table_name ||')'; 
+        end if;
     end if;
     
     select count(*)
