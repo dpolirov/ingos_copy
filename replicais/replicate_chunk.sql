@@ -90,7 +90,7 @@ begin
     if v_len >= 2 then v_join_condition := v_join_condition||' and p.'||v_pkeys[2]||'=h.agrisn';  v_hist_key = v_hist_key || ',agrisn'; end if;
     if v_len >= 3 then v_join_condition := v_join_condition||' and p.'||v_pkeys[3]||'=h.isn3';    v_hist_key = v_hist_key || ',isn3';   end if;
     if v_len >= 4 then v_join_condition := v_join_condition||' and p.'||v_pkeys[4]||'=h.histisn'; v_hist_key = v_hist_key || ',histisn'; end if;
-    
+
     -- Get replicated chunk of data for main table
     perform shared_system.execute_oracle(v_connect_id,
         'insert into gp_user.temp_' || p_table_name || ' (' || v_field_list_csv_ora || ')
@@ -98,10 +98,11 @@ begin
                 from ' || v_schema || '.' || p_table_name || ' p
                     inner join (
                         select distinct ' || v_hist_key || '
-                            from gp_user.histunloaded) h on ('||v_join_condition||')
-                where h.unloadisn between ' || v_start_isn::varchar || ' and ' || v_end_isn || '
-                    and h.operation in (''U'', ''I'')');
-    
+                            from gp_user.histunloaded
+                            where unloadisn between ' || v_start_isn::varchar || ' and ' || v_end_isn::varchar || '
+                    ) h on ('||v_join_condition||')'
+                );
+
     -- Get replicated chunk of data for hist table if needed
     if v_skiphist = 'N' then
         perform shared_system.execute_oracle(v_connect_id,
@@ -109,34 +110,39 @@ begin
                 select ' || v_field_list_csv_p || ', p.histisn 
                     from hist.' || p_table_name || ' p
                         inner join gp_user.histunloaded h on ('||v_join_condition||' and p.histisn = h.histisn)
-                    where h.unloadisn between ' || v_start_isn::varchar || ' and ' || v_end_isn || '
-                        and h.operation in (''U'', ''I'')');
+                    where h.unloadisn between ' || v_start_isn::varchar || ' and ' || v_end_isn::varchar);
     end if;
       
-    -- Delete/Insert rows in main table
+    --Load into main table 
     execute 'delete from ' || v_schema || '.' || p_table_name || ' as p
                 using hist.temp_histlog as h
                 where h.tablename = ''' || p_table_name || '''
-                    and h.unloadisn between ' || v_start_isn::varchar || ' and ' || v_end_isn || '
-                    and h.operation in (''D'',''U'') and '||
+                    and h.unloadisn between ' || v_start_isn::varchar || ' and ' || v_end_isn::varchar || ' and '||
                     v_join_condition;
     execute 'insert into ' || v_schema || '.' || p_table_name || ' (' || v_field_list_csv_gp || ')          
                 select ' || v_field_list_csv_gp || '
                     from replicais.ext_' || p_table_name;
- 
-    -- Delete/Insert rows in hist table if needed
+                    
+     -- Load into hist table 
     if v_skiphist = 'N' then
-        execute 'delete from hist.'||p_table_name||' as p
-                    using hist.temp_histlog as h
-                    where h.tablename = ''' || p_table_name || '''
-                        and h.unloadisn between ' || v_start_isn::varchar || ' and ' || v_end_isn || '
-                        and h.operation = ''U'' and '||
-                        v_join_condition||' and p.histisn=h.isn';
-        execute 'insert into hist.'||p_table_name||' ('||v_field_list_csv_gp||', histisn)          
-                    select '||v_field_list_csv_gp||', histisn
-                        from replicais.ext_hist_'||p_table_name;
-    end if;               
-     
+        execute 'truncate table replicais_incr.hist_' || p_table_name;
+        execute 'insert into replicais_incr.hist_' || p_table_name ||' (' || v_field_list_csv_gp || ', histisn)
+                    select ' || v_field_list_csv_gp || ', histisn
+                        from replicais.ext_hist_' || p_table_name;              
+
+        execute 'delete from hist.' || p_table_name || ' as p
+                    using (select h.*
+                            from hist.temp_histlog as h
+                                 inner join replicais_incr.hist_' || p_table_name || ' as p
+                                 on ' || v_join_condition || ' and p.histisn = h.histisn
+                            where h.unloadisn between ' || v_start_isn::varchar || ' and ' || v_end_isn::varchar || ') as h
+                    where ' || v_join_condition || ' and p.histisn = h.histisn';              
+        
+        execute 'insert into hist.' || p_table_name || ' (' || v_field_list_csv_gp || ', histisn)
+                    select ' || v_field_list_csv_gp || ', histisn 
+                        from replicais_incr.hist_' || p_table_name;
+    end if;                    
+    
     -- Cleanup replicated chunk of data    
     perform replicais.replication_cleanup(v_start_isn, v_end_isn, array[p_table_name]);
 end;
