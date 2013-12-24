@@ -53,8 +53,10 @@ def convertType(type, precision, scale, length) :
     elif type.startswith("INTERVAL") :
         newtype = "INTERVAL"
 
-    elif type in ("CHAR", "VARCHAR2", "NVARCHAR2", "RAW") :
+    elif type in ("CHAR", "VARCHAR2", "NVARCHAR2") :
         newtype = "VARCHAR(%d)" % length
+    elif type == "RAW" :
+        newtype = "VARCHAR(%d)" % (length * 2)
     elif type in ("CLOB", "LONG", "LONG RAW") :
         newtype = "TEXT"
     elif type == "ROWID" :            
@@ -222,6 +224,7 @@ for fulltablename in options.tables_list :
         
         default_stmt = ""
         if default_value is not None :
+            default_value = default_value.strip()
             if default_value.upper() == "SYSDATE" :
                 default_value = "current_timestamp"
             default_stmt = " DEFAULT " + default_value
@@ -249,10 +252,10 @@ for fulltablename in options.tables_list :
     if len(result) > 0 :
         comments = [dict(zip([y[0] for y in cursor_comments.description], x)) for x in result]
         if comments[0]["TABLE_COMMENT"] is not None :
-            print "COMMENT ON TABLE %s.%s IS '%s';" % (owner, table, comments[0]["TABLE_COMMENT"])
+            print "COMMENT ON TABLE %s.%s IS $COMM$%s$COMM$;" % (owner, table, comments[0]["TABLE_COMMENT"])
         for comment in comments :
             if comment["COLUMN_COMMENT"] is not None :
-                print "COMMENT ON COLUMN %s.%s.%s IS '%s';" % (owner, table, columns_renamed[comment["COLUMN_NAME"].lower()], comment["COLUMN_COMMENT"].replace("'","''"))
+                print "COMMENT ON COLUMN %s.%s.%s IS $COMM$%s$COMM$;" % (owner, table, columns_renamed[comment["COLUMN_NAME"].lower()], comment["COLUMN_COMMENT"])
     print
     print
 
