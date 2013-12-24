@@ -74,7 +74,7 @@ class QAOptions:
         
         (self.schema, self.table) = parser_result.table.split('.')
         self.keys = parser_result.keys or self.keys
-        self.keys_list = self.keys.upper().replace(' ', '').split(',')
+        self.keys_list = sorted(self.keys.upper().replace(' ', '').split(','))
         configpath = parser_result.config or "./compare_tables.conf"
         try:
             configfile = open(configpath, 'rb')
@@ -263,7 +263,7 @@ class QAHelper :
         
 
 
-    def prepareCharExpressions (self, syntax, table_alias = '', exclude_keys = False, column_aliases = False) :
+    def prepareCharExpressions (self, syntax, table_alias = '', take_keys = True, take_nonkeys = True, column_aliases = False, remove_newlines = False) :
         max_length = 100
         fields_to_char = []
         for column in self.orah.columns_dict :
@@ -287,6 +287,8 @@ class QAHelper :
                     field_to_char = "substr(%s,1,%d)" % (name_al, max_length)
                 else:
                     field_to_char = name_al
+                if remove_newlines :
+                    field_to_char = "replace(replace(%s, chr(13), 'r'), chr(10), 'n')" % field_to_char
                 field_to_char = "coalesce(replace(%s, '|', ' '), '')" % field_to_char
             elif type in ('FLOAT') :
                 field_to_char = "coalesce(to_char(%s,'%s.%s'), '')" % (name_al,    "9" * 30,   "0" * 6)
@@ -295,7 +297,7 @@ class QAHelper :
             
             if column_aliases :
                 field_to_char += ' as '+name
-            if not (name in self.options.keys_list and exclude_keys) :
+            if (name in self.options.keys_list and take_keys) or (name not in self.options.keys_list and take_nonkeys):
                 fields_to_char.append(field_to_char)
 
         return fields_to_char
@@ -321,14 +323,15 @@ class QAHelper :
     def downloadHash(self) :
         try :
             self.gph.execute("drop table if exists "+self.gph.hash_tablename+";")
-            self.gph.execute("create table %s as select %s, cast('' as varchar(32)) __h, '' as hsource from %s.%s limit 0 distributed by (%s);" % \
+            self.gph.execute("create table %s as select %s, cast('' as varchar(32)) __h from %s.%s limit 0 distributed by (%s);" % \
                 (self.gph.hash_tablename, self.options.keys, self.gph.schema, self.gph.table, self.options.keys))
         except Exception, e :
             raise Exception("Error while downloading hash: "+str(e))
 
+        keys_stmts = ', '.join(self.prepareCharExpressions('ORA',take_nonkeys=False))
         hash_expr = '||'.join(self.prepareCharExpressions('ORA'))
-        ora_hash_query = "select %s, cast(dbms_obfuscation_toolkit.md5(input=>SYS.utl_raw.cast_to_raw(%s)) as varchar2(32)) h, %s from %s.%s;" % \
-                    (self.options.keys, hash_expr, hash_expr, self.orah.schema, self.orah.table)
+        ora_hash_query = "select %s, cast(dbms_obfuscation_toolkit.md5(input=>SYS.utl_raw.cast_to_raw(convert(%s,'UTF8'))) as varchar2(32)) h from %s.%s;" % \
+                    (keys_stmts, hash_expr, self.orah.schema, self.orah.table)
         gp_copy_statement = "copy %s from stdin with delimiter '|';" % (self.gph.hash_tablename,)
         self.download(ora_hash_query, gp_copy_statement)
 
@@ -390,7 +393,7 @@ class QAHelper :
         # create diff table and get samples from Greenplum
         query =  "drop table if exists %s;" % self.gph.sample_tablename
         keys_stmts = ', '.join(['t.'+x for x in self.options.keys_list])
-        char_stmts = ', '.join(self.prepareCharExpressions('GP',exclude_keys=True, column_aliases = True))
+        char_stmts = ', '.join(self.prepareCharExpressions('GP',take_keys=False, column_aliases = True, remove_newlines = True))
         join_cond = ' and '.join(['t.%s=s.%s' % (x,x) for x in self.options.keys_list])
         query += """create table %s as 
                     select %s, %s, cast('Greenplum' as varchar(10)) as __source
@@ -414,9 +417,10 @@ class QAHelper :
         # start psql-copy process
         psql_process =  Popen(['psql', '-c', copy_stmt ], stdin=PIPE, stdout=PIPE, stderr=PIPE)
         # prepare selects from oracle - parametrized query
-        char_stmts = ', '.join(self.prepareCharExpressions('ORA',exclude_keys=True))
+        keys_stmts = ', '.join(self.prepareCharExpressions('ORA',take_nonkeys=False))
+        char_stmts = ', '.join(self.prepareCharExpressions('ORA',take_keys=False, remove_newlines = True))
         filter_stmt = ' and '.join(["%s=:%d" % (self.options.keys_list[i], i+1) for i in range(len(self.options.keys_list))])
-        querytemplate = "select %s, %s, 'Oracle' as tmp_source from %s.%s where %s" % (self.options.keys, char_stmts, self.orah.schema, self.orah.table, filter_stmt)
+        querytemplate = "select %s, %s, 'Oracle' as tmp_source from %s.%s where %s" % (keys_stmts, char_stmts, self.orah.schema, self.orah.table, filter_stmt)
 
         # get data from oracle and put it into stdin of psql process
         cursor = self.orah.connection.cursor()
@@ -448,25 +452,26 @@ class QAHelper :
             self.checkDDL(self.options.strict)
             timestart = time.time()
             if self.options.reloadhash :
-                print "Downloading hash..."
+                print "Calculating hash in Oracle..."
                 self.downloadHash()
             print "Comparing..."
             self.compare()
             (in_ora_only, in_gp_only, in_both) = self.analyze()
             if in_ora_only+in_gp_only+in_both == 0 :
                 print "Tables are identical."
+                self.gph.execute("drop table %s;" % self.gph.diff_tablename)
             else :
                 samplemsg = ""
                 if self.options.nsamples > 0 :
                     print "Sampling..."
                     self.prepareSample(self.options.nsamples)
                     samplemsg = "Created sample table. Query samples as below:\n" + "select * from %s order by %s,__source" % (self.gph.sample_tablename, self.options.keys)
-                print "------------REPORT---------------"
-                print "Rows exist only in oracle: %d" % in_ora_only
-                print "Rows exist only in greenplum: %d" % in_gp_only
+                print "------------REPORT-----------------"
+                print "Rows exist only in Oracle:      %d" % in_ora_only
+                print "Rows exist only in Greenplum:   %d" % in_gp_only
                 print "Rows with different hash value: %d" % in_both
                 print samplemsg
-            print str(round(time.time()-timestart,1))+" seconds wasted"
+            print "Comparison took " + str(round(time.time()-timestart,1))+" seconds"
             print ""
         except Exception,e :
             logger.error(str(e))
