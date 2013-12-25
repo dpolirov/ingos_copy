@@ -43,7 +43,7 @@ begin
         select nextval('replicais.replication_full_seq') into v_rep_full_seq;
             
         v_job_code := 'select replicais.replicate_full_run('||v_rep_full_seq||');';
-        select dbms_jobs.job_submit(v_job_code,2) into v_job_isn;
+        select dbms_jobs.job_submit(v_job_code,2,2) into v_job_isn;
             
         insert into replicais.replication_tasks_full(replication_task_isn, replication_table, replication_job_isn, replication_status)
             values(v_rep_full_seq, v_table_from_list, v_job_isn, 'RUN');
