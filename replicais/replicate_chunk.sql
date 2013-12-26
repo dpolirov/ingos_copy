@@ -134,9 +134,9 @@ begin
                     using (select h.*
                             from hist.temp_histlog as h
                                  inner join replicais_incr.hist_' || p_table_name || ' as p
-                                 on ' || v_join_condition || ' and p.histisn = h.histisn
+                                 on ' || v_join_condition || ' and p.histisn = h.isn
                             where h.unloadisn between ' || v_start_isn::varchar || ' and ' || v_end_isn::varchar || ') as h
-                    where ' || v_join_condition || ' and p.histisn = h.histisn';              
+                    where ' || v_join_condition || ' and p.histisn = h.isn';              
         
         execute 'insert into hist.' || p_table_name || ' (' || v_field_list_csv_gp || ', histisn)
                     select ' || v_field_list_csv_gp || ', histisn 
