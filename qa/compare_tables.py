@@ -328,9 +328,9 @@ class QAHelper :
         except Exception, e :
             raise Exception("Error while downloading hash: "+str(e))
 
-        keys_stmts = ', '.join(self.prepareCharExpressions('ORA',take_nonkeys=False))
-        hash_expr = '||'.join(self.prepareCharExpressions('ORA'))
-        ora_hash_query = "select %s, cast(dbms_obfuscation_toolkit.md5(input=>SYS.utl_raw.cast_to_raw(convert(%s,'UTF8'))) as varchar2(32)) h from %s.%s;" % \
+        keys_stmts = "||'|'||".join(self.prepareCharExpressions('ORA',take_nonkeys=False))
+        hash_expr = '||'.join(self.prepareCharExpressions('ORA', take_keys=False))
+        ora_hash_query = "select %s||'|'||cast(dbms_obfuscation_toolkit.md5(input=>SYS.utl_raw.cast_to_raw(convert(%s,'UTF8'))) as varchar2(32)) from %s.%s;" % \
                     (keys_stmts, hash_expr, self.orah.schema, self.orah.table)
         gp_copy_statement = "copy %s from stdin with delimiter '|';" % (self.gph.hash_tablename,)
         self.download(ora_hash_query, gp_copy_statement)
@@ -339,7 +339,7 @@ class QAHelper :
     def compare(self) :
         keys_coalesce_list = ', '.join(['coalesce(g.%s, o.%s) as %s' % (x,x,x) for x in self.options.keys_list])
         join_cond = ' and '.join(['g.%s=o.%s' % (x,x) for x in self.options.keys_list])
-        hash_expr = '||'.join(self.prepareCharExpressions('GP', 'g.'))
+        hash_expr = '||'.join(self.prepareCharExpressions('GP', 'g.', take_keys=False))
         try:
             self.gph.execute("drop table if exists %s;" % self.gph.diff_tablename)
             compare_stmt = """
