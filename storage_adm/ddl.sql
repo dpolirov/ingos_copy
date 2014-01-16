@@ -2,13 +2,13 @@ CREATE SEQUENCE storage_adm.histlog_chunks_seq;
 
 CREATE SEQUENCE storage_adm.repload_seq;
 
-
 CREATE SEQUENCE storage_adm.ss_seq;
 
 CREATE TABLE storage_adm.mx_histlog_etl(
    LOCKED smallint
 ) DISTRIBUTED BY (LOCKED);
 
+--created
 CREATE TABLE storage_adm.histlog_chunks (
     etl_iteration_isn                INTEGER,
     max_completed_dttm               TIMESTAMP,
@@ -16,6 +16,7 @@ CREATE TABLE storage_adm.histlog_chunks (
 )
 distributed by (max_completed_dttm);
 
+--migrated
 CREATE TABLE storage_adm.repload (
     isn                              NUMERIC,
     datebeg                          TIMESTAMP,
@@ -34,57 +35,64 @@ CREATE TABLE storage_adm.repload (
     procisn                          NUMERIC,
     daterep                          TIMESTAMP,
 )
-;
---WARNING: No primary key defined for storage_adm.repload
-
-COMMENT ON COLUMN storage_adm.repload.isn IS $COMM$Системный идентификатор$COMM$;
-COMMENT ON COLUMN storage_adm.repload.datebeg IS $COMM$Дата начала загрузки$COMM$;
-COMMENT ON COLUMN storage_adm.repload.dateend IS $COMM$Дата окончания$COMM$;
-COMMENT ON COLUMN storage_adm.repload.buhdate IS $COMM$Отчетная дата$COMM$;
-COMMENT ON COLUMN storage_adm.repload.updatedby IS $COMM$Автор изменения$COMM$;
-COMMENT ON COLUMN storage_adm.repload.updated IS $COMM$Дата изменения$COMM$;
-COMMENT ON COLUMN storage_adm.repload.description IS $COMM$Описание$COMM$;
-COMMENT ON COLUMN storage_adm.repload.lastisnloaded IS $COMM$НЕ ISN!!!! Просто номер "шага" для составных задач$COMM$;
-COMMENT ON COLUMN storage_adm.repload.procisn IS $COMM$FK SA_PROCESS.ISN Процесс экземпляром которого является данная загрузка$COMM$;
-
-
-
-/*********** Errors and warnings **********
-WARNING: No primary key defined for storage_adm.repload
-*******************************************/
-
-
-CREATE TABLE storage_adm.ss_buf_log (
-    isn                              integer,
-    loadisn                          integer,
-    recisn                           integer,
-    procisn                          integer
-)
 distributed by (isn);
---WARNING: No primary key defined for storage_adm.ss_buf_log
 
-COMMENT ON TABLE storage_adm.ss_buf_log IS $COMM$Буффер для отсадки записей из логов для схемы REPAGR. $COMM$;
+COMMENT ON COLUMN storage_adm.repload.isn IS 'Системный идентификатор';
+COMMENT ON COLUMN storage_adm.repload.datebeg IS 'Дата начала загрузки';
+COMMENT ON COLUMN storage_adm.repload.dateend IS 'Дата окончания';
+COMMENT ON COLUMN storage_adm.repload.buhdate IS 'Отчетная дата';
+COMMENT ON COLUMN storage_adm.repload.updatedby IS 'Автор изменения';
+COMMENT ON COLUMN storage_adm.repload.updated IS 'Дата изменения';
+COMMENT ON COLUMN storage_adm.repload.description IS 'Описание';
+COMMENT ON COLUMN storage_adm.repload.lastisnloaded IS 'НЕ ISN!!!! Просто номер "шага" для составных задач';
+COMMENT ON COLUMN storage_adm.repload.procisn IS 'FK SA_PROCESS.ISN Процесс экземпляром которого является данная загрузка';
 
+--created
+CREATE TABLE storage_adm.tt_histlog (
+    isn                              NUMERIC,
+    table_name                       VARCHAR(150),
+    recisn                           NUMERIC
+)
+distributed by (recisn);
 
+--created
+CREATE TABLE storage_adm.tt_input (
+    findisn                          NUMERIC,
+    table_name                       VARCHAR(150),
+    recisn                           NUMERIC
+)
+distributed by (table_name, findisn);
+
+--migrated
 CREATE TABLE storage_adm.ss_histlog (
-    isn                              integer,
-    findisn                          integer,
+    isn                              NUMERIC,
+    findisn                          NUMERIC,
     procisn                          integer,
     indate                           TIMESTAMP DEFAULT current_timestamp,
     table_name                       VARCHAR(150),
-    loadisn                          integer DEFAULT NULL,
-    recisn                           integer
+    loadisn                          NUMERIC DEFAULT NULL,
+    recisn                           NUMERIC
 )
 distributed by (isn);
 --WARNING: No primary key defined for storage_adm.ss_histlog
 
-COMMENT ON TABLE storage_adm.ss_histlog IS $COMM$сюда отсаживаются логи по схемам загрузки для дальнейшей обработки. пишет сюда джоб, пакет забора -  SS_GET_LOG.LOAD_HISTLOG_PROCESS_BUFFER$COMM$;
-COMMENT ON COLUMN storage_adm.ss_histlog.findisn IS $COMM$ISN, уже преобразованный$COMM$;
-COMMENT ON COLUMN storage_adm.ss_histlog.procisn IS $COMM$ISN процесса, к которому относится$COMM$;
-COMMENT ON COLUMN storage_adm.ss_histlog.indate IS $COMM$дата фактич попадания записи в лог$COMM$;
-COMMENT ON COLUMN storage_adm.ss_histlog.table_name IS $COMM$таблица, обработанные ISN-ны которой лежат в FINDISN$COMM$;
-COMMENT ON COLUMN storage_adm.ss_histlog.loadisn IS $COMM$загрузка, которая забрала данные$COMM$;
-COMMENT ON COLUMN storage_adm.ss_histlog.recisn IS $COMM$Isn исходной таблицы, преобразованный в FindIsn$COMM$;
+COMMENT ON TABLE storage_adm.ss_histlog IS 'сюда отсаживаются логи по схемам загрузки для дальнейшей обработки. пишет сюда джоб, пакет забора -  SS_GET_LOG.LOAD_HISTLOG_PROCESS_BUFFER';
+COMMENT ON COLUMN storage_adm.ss_histlog.findisn IS 'ISN, уже преобразованный';
+COMMENT ON COLUMN storage_adm.ss_histlog.procisn IS 'ISN процесса, к которому относится';
+COMMENT ON COLUMN storage_adm.ss_histlog.indate IS 'дата фактич попадания записи в лог';
+COMMENT ON COLUMN storage_adm.ss_histlog.table_name IS 'таблица, обработанные ISN-ны которой лежат в FINDISN';
+COMMENT ON COLUMN storage_adm.ss_histlog.loadisn IS 'загрузка, которая забрала данные';
+COMMENT ON COLUMN storage_adm.ss_histlog.recisn IS 'Isn исходной таблицы, преобразованный в FindIsn';
+
+--migrated
+CREATE TABLE storage_adm.ss_buf_log (
+    isn                              NUMERIC,
+    loadisn                          NUMERIC,
+    recisn                           NUMERIC,
+    procisn                          integer
+)
+distributed by (isn);
+COMMENT ON TABLE storage_adm.ss_buf_log IS $COMM$Буффер для отсадки записей из логов для схемы REPAGR. $COMM$;
 
 
 CREATE TABLE storage_adm.ss_process_dest_tables (
@@ -92,7 +100,7 @@ CREATE TABLE storage_adm.ss_process_dest_tables (
     table_name                       VARCHAR(150),
     view_name                        VARCHAR(150),
     tt_table_name                    VARCHAR(150),
-    keyfield                         VARCHAR(150),
+    keyfield                         VARCHAR(250),
     hist_keyfield                    VARCHAR(150),
     priority                         integer,
     dest_table_index                 VARCHAR(150),
@@ -159,6 +167,17 @@ COMMENT ON COLUMN storage_adm.ss_processes.blockcnt IS $COMM$Размер бло
 COMMENT ON COLUMN storage_adm.ss_processes.wormactive IS $COMM$Признак обработки процесса "червяком"$COMM$;
 
 
+create view storage_adm.v_active_process_source_tables as
+select st.*
+    from storage_adm.ss_process_source_tables st
+    inner join storage_adm.ss_processes p
+        on p.isn=st.procisn
+    where p.active = 'Y';
+
+    
+---------------------------------------------
+-- TT temporary tables with  portion of data updating target tables
+---------------------------------------------
 CREATE TABLE storage_adm.tt_repagr_economic (
     agrisn                           NUMERIC,
     id                               VARCHAR(20),
