@@ -1,1706 +1,2243 @@
-  CREATE OR REPLACE FORCE VIEW "STORAGES"."V_BUH_LINECODE" ("BODYISN", "STATCODE", "LINECODE") AS 
-  with Prm as (
--- sts 25.07.2012 - загрузка данных для RepBuh2Obj
--- part - расшифровка 48 статкодов
-  select
-    max(pParam.GetParamD('pDB')) as DB,
-    max(pParam.GetParamD('pDE')) as DE
-  from dual
-)
+п»ї
+  CREATE OR REPLACE FUNCTION "STORAGES"."GCC2P" (pAmount in number,pCurIn in number, pCurOut in number, pDate in date) return number PARALLEL_ENABLE
 
-select
+ is
+  r number;
+begin
+ R:=gcc2.gcc2(pAmount,pCurIn , pCurOut, pDate);
+ return r;
+end;
 
-  B.BodyISN,
-  B.STATCODE,
-  Max(nvl(RS.STATCODE, B.STATCODE)) keep (dense_rank first  order by  Rs.ANALITIKISN nulls last) as LINECODE
-from 
- (select --+ parallel(RB 28) ordered use_nl(Prm RB)
-  distinct
-    RB.BodyISN,          
-    RB.SubAccISN,
-    RB.CorSubAccISN,
-    RB.STATCODE
-  from  
-    Prm,
-    repbuhbody RB
-  where  
-    RB.DateVal >= Prm.DB and RB.DateVal < Prm.DE
-    and RB.Sagroup in (1, 3, 5)
-    and RB.StatCode = 48
-  UNION 
-  select --+ parallel(RB 28) ordered use_nl(Prm RB)
-  distinct
-    RB.BodyISN,          
-    RB.SubAccISN,
-    RB.CorSubAccISN,
-    RB.STATCODE
-  from  
-    Prm,
-    STORAGE_SOURCE.RepBuhQuit RB
-  where  
-    RB.BuhQuitDate >= Prm.DB and RB.BuhQuitDate < Prm.DE
-    and RB.Sagroup in (1, 3, 5)
-    and RB.StatCode = 48
- ) B,
-   REP_BUDGET_STATCODE RS
-where
-  B.SubAccISN = RS.SUBACCISN(+)
-  and nvl(RS.CORSUBACCISN(+), B.CorSubAccISN) = B.CorSubAccISN
-  AND CASE
-        WHEN RS.ANALITIKISN(+) IS NULL THEN 1
-        ELSE
-          CASE RS.ANALITIKISN(+)
-            WHEN (SELECT KS.CLASSISN
-                  FROM AIS.BUHBODY_T BB,
-                       AIS.KINDACCSET KS
-                  WHERE BB.ISN        = B.BODYISN
-                    AND KS.KINDACCISN = BB.SUBKINDISN
-                    AND KS.CLASSISN   = RS.ANALITIKISN
-                 ) THEN 1
-          END
-      END = 1
-group by B.BodyISN,
-  B.STATCODE;
+  CREATE OR REPLACE FUNCTION "STORAGES"."GETAGRREINFO" (AISN NUMBER, RESISN NUMBER:=NULL,
+          oisn number:=0, risn number:=0) return varchar2 PARALLEL_ENABLE is
+s varchar2(4000);
+p number;
+pr number;
+isum number;
+pq number;
+xper number;
+begin
 
-  CREATE OR REPLACE FORCE VIEW "STORAGES"."V_MV_REPBUH2OBJ_SMALL" ("DB", "DE", "AGRISN", "REFUNDISN", "REAGRISN", "STATCODE", "SAGROUP", "LINECODE", "DEPTISN", "BUHSUBJISN", "RPTCLASS", "RPTGROUPISN", "MOTIVGROUPISN", "CARRPTCLASS", "NAMOUNTRUB", "NAMOUNTUSD", "QAMOUNTRUB", "QAMOUNTUSD", "DATEVAL", "DATEQUIT", "IS_NACH", "IS_QUIT", "SALERGOISN", "SALERGODEPT", "SALERCRGOISN", "SALERCRGODEPT", "SALERFISN", "SALERFDEPT", "FIRST_DATEPAY", "LAST_DATEPAY", "DATEPAYLAST", "OBJISN", "OBJCLASSISN") AS 
-  select /*+ ordered use_nl( ags B RA AD) Index(ags) */
-/*$
-sts 15.02.2013 - загрузка данных для материализованного представления MV_REPBUH2OBJ_SMALL
-$*/
-  b.db,
-  b.de, 
-  b.agrisn, 
-  b.refundisn, 
-  b.reagrisn, 
-  b.statcode,
-  b.sagroup, 
-  b.linecode, 
-  b.deptisn, 
-  b.buhsubjisn, 
-  b.rptclass,
-  b.rptgroupisn, 
-  b.motivgroupisn, 
-  b.carrptclass,
-  sum(b.namountrub) as namountrub,
-  sum(b.namountusd) as namountusd,
-  sum(b.qamountrub) as qamountrub, 
-  sum(b.qamountusd) as qamountusd, 
-  min(b.dateval) as dateval, 
-  min(b.datequit) as datequit,
-  b.is_nach, 
-  b.is_quit, 
-  b.salergoisn, 
-  b.salergodept,
-  b.salercrgoisn, 
-  b.salercrgodept, 
-  b.salerfisn, 
-  b.salerfdept,
-  min(b.first_datepay) as first_datepay, 
-  max(b.last_datepay) as last_datepay,
-  max(b.datepaylast) as datepaylast,
-  b.objisn,
-  b.objclassisn
-from storages.repbuh2obj b
-/*$
-   sts - т.к. текст этой вьюхи используется в пакете REP_MOTIVATION как текст мат. представления,
-   то тут в комментариях прописан текст, который будет заменятся на даты.
-$*/
- /*$MAT_VIEW_DATE_SECTION$*/
-group by
-  b.db, 
-  b.de, 
-  b.agrisn, 
-  b.refundisn, 
-  b.reagrisn, 
-  b.statcode,
-  b.sagroup, 
-  b.linecode, 
-  b.deptisn, 
-  b.buhsubjisn, 
-  b.rptclass,
-  b.rptgroupisn, 
-  b.motivgroupisn, 
-  b.carrptclass,
-  b.is_nach, 
-  b.is_quit, 
-  b.salergoisn, 
-  b.salergodept,
-  b.salercrgoisn, 
-  b.salercrgodept, 
-  b.salerfisn, 
-  b.salerfdept,
-  b.objisn,
-  b.objclassisn;
+s:=null; xper:=0;
+for r in (select --+ use_nl(a x s)
+              a.isn aisn, x.isn xisn,a.datebeg, a.ruleisn,
+              getcrosscover(insuredsum,a.currisn,53,a.datebeg) insuredsum,
+              getcrosscover(limitsum,a.currisn,53,a.datebeg) limitsum,
+              x.sectisn,x.xpc,nvl(reinspc,0) reinspc,nvl(sharepc,100) sharepc,s.secttype,s.currisn,
+              s.limiteverymode,s.optionalcode,x.ISCALC,x.LIMITUSD
+         from STORAGES.REP_AGRX x,agreement a, resection s
+         where  x.objisn=oisn and x.riskisn=risn and x.agrisn=aisn
+               and    a.isn=x.agrisn and x.sectisn=s.isn
 
-  CREATE OR REPLACE FORCE VIEW "STORAGES"."V_REPBUH2OBJ_FINAL_PART" ("DB", "DE", "AGRISN", "REFUNDISN", "REAGRISN", "STATCODE", "SAGROUP", "LINECODE", "DEPTISN", "SUBACCISN", "BUHSUBJISN", "RULEISN", "OBJISN", "OBJCLASSISN", "RPTCLASS", "RPTGROUPISN", "MOTIVGROUPISN", "CARRPTCLASS", "NAMOUNTRUB", "NAMOUNTUSD", "QAMOUNTRUB", "QAMOUNTUSD", "DATEVAL", "DATEQUIT", "ADDISN", "IS_NACH", "IS_QUIT", "AGRDATEBEG", "AGRDATEEND", "AGRDATESIGN", "AGRRULEISN", "AGRID", "ADDDATEBEG", "ADDDATEEND", "ADDDATESIGN", "ADDRULEISN", "ADDID", "EXCLUDE_MEDIC", "SALERGOISN", "SALERGODEPT", "SALERCRGOISN", "SALERCRGODEPT", "SALERFISN", "SALERFDEPT", "FIRST_DATEPAY", "LAST_DATEPAY", "DATEPAYLAST") AS 
-  select --+ ordered use_nl( ags B RA AD agr) Index(ags X_REP_AGR_SALERS_LINE_AGR_DB)
--- sts 25.07.2012 - загрузка данных для RepBuh2Obj
--- part - "схлопываем" строки начислений и квитовок
--- kgs 28.08.2012 - добавил определения продавцов (строчки из rep_agr_salers_Line)
--- kgs 26.03.2013 - если продавца нет в rep_agr_salers_Line - берем последнего из repagroleagr - для исходящих проводок которые делают хер знает когда
-  B.DB,
-  B.DE,
-  B.agrisn,
-  B.refundisn,
-  B.ReAgrisn,
-  B.statcode,
-  B.sagroup,
-  nvl(B.LineCode, B.statcode) as LineCode,
-  B.deptisn,
-  B.subaccisn,
-  B.BuhSubjIsn,
-  B.ruleisn,
-  B.ObjIsn,
-  B.objclassisn,
-  B.rptclass,
-  B.rptgroupisn,
-  B.motivgroupisn,
-  B.carrptclass,
-  B.NAmountrub,
-  B.NAmountusd,
-  B.qamountrub,
-  B.qamountusd,
-  B.dateval,
-  B.datequit,
-  B.addisn,
-  B.IS_NACH,       -- признак наличия начислений
-  B.IS_QUIT,       -- признак наличия квитовок
-  /* убрано для скорости
-  -- некоторые атрибуты договора
-  RA.DATEBEG as AGRDATEBEG,
-  RA.DATEEND as AGRDATEEND,
-  RA.DATESIGN as AGRDATESIGN,
-  RA.RULEISN as AGRRULEISN,
-  RA.ID as AGRID,
-  -- некоторые атрибуты адендума
-  AD.DATEBEG as ADDDATEBEG,
-  AD.DATEEND as ADDDATEEND,
-  AD.DATESIGN as ADDDATESIGN,
-  AD.RULEISN as ADDRULEISN,
-  AD.ID as ADDID,
-  */
-  -- некоторые атрибуты договора
-  to_date(null) as AGRDATEBEG,
-  to_date(null) as AGRDATEEND,
-  to_date(null) as AGRDATESIGN,
-  to_number(null) as AGRRULEISN,
-  cast(null as varchar2(20)) as AGRID,
-  -- некоторые атрибуты адендума
-  to_date(null) as ADDDATEBEG,
-  to_date(null) as ADDDATEEND,
-  to_date(null) as ADDDATESIGN,
-  to_number(null) as ADDRULEISN,
-  cast(null as varchar2(20)) as ADDID,
+                        order by nvl(to_char(s.orderno),s.secttype||s.id)) loop
+ if s is null then
+  s:=Substr('Share:'||r.sharepc||' F:'||r.reinspc,1,255);
+  p:=r.reinspc; xper:=p;
+  if oisn>0 or risn>0 then
 
-  B.Exclude_Medic, -- признак исключения строк из мотивационного отчета (Y - исключить/N - оставить)
-  
-  Nvl(AGS.SALERGOISN,Agr.SALERGOISN) SALERGOISN,
-  Nvl(AGS.SALERGODEPT,AGR.SALERGODEPTISN) SALERGODEPT,
-  
-  Nvl(AGS.SALERCRGOISN,AGR.crossalerisn) SALERCRGOISN,
-  Nvl(AGS.SALERCRGODEPT,AGR.crossalerdeptisn) SALERCRGODEPT,
-  
-  Nvl(AGS.SALERFISN,AGR.SALERFISN) SALERFISN,
-  Nvl(AGS.SALERFDEPT,AGR.SALERFDEPTISN) SALERFDEPT,
-  
-  B.first_datepay,
-  B.last_datepay,
-  B.datepaylast
-
-from
- (select
-    b.DB,
-    b.DE,
-    b.agrisn,
-    b.refundisn,
-    b.ReAgrisn,
-    b.statcode,
-    b.sagroup,
-    b.LineCode,
-    b.deptisn,
-    b.subaccisn,
-    b.BuhSubjIsn,
-    b.ruleisn,
-    b.ObjIsn,
-    b.objclassisn,
-    b.rptclass,
-    b.rptgroupisn,
-    b.motivgroupisn,
-    b.carrptclass,
-    sum(b.NAmountrub) as NAmountRUB,
-    sum(b.NAmountusd) as NAmountUSD,
-    sum(b.qamountrub) as QAmountRUB,
-    sum(b.qamountusd) as QAmountUSD,
-    b.dateval,
-    b.datequit,
-    b.addisn,
-    max(b.IS_NACH) as IS_NACH,       -- признак наличия начислений
-    max(b.IS_QUIT) as IS_QUIT,       -- признак наличия квитовок
-    b.Exclude_Medic,
-    min(b.first_datepay) as first_datepay,
-    max(b.last_datepay) as last_datepay,
-    max(b.datepaylast) as datepaylast
-
-  from tt_repbuh2obj b
-  group by
-    b.DB,
-    b.DE,
-    b.agrisn,
-    b.refundisn,
-    b.ReAgrisn,
-    b.statcode,
-    b.sagroup,
-    b.LineCode,
-    b.deptisn,
-    b.subaccisn,
-    b.BuhSubjIsn,
-    b.ruleisn,
-    b.ObjIsn,
-    b.objclassisn,
-    b.rptclass,
-    b.rptgroupisn,
-    b.motivgroupisn,
-    b.carrptclass,
-    b.dateval,
-    b.datequit,
-    b.addisn,
-    b.Exclude_Medic
- ) B,Storages.rep_agr_salers_Line ags, repagrroleagr agr
- 
- Where B.agrisn=Ags.agrisn(+)
- and Nvl(B.datequit,B.Dateval) between ags.datebeg(+)  and Ags.Dateend(+)
- and b.agrisn=agr.agrisn(+)
- /* убрано для скорости
-   REPAGR RA,
-   AGREEMENT AD
-where
-  B.AGRISN = RA.AGRISN
-  and B.ADDISN = AD.ISN(+)
-*/;
-
-  CREATE OR REPLACE FORCE VIEW "STORAGES"."V_REPBUH2OBJ_NACH_DIRECT" ("DB", "DE", "AGRISN", "REFUNDISN", "REAGRISN", "STATCODE", "SAGROUP", "LINECODE", "DEPTISN", "SUBACCISN", "BUHSUBJISN", "RULEISN", "OBJISN", "OBJCLASSISN", "RPTCLASS", "RPTGROUPISN", "MOTIVGROUPISN", "CARRPTCLASS", "NAMOUNTRUB", "NAMOUNTUSD", "QAMOUNTRUB", "QAMOUNTUSD", "DATEVAL", "DATEQUIT", "ADDISN", "IS_NACH", "IS_QUIT", "EXCLUDE_MEDIC", "FIRST_DATEPAY", "LAST_DATEPAY", "DATEPAYLAST") AS 
-  with Prm as (
--- sts 25.07.2012 - загрузка данных для RepBuh2Obj
--- part - данные по прямым начислениям
-  select
-    max(pParam.GetParamD('pDB')) as DB,
-    max(pParam.GetParamD('pDE')) as DE
-  from dual
-)
-
-Select
-   A.DB,
-   A.DE - 1 as DE,
-   a.agrisn,
-   a.refundisn,
-   0 ReAgrisn,
-
-   statcode,
-   sagroup,
-   LineCode,
-
-   deptisn,
-   subaccisn,
-   buhsubjisn,
-
-   ruleisn,
-   objisn,
-   objclassisn,
-   rptclass,
-   rptgroupisn,
-
-   motivgroupisn,
-   Carrptclass,
-
-   amountrub as NAmountrub,
-   amountusd as NAmountusd,
-   0 as qamountrub,
-   0 as qamountusd,
-
-   a.dateval,
-   a.datequit,
-   a.addisn,
-
-   'Y' as IS_NACH,       -- признак наличия начислений
-   cast(null as char(1)) as IS_QUIT,  -- признак наличия квитовок
-   A.Exclude_Medic,  -- признак исключения строк из мотивационного отчета
-   a.first_datepay,
-   a.last_datepay,
-   a.datepaylast
-
-from (
-  select --+ ordered use_nl(Prm a) use_hash(ST CarRules DKBRules LC EXCL_BS) parallel(a 28)
-    Prm.DB,
-    Prm.DE as DE,
-    a.agrisn,
-    a.refundisn,
-    a.statcode,
-    LC.LINECODE, -- расшифровка 48 статкода по начислениям нужна для отчета "Бюджет по договорам"
-    a.deptisn,
-    a.subaccisn,
-    Nvl(a.bodysubjisn, a.subjisn) as BuhSubjIsn,
-    a.ruleisn,
-    Case When CarRules.Isn is not null or DKBRules.Isn is not null Then Nvl(ParentObjIsn,a.objisn) end ObjIsn,
-    Case When CarRules.Isn is not null or DKBRules.Isn is not null Then Nvl(a.parentobjclassisn, a.objclassisn) end objclassisn,
-    a.rptclass,
-    a.rptgroupisn,
-    Sum(a.amountrub) as amountrub,
-    Sum(a.amountusd) as amountusd,
-    a.sagroup,
-    a.motivgroupisn,
-    CarRules.Isn as CarRulesIsn,
-    a.Carrptclass,
-    trunc(a.dateval) as dateval,
-    trunc(a.datequit) as datequit,
-    to_number(Case When CarRules.Isn is not null then a.addisn else a.agrisn end) as addisn,
-    case
-      when a.deptisn = 23735116 and EXCL_BS.SubAccISN is not null then 'Y'
-      else 'N'
-    end as Exclude_Medic, -- признак исключения строк из мотивационного отчета
-    min(a.DatePay) as first_datepay,
-    max(a.DatePay) as last_datepay,
-    max(a.datepaylast) as datepaylast
-  from
-     Prm,
-     RepBuh2Cond a,
-    (select statcode from rep_statcode Where grp <> 'Исходящее перестрахование') ST,
-    --(select r.* from  motor.v_dicti_rule r Where isn <> 753518300) CarRules,
-    motor.v_dicti_rule CarRules,
-    (-- Продукты ДКБ
-     select
-       ISN,PARENTISN,CODE,SHORTNAME,FULLNAME,CONSTNAME,ACTIVE
-     from dicti
-     start with parentisn = 24890816 and Filterisn = 2553627303
-     connect by prior isn=parentisn
-    ) DKBRules,
-    TT_BUH_LINECODE LC,
-   (select Isn as SubAccISN, 220 as statcode from buhsubacc where Id Like '60%' -- исключаем Расчеты с поставщиками и подрядчиками
-    UNION ALL
-    select SubAccISN, 60 as statcode from subacc4dept sb where sb.statcode = 220  -- по мед убыткам исключаем корреспонденцию с авансами
-   ) EXCL_BS -- счета и статкоды для определения признака исключения проводок из мотивационного отчета
-
-  where
-    a.DateVal >= Prm.DB and a.DateVal < Prm.DE
-    and a.Sagroup in (1, 3, 5)
-    and a.statcode = ST.statcode
-    --and a.statcode in (select statcode from rep_statcode Where grp <> 'Исходящее перестрахование')
-    and a.ruleisnagr = CarRules.Isn(+)
-    and a.ruleisnagr = DKBRules.Isn(+)
-    and a.BodyISN = LC.BodyISN(+)
-    and a.StatCode = LC.StatCode(+)
-    and a.corsubaccisn = EXCL_BS.SubAccISN(+)
-    and a.Statcode = EXCL_BS.Statcode(+)
-  group by
-    Prm.DB,
-    Prm.DE,
-    a.agrisn,
-    a.refundisn,
-    a.statcode,
-    LC.LineCode,
-    a.deptisn,
-    a.subaccisn,
-    Nvl(a.bodysubjisn,a.subjisn),
-    a.ruleisn,
-    Case When CarRules.Isn is not null or DKBRules.Isn is not null Then Nvl(a.ParentObjIsn, a.objisn) end,
-    Case When CarRules.Isn is not null or DKBRules.Isn is not null Then Nvl(a.Parentobjclassisn, a.objclassisn) end,
-    a.rptclass,
-    a.rptgroupisn,
-    a.sagroup,
-    a.motivgroupisn,
-    A.RULEISN,
-    CarRules.Isn,
-    a.Carrptclass,
-    trunc(a.dateval),
-    trunc(a.datequit),
-    to_number(Case When CarRules.Isn is not null then a.addisn else a.agrisn end),
-    case
-      when a.deptisn = 23735116 and EXCL_BS.SubAccISN is not null then 'Y'
-      else 'N'
-    end
-
-) A;
-
-  CREATE OR REPLACE FORCE VIEW "STORAGES"."V_REPBUH2OBJ_NACH_RE" ("DB", "DE", "AGRISN", "REFUNDISN", "REAGRISN", "STATCODE", "SAGROUP", "LINECODE", "DEPTISN", "SUBACCISN", "BUHSUBJISN", "RULEISN", "OBJISN", "OBJCLASSISN", "RPTCLASS", "RPTGROUPISN", "MOTIVGROUPISN", "CARRPTCLASS", "NAMOUNTRUB", "NAMOUNTUSD", "QAMOUNTRUB", "QAMOUNTUSD", "DATEVAL", "DATEQUIT", "ADDISN", "IS_NACH", "IS_QUIT", "EXCLUDE_MEDIC", "FIRST_DATEPAY", "LAST_DATEPAY", "DATEPAYLAST") AS 
-  with Prm as (
--- sts 25.07.2012 - загрузка данных для RepBuh2Obj
--- part - данные по исходящим начислениям
-  select
-    max(pParam.GetParamD('pDB')) as DB,
-    max(pParam.GetParamD('pDE')) as DE
-  from dual  
-)
-
-select  --+ Parallel(a 28)
-  Prm.DB,
-  Prm.DE - 1 as DE,
-  a.agrisn,
-  0 as refundisn,
-  ReIsn as ReAgrisn,
-
-  a.statcode,
-  a.sagroup,
-  a.statcode as LineCode,
-  a.deptisn,
-  a.subaccisn,
-  0 as buhsubjisn,
-
-  0 as ruleisn,
-  0 as objisn,
-  0 as objclassisn,
-  a.rptclass,
-  a.rptgroupisn,
-
-  a.motivgroupisn,
-  null as carrptclass,
-  a.amountrub NAmountrub,
-  a.amountusd  NAmountusd,
-  0 as qamountrub,
-  0 as qamountusd,
-  
-  trunc(a.dateval) as dateval,
-  trunc(a.dateval) as datequit,
-  a.agrisn as addisn,
-  
-  'Y' as IS_NACH,       -- признак наличия начислений
-  cast(null as char(1)) as IS_QUIT,  -- признак наличия квитовок
-  'N' as Exclude_Medic, -- признак исключения строк из мотивационного отчета (для данного случая всегда N)
-  
-  to_date(null) as first_datepay,
-  to_date(null) as last_datepay,
-  to_date(null) as datepaylast
-
-from
-  Prm,
-  repbuhre2directanalytics a,
- (select statcode from rep_statcode Where grp = 'Исходящее перестрахование') ST
-where
-  a.DateVal >= Prm.DB and a.DateVal < Prm.DE
-  and a.Sagroup in (1, 3, 5)
-  and a.statcode  = ST.statcode
-  --and a.statcode in (select statcode from rep_statcode Where grp = 'Исходящее перестрахование');
-
-  CREATE OR REPLACE FORCE VIEW "STORAGES"."V_REPBUH2OBJ_QUITPC_KASSA" ("BODYISN", "DATEVAL", "QUITPC", "LINECODE", "STATCODE", "DATEQUIT", "EXCLUDE_MEDIC") AS 
-  (-- sts 25.07.2012 - загрузка данных для RepBuh2Obj
--- part - проводки, сквитованные или начисленные в периоде (для кассовых операций), с коэффициентом квитовки
--- Версия из мотивации:
--- в отчете по мотивации для статкодов 220, 60, 221 учитывается курсовая разница, а тут - нет
--- Из за этого расходятся суммы для: BodyISN = 15484201903, StatCode = 221, DB = '01-jan-2011'
-select
-  b.bodyisn,
-  b.Dateval,
-  decode(
-    b.max_BuhAmountRub,
-    0, 0,
-    b.row_BuhAmountRub / b.max_BuhAmountRub
-  ) as QuitPC,
-  b.LineCode,
-  b.Statcode,
-  b.DateVal as DateQuit,  --< для кассового метода
-  b.Exclude_Medic -- признак исключения строк из мотивационного отчета
-from (
-  select --+ ordered use_nl(t b) use_hash(EXCL_BS) Full(t) Parallel(t,32)
-    b.bodyisn,
-    b.Dateval,
-    b.BuhQuitDate as DateQuit,  -- агрегировать нельзя, иначе некорректно расчитывается QuitPC в разрезе DateQuit
-    case
-      when b.deptisn = 23735116 and EXCL_BS.SubAccISN is not null then 'Y'
-      else 'N'
-    end as Exclude_Medic,
-    sum((b.BuhAmountRub * b.BuhPC * b.QuitPC * b.BuhQuitPC) + b.RepCursDiff) as row_BuhAmountRub,
-    max(b.BuhAmountRub) as max_BuhAmountRub,
-    max(b.StatCode) as LineCode,
-    max(b.Statcode) as Statcode
-  from
-    tt_rowid t,
-    STORAGE_SOURCE.RepBuhQuit b,
-   (select Isn as SubAccISN, 220 as statcode from buhsubacc where Id Like '60%' -- исключаем Расчеты с поставщиками и подрядчиками
-    UNION ALL
-    select SubAccISN, 60 as statcode from subacc4dept sb where sb.statcode = 220  -- по мед убыткам исключаем корреспонденцию с авансами
-   ) EXCL_BS -- счета и статкоды для определения признака исключения проводок из мотивационного отчета
-  where
-    t.ISN = b.bodyisn
-    and b.corsubaccisn = EXCL_BS.SubAccISN(+)
-    and b.Statcode = EXCL_BS.Statcode(+)
-    /* данное условие нужно только в мотивационном отчете. В витрине же должны быть все данные.
-    Поэтому вынесено отдельным признаком выше
-
-    and (
-      not (b.deptisn = 23735116 and b.Statcode = 220) or
-        b.corsubaccisn not in (select Isn from buhsubacc where Id Like '60%') -- исключаем Расчеты с поставщиками и подрядчиками
-    )
-    -- по мед убыткам исключаем корреспонденцию с авансами
-    and (
-      not (deptisn = 23735116 and Statcode = 60) or
-        b.corsubaccisn not in (select subaccisn from subacc4dept sb where sb.statcode = 220)
-    )
-    */
-  group by
-    b.bodyisn,
-    b.Dateval,
-    b.BuhQuitDate,
-    case
-      when b.deptisn = 23735116 and EXCL_BS.SubAccISN is not null then 'Y'
-      else 'N'
-    end
-) b
-);
-
-  CREATE OR REPLACE FORCE VIEW "STORAGES"."V_REPBUH2OBJ_QUITPC_NORMAL" ("BODYISN", "DATEVAL", "QUITPC", "LINECODE", "STATCODE", "DATEQUIT", "EXCLUDE_MEDIC") AS 
-  with Prm as (
--- sts 25.07.2012 - загрузка данных для RepBuh2Obj
--- part - проводки, сквитованные или начисленные в периоде (для кассовых операций), с коэффициентом квитовки
-  select
-    max(pParam.GetParamD('pDB')) as DB,
-    max(pParam.GetParamD('pDE')) as DE
-  from dual  
-)
-
-select
-  b.bodyisn,
-  b.Dateval,
-  decode(
-    b.max_BuhAmountRub,
-    0, 0,
-    b.row_BuhAmountRub / b.max_BuhAmountRub
-  ) as QuitPC,
-  b.LineCode, 
-  b.Statcode,
-  b.DateQuit,
-  'N' as Exclude_Medic -- признак исключения строк из мотивационного отчета (для данного случая всегда N)
-from (
-  select --+ ordered use_nl(Prm B) use_hash(LC)
-    b.bodyisn,
-    --max(b.Dateval) as DateVal,
-    b.Dateval,
-    b.BuhQuitDate as DateQuit,  -- агрегировать нельзя, иначе некорректно расчитывается QuitPC в разрезе DateQuit
-    sum((b.BuhAmountRub * b.BuhPC * b.QuitPC * b.BuhQuitPC) + b.RepCursDiff) as row_BuhAmountRub,
-    max(b.BuhAmountRub) as max_BuhAmountRub,
-    max(LC.LineCode) as LineCode,
-    max(b.Statcode) as Statcode
-  from --+ Parallel(b 28)
-    Prm,
-    STORAGE_SOURCE.RepBuhQuit b,
-    TT_BUH_LINECODE LC
-  where              
-    b.BuhQuitDate >= Prm.DB and b.BuhQuitDate < Prm.DE
-    and b.sagroup in (1, 3, 5)
-    and b.statcode not in (220, 60, 221)
-    and b.BodyISN = LC.BodyISN(+)
-    and b.StatCode = LC.StatCode(+)
-  group by b.bodyisn, b.Dateval, b.BuhQuitDate
-) b;
-
-  CREATE OR REPLACE FORCE VIEW "STORAGES"."V_REPBUH2OBJ_QUIT_DIRECT" ("DB", "DE", "AGRISN", "REFUNDISN", "REAGRISN", "STATCODE", "SAGROUP", "LINECODE", "DEPTISN", "SUBACCISN", "BUHSUBJISN", "RULEISN", "OBJISN", "OBJCLASSISN", "RPTCLASS", "RPTGROUPISN", "MOTIVGROUPISN", "CARRPTCLASS", "NAMOUNTRUB", "NAMOUNTUSD", "QAMOUNTRUB", "QAMOUNTUSD", "DATEVAL", "DATEQUIT", "ADDISN", "IS_NACH", "IS_QUIT", "EXCLUDE_MEDIC", "FIRST_DATEPAY", "LAST_DATEPAY", "DATEPAYLAST") AS 
-  with Prm as (
--- sts 25.07.2012 - загрузка данных для RepBuh2Obj
--- part - проводки, сквитованные или начисленные в периоде (для кассовых операций), с коэффициентом квитовки
--- sts 17.08.2012 - версия, разбитая на два подзапроса - первый - по отобранным записям по партиции в том же периоде
--- и второй - по оставшимся записям в остальных партициях.
--- Сделано для скорости, части отличаются способом доступа к таблице
-  select
-    max(pParam.GetParamD('pDB')) as DB,
-    max(pParam.GetParamD('pDE')) as DE
-  from dual
-),
-ST as (select statcode from rep_statcode Where grp <> 'Исходящее перестрахование')
-
-select --+ ordered use_hash(rb CarRules DKBRules)
--- sts 25.07.2012 - загрузка данных для RepBuh2Obj
--- part - по прямым договорам квитовки на аналитику договоров
-  rb.DB,
-  rb.DE - 1 as DE,
-  rb.agrisn,
-  rb.refundisn,
-  0 as ReAgrisn,
-  rb.statcode,
-  rb.sagroup,
-  rb.LineCode,
-  rb.deptisn,
-  rb.subaccisn,
-  rb.BuhSubjIsn,
-  rb.ruleisn,
-  to_number(Case When CarRules.Isn is not null or DKBRules.Isn is not null Then rb.ParentObjIsn end ) as ObjIsn,
-  to_number(Case When CarRules.Isn is not null or DKBRules.Isn is not null Then rb.parentobjclassisn end ) as objclassisn ,
-  rb.rptclass,
-  rb.rptgroupisn,
-  rb.motivgroupisn,
-  rb.Carrptclass,
-  0 as NAmountrub,
-  0 as NAmountusd,
-  Sum(rb.qamountrub) as qamountrub,
-  0 as qamountusd,
-  rb.dateval,
-  rb.datequit,
-  to_number(Case When CarRules.Isn is not null then rb.addisn else rb.agrisn end) as addisn,
-  cast(null as char(1)) as IS_NACH,       -- признак наличия начислений
-  'Y' as IS_QUIT,  -- признак наличия квитовок
-  rb.Exclude_Medic, -- признак исключения строк из мотивационного отчета
-  min(rb.DatePay) as first_datepay,
-  max(rb.DatePay) as last_datepay,
-  max(rb.datepaylast) as datepaylast
-
-from
-   (
-    select --+ ordered  use_hash(ST bq) no_parallel(bq) 
-      Rb.DB,
-      Rb.DE,
-      rb.agrisn,
-      rb.refundisn,
-      bq.statcode,
-      rb.sagroup,
-      bq.LineCode,
-      rb.deptisn,
-      rb.subaccisn,
-      rb.BuhSubjIsn,
-      rb.ruleisn,
-      rb.ruleisnagr,
-      rb.ParentObjIsn,
-      rb.parentobjclassisn,
-      rb.rptclass,
-      rb.rptgroupisn,
-      rb.motivgroupisn,
-      rb.Carrptclass,
-      rb.amountrub * bq.quitpc as qamountrub,
-      rb.dateval,
-      trunc(bq.datequit) as datequit,
-      rb.AddISN,
-      nvl(Bq.Exclude_Medic, 'N') as Exclude_Medic, -- признак исключения строк из мотивационного отчета
-      rb.DatePay,
-      rb.datepaylast
-    from
-      (-- доступ фулсканом к партиции
-      Select /*+ Ordered Use_Nl(rb) Full(rb) parallel(rb 28) */
-      Prm.DB,
-      Prm.DE,
-      rb.bodyIsn,
-      rb.statcode,
-      rb.agrisn,
-      rb.refundisn,
-      rb.sagroup,
-      rb.deptisn,
-      rb.subaccisn,
-      nvl(rb.bodysubjisn, rb.subjisn) as BuhSubjIsn,
-      rb.ruleisn,
-      rb.ruleisnagr,
-      nvl(rb.ParentObjIsn, rb.objisn) as ParentObjIsn,
-      nvl(rb.parentobjclassisn, rb.objclassisn) as parentobjclassisn,
-      rb.rptclass,
-      rb.rptgroupisn,
-      rb.motivgroupisn,
-      rb.Carrptclass,
-      Sum(rb.amountrub) amountrub,
-      trunc(rb.dateval) as dateval,
-      rb.AddISN,
-      rb.DatePay,
-      rb.datepaylast
-    from      Prm,
-      repbuh2cond rb
-    Where
-      rb.DateVal >= Prm.DB and rb.DateVal < Prm.DE
-group by
-      Prm.DB,
-      Prm.DE,
-      rb.bodyIsn,
-      rb.statcode,
-      rb.agrisn,
-      rb.refundisn,
-      rb.sagroup,
-      rb.deptisn,
-      rb.subaccisn,
-      nvl(rb.bodysubjisn, rb.subjisn) ,
-      rb.ruleisn,
-      rb.ruleisnagr,
-      nvl(rb.ParentObjIsn, rb.objisn) ,
-      nvl(rb.parentobjclassisn, rb.objclassisn) ,
-      rb.rptclass,
-      rb.rptgroupisn,
-      rb.motivgroupisn,
-      rb.Carrptclass,
-      trunc(rb.dateval),
-      rb.AddISN,
-      rb.DatePay,
-      rb.datepaylast
-
-   ) rb,
-   tt_quitpc Bq,
-      ST
-      
-    where
-          rb.statcode = ST.statcode
-      and Bq.BodyIsn = rb.BodyIsn
-  UNION ALL
-    -- доступ через индекс
-    select --+ ordered use_nl(Prm bq rb) use_hash(ST)
-      Prm.DB,
-      Prm.DE,
-      rb.agrisn,
-      rb.refundisn,
-      bq.statcode,
-      rb.sagroup,
-      bq.LineCode,
-      rb.deptisn,
-      rb.subaccisn,
-      nvl(rb.bodysubjisn, rb.subjisn) as BuhSubjIsn,
-      rb.ruleisn,
-      rb.ruleisnagr,
-      nvl(rb.ParentObjIsn, rb.objisn) as ParentObjIsn,
-      nvl(rb.parentobjclassisn, rb.objclassisn) as parentobjclassisn,
-      rb.rptclass,
-      rb.rptgroupisn,
-      rb.motivgroupisn,
-      rb.Carrptclass,
-      rb.amountrub * bq.quitpc as qamountrub,
-      trunc(rb.dateval) as dateval,
-      trunc(bq.datequit) as datequit,
-      rb.AddISN,
-      nvl(Bq.Exclude_Medic, 'N') as Exclude_Medic, -- признак исключения строк из мотивационного отчета
-      rb.DatePay,
-      rb.datepaylast
-    from
-      Prm,
-      tt_quitpc Bq,
-      repbuh2cond rb,
-      ST
-    where
-      not (bq.DateVal >= Prm.DB and bq.DateVal < Prm.DE)
-      and Bq.BodyIsn = rb.BodyIsn
-      and rb.statcode = ST.statcode
-   ) rb,
-  --( select r.* from  motor.v_dicti_rule r Where isn <> 753518300) CarRules,
-  motor.v_dicti_rule CarRules,
-  (-- Продукты ДКБ
-   select
-     ISN,PARENTISN,CODE,SHORTNAME,FULLNAME,CONSTNAME,ACTIVE
-   from dicti
-   start with parentisn = 24890816 and Filterisn = 2553627303
-   connect by prior isn=parentisn
-  ) DKBRules
-where
-  rb.ruleisnagr = CarRules.Isn(+)
-  and rb.ruleisnagr = DKBRules.Isn(+)
-group by
-  rb.DB,
-  rb.DE - 1,
-  rb.agrisn,
-  rb.refundisn,
-  rb.statcode,
-  rb.sagroup,
-  rb.LineCode,
-  rb.deptisn,
-  rb.subaccisn,
-  rb.BuhSubjIsn,
-  rb.ruleisn,
-  to_number(Case When CarRules.Isn is not null or DKBRules.Isn is not null Then rb.ParentObjIsn end ),
-  to_number(Case When CarRules.Isn is not null or DKBRules.Isn is not null Then rb.parentobjclassisn end ),
-  rb.rptclass,
-  rb.rptgroupisn,
-  rb.motivgroupisn,
-  rb.Carrptclass,
-  rb.dateval,
-  rb.datequit,
-  to_number(Case When CarRules.Isn is not null then rb.addisn else rb.agrisn end),
-  rb.Exclude_Medic;
-
-  CREATE OR REPLACE FORCE VIEW "STORAGES"."V_REPBUH2RESECTION" ("AGRISN", "BODYISN", "STATCODE", "DATEVAL", "RPTGROUPISN", "MOTIVGROUPISN", "BUDGETGROUPISN", "RPTCLASS", "RPTCLASSISN", "REFUNDISN", "REFUNDEXTISN", "BUHCURRISN", "SAGROUP", "BUHAMOUNTRUB", "BUHAMOUNTUSD", "BUHAMOUNT", "AMOUNTRUB", "AMOUNTUSD", "AMOUNT", "REISN", "REAGRCLASSISN", "SECTISN", "SHARENEORIG", "REINSURANCEPERIODPC", "SECTPC", "BUHISN") AS 
-  SELECT a.agrisn, a.bodyisn, max(a.statcode) AS statcode, max(a.dateval) AS dateval, a.rptgroupisn, a.motivgroupisn,
-       a.budgetgroupisn, a.rptclass, a.rptclassisn, a.refundisn, a.refundextisn,
-       max(a.buhcurrisn) AS buhcurrisn, max(a.sagroup) AS sagroup, max(a.buhamountrub) AS buhamountrub,
-       max(a.buhamountusd) AS buhamountusd, max(a.buhamount) AS buhamount,
-       sum(a.amountrub*a.sectpc) AS amountrub,
-       sum(a.amountusd*a.sectpc)AS amountusd,
-       sum(a.amount*a.sectpc) AS amount,
-       max(a.reisn) AS reisn,
-       max(a.reagrclassisn) AS reagrclassisn,
-       a.sectisn,
-       a.shareneorig,
-       max(a.reinsuranceperiodpc) AS reinsuranceperiodpc,
-       max(a.sectpc) AS sectpc,
-       MAX(a.buhisn) AS buhisn
-FROM (
-      SELECT --+ ordered use_nl ( a re ra s ) index ( re X_REPAGR_AGR ) index ( ra  X_REPAGR_AGR )
-             a.agrisn, a.rptgroupisn, a.amountrub, a.amountusd, a.amount, a.statcode,
-             a.refundisn, a.refundextisn, a.bodyisn, a.dateval, a.motivgroupisn,
-             a.reinsuranceperiodpc, a.shareneorig, a.reagrclassisn, a.sectisn,
-             a.reisn, /*1/COUNT(sectisn) over (PARTITION BY a.buhisn) EGAO 26.04.2013 */1 AS sectpc, a.buhamountrub, a.buhamountusd, a.buhamount,
-             a.buhcurrisn, a.sagroup, a.budgetgroupisn, a.rptclass, a.rptclassisn, a.buhisn
-      FROM (
-            WITH
-                 x AS (
-                       SELECT x.*
-                       FROM (
-                             SELECT --+ index ( x X_REP_AGRRE_AGR ) ordered use_nl ( x re ra )
-                                    DISTINCT x.agrisn, x.condisn, x.reisn, x.sectisn,
-                                             CASE
-                                               WHEN re.datebase='I' THEN 1
-                                               ELSE (least(trunc(x.sdateend), trunc(ra.dateend))-greatest(trunc(x.sdatebeg), trunc(ra.datebeg))+1)/(trunc(ra.dateend)-trunc(ra.datebeg)+1)
-                                             END AS reinsuranceperiodpc,
-                                             CASE re.classisn
-                                               WHEN 9058 THEN nvl(x.shareneorig/100, 1)
-                                               ELSE 1
-                                             END AS shareneorig,
-                                             re.classisn AS reagrclassisn
-
-                             FROM rep_agrre x, repagr re, repagr ra
-                             WHERE x.agrisn>pparam.GetParamN('minagrisn') AND x.agrisn<=pparam.GetParamN('maxagrisn')
-                               AND re.agrisn=x.reisn
-                               AND ra.agrisn=x.agrisn
-                            ) x
-                       WHERE x.reinsuranceperiodpc>0
-                      ),
-                 a AS (
-                       SELECT --+ index ( bc X_REPBUH2COND_AGRISN ) ordered use_nl ( x bc ) no_merge ( x )
-                              bc.agrisn, bc.condisn, bc.rptgroupisn, bc.refundisn, bc.statcode,
-                              bc.refundextisn, bc.bodyisn, bc.motivgroupisn, bc.budgetgroupisn, bc.rptclass, bc.rptclassisn,
-                              MAX(bc.isn) AS buhisn,
-                              MAX(bc.dateval) AS dateval,
-                              MAX(bc.buhamountrub) AS buhamountrub,
-                              MAX(bc.buhamountusd) AS buhamountusd,
-                              MAX(bc.buhamount) AS buhamount,
-                              MAX(bc.buhcurrisn) AS buhcurrisn,
-                              MAX(bc.sagroup) AS sagroup,
-                              SUM(bc.amountusd) AS amountusd,
-                              SUM(bc.amount) AS amount,
-                              SUM(bc.amountrub) AS amountrub
-                       FROM (SELECT DISTINCT agrisn FROM x) x, repbuh2cond bc
-                       WHERE bc.agrisn=x.agrisn
-                         AND bc.statcode IN (38, 34, 220, 24)
-                         AND bc.sagroup IN (1, 3)
-                         AND NVL(bc.amountrub,0)<>0
-                       GROUP BY bc.agrisn, bc.condisn, bc.rptgroupisn, bc.refundisn, bc.statcode,
-                                bc.refundextisn, bc.bodyisn, bc.motivgroupisn, bc.budgetgroupisn, bc.rptclass, bc.rptclassisn
-                       HAVING SUM(bc.amountrub)<>0
+     If Nvl(r.ISCALC,1)=0 then
+      r.insuredsum:=r.LIMITUSD;
+     else
+      r.insuredsum:=getisum2(r.aisn,53,r.datebeg,oisn,risn,r.limiteverymode,r.xisn);
+     end if;
+    --raise_application_error(-20005,'isum'||r.insuredsum);
+    r.limitsum:=0;
+  elsif r.limiteverymode='Y' then
+    ---r.insuredsum:=getisum2(r.aisn,53,r.datebeg,0,0,'Y');
+                      SELECT max(SUM(limitsum))
+                      INTO r.insuredsum
+                      FROM(
+                      SELECT connect_by_root(objisn) AS prnobj, a.limitsum
+                      FROM (SELECT gcc2.gcc2(nvl(x.limiteverysum, x.limitsum), b.currisn, 53, r.datebeg) AS limitsum, b.objisn, b.parentobjisn
+                            FROM agrcond x, repcond b WHERE b.condisn=x.isn AND x.agrisn=r.aisn) a
+                      START WITH a.parentobjisn IS NULL
+                      CONNECT BY PRIOR a.objisn=a.parentobjisn
                       )
+                      GROUP BY prnobj;
 
-            SELECT --+ use_hash ( a x )
-                   a.*, x.sectisn, x.reisn, x.shareneorig, x.reagrclassisn, x.reinsuranceperiodpc
-            FROM a, x
-            WHERE x.agrisn=a.agrisn
-              AND x.condisn IS NULL
-            UNION
-            SELECT --+ use_hash ( a x )
-                   a.*, x.sectisn, x.reisn, x.shareneorig, x.reagrclassisn, x.reinsuranceperiodpc
-            FROM a, x
-            WHERE x.agrisn=a.agrisn
-              AND x.condisn IS NOT NULL
-              AND x.condisn=a.condisn
 
-           ) a) a
-GROUP BY a.agrisn,
+
+
+
+
+
+    r.limitsum:=0;
+  end if;
+  if r.ruleisn=34053716 then -- С‚РµС….СЂРёСЃРєРё
+   if nvl(r.insuredsum,0)>0 and nvl(risn,0)=0 then r.limitsum:=0; end if;
+  end if;
+  isum:=((r.insuredsum+r.limitsum)*r.sharepc/100)*((100-r.reinspc)/100);
+--  dbms_output.put_line(isum);
+  if isum=0 then return 0; end if; --BAG!!!
+ end if;
+--  raise_application_error(-20010,'debug: '||isum);
+ if r.secttype='QS' then
+  select retention,getcrosscover(limitsum,r.currisn,53,sysdate) into pq,pr
+   from recond where sectisn=r.sectisn;
+  if isum>pr then
+   pq:=round((pr*100/isum),4)*pq/100;
+  else
+   pr:=isum;
+  end if;
+  if (nvl(r.xpc,0)=0) and (isum > 0) then
+    -- p:=(100-p)*(round(pr*100/isum,2)-pq)/100;
+    p:=(100-xper)*(round(pr*100/isum,4)-pq)/100;
+  else
+     p:=nvl(r.xpc,0);
+  end if;
+  if (p > 0) then
+    s:=Substr(s||' QS:'||p,1,255);
+    xper:=xper+p;
+    -- isum:=isum*((100-p)/100);
+    isum:=isum*pq/100;
+  end if;
+ end if;
+ if r.secttype='SP' then
+   select getcrosscover(prioritysum,r.currisn,53,sysdate),
+          getcrosscover(limitsum,r.currisn,53,sysdate)
+          into pr,pq from recond where sectisn=r.sectisn;
+--  raise_application_error(-20010,'debug: isum:'||isum||' pr+pq:'||(pr+pq));
+   if isum>pr+pq then
+     pr:=isum-pq;
+   end if;
+   if (nvl(r.xpc,0)=0) and (isum > 0) then
+     p:=(100-xper)*round((isum-pr)*100/isum,4)/100;
+-- p:=round((isum-pr)*100/isum,2);
+   else
+     p:=nvl(r.xpc,0);
+   end if;
+   if (p > 0) then
+     s:=Substr(s||' SP:'||p,1,255);
+     xper:=xper+p;
+     if (isum > 0) then
+       isum:=isum*((100-round((isum-pr)*100/isum,2))/100);
+     end if;
+   end if;
+ end if;
+ if r.secttype='XL' then
+  select max(getcrosscover(limitsum+prioritysum,r.currisn,53,sysdate))
+      into pr from recond where sectisn=r.sectisn;
+     dbms_output.put_line('0isum =  '||isum);
+  if pr<isum and r.optionalcode is null then
+   -- s:=s||' XL:'||round(100-(isum-pr)*100/isum,2);
+   -- isum:=isum*round(100-(isum-pr)*100/isum,2)/100;
+   dbms_output.put_line('r.xpc= '||r.xpc);
+   dbms_output.put_line('isum =  '||isum);
+   if (nvl(r.xpc,0)=0) and (isum > 0) then
+    p:=(100-xper)*round(100-(isum-pr)*100/isum,4)/100;
+   -- p:=round(100-(isum-pr)*100/isum,2);
+   else
+     p:=nvl(r.xpc,0);
+   end if;
+   if (p > 0) then
+     s:=Substr(s||' XL:'||p,1,255);
+     xper:=xper+p;
+     if (isum > 0) then
+       isum:=isum*((100-round((isum-pr)*100/isum,2))/100);
+     end if;
+   end if;
+  else
+   if nvl(r.xpc,0)=0 then
+    p:=100-xper;
+   else
+    p:=r.xpc;
+   end if;
+   if (p > 0) then
+     s:=s||' XL:'||p;
+   end if;
+  end if;
+ end if;
+-- dbms_output.put_line(isum);
+ if resisn=r.sectisn then
+  If P<0 Then p:=0; end if;
+  return p;
+ end if;
+end loop;
+return S;
+/* exception when others then raise_application_error(-20000,aisn||' '||resisn); */
+end;
+
+  CREATE OR REPLACE FUNCTION "STORAGES"."INIT_PARTITION_BY_KEY" 
+  ( pTableName varchar2,
+    pKey varchar2,
+    pClear number:=1,
+    pCompress NUMBER := 1)
+  RETURN  varchar2 IS
+--
+-- To modify this template, edit file FUNC.TXT in TEMPLATE 
+-- directory of SQL Navigator
+--
+-- Purpose: Briefly explain the functionality of the function
+--
+-- MODIFICATION HISTORY
+-- Person      Date    Comments
+-- ---------   ------  -------------------------------------------       
+  vPart varchar2(250);
+   -- Declare program variables as shown above
+BEGIN 
+vPart:=GET_TABLE_VALUE_PARTITITON(pTableName,pKey);
+
+ if  (vPart is not null and pClear=1)then
+  Execute immediate 'Alter TAble '||pTableName||' truncate partition '||vPart;
+ end if;
+
+ If (vPart is  null) Then
+  Execute Immediate 'Alter Table '||pTableName||' add Partition p'||pKey||' Values ('||pKey||')'||CASE pCompress WHEN 1 THEN ' compress' END;
+  vPart:='p'||pKey;
+ end if;
+
+return vPart;
+END;
+
+
+  CREATE OR REPLACE PROCEDURE "STORAGES"."INSERT_AGRRE" (pLoadIsn Number,pLoadAgrx Number:=1)
+Is
+ vMinIsn Number:=-1;
+ vlMaxIsn Number;
+ vCnt Number:=0;
+ vLoadObjCnt Number:=1000;
+ SesId Number;
+ vSql Varchar2(4000);
+Begin
+  Execute Immediate 'truncate table Rep_AgrRe reuse storage';
+
+
+   -- РІСЃРµ РїРµСЂРµСЃС‚СЂР°С…РѕРІР°РЅРЅС‹Рµ РІ С„РѕСЂРјСѓР»СЏСЂРµ РїСЂСЏРјРѕРіРѕ РґРѕРі-СЂР°
+  Insert Into Rep_AgrRe(isn, agrisn, subjisn, sharepc, outcompc, datebeg, dateend,Loadisn,OLDSHAREPC, Agrxinsuredsum, agrdatebeg, agrdateend)
+  Select --+ ordered use_nl ( s ra ) no_merge ( s ) index ( ra X_REPAGR_AGR )
+         Seq_Reports.NEXTVAL,s.agrisn,s.subjisn, s.sharepc,
+    decode(s.BasePC,0,0,Least(100,Greatest(0,100*s.ComBasePC/s.BasePC))),s.Datebeg,s.Dateend,pLoadIsn,s.sharepc*100,0
+    , ra.datebeg, ra.dateend
+  From
+    (select a.agrisn, A.subjisn,
+       nvl(sum(Decode(sumclassisn,427,0,A.sharepc/100)),0) sharepc,
+       nvl(sum(Decode(sumclassisn,427,0,A.base)),0) BasePC,
+       nvl(sum(Decode(sumclassisn,427,A.base,0)),0) ComBasePC,
+       Min(Datebeg) Datebeg,Max(Dateend) Dateend
+     from Ais.agrrole a
+     where 1=1 --EGAO 27.11.2012 A.orderno>0
+       and A.classisn=435 -- РџР•Р Р•РЎРўР РђРҐРћР’Р©РРљ
+       and nvl(A.sumclassisn,0) in (8133016,414,427) -- 0, РџР Р•РњРРЇ, РљРћРњРРЎРЎРРЇ
+       and A.sharepc<>0
+       and A.calcflg='Y'
+--       and (nvl(A.sumclassisn,0)=427 or instr(upper(A.formula),'SI')>0)
+     group by a.agrisn,A.subjisn) S, repagr ra
+     WHERE s.agrisn=ra.agrisn(+);
+
+  Commit;
+/*
+    -- РўСѓСЂРёСЃС‚С‹
+  Merge Into Rep_AgrRe D
+  Using (select --+   ordered Use_Nl ( r t1 a) Index(a x_repagr_agr)
+           R.agrisn,t1.subjisn,Max(t1.reinspc) SHAREPC,Min(r.Datebeg) Datebeg,Max(r.Dateend) Dateend,
+           Max( T1.REINSCOMMI) outcompc
+         from finance.tourreinsurers t1, Ais.agrrole r, repagr a
+         where A.AgrIsn=r.agrisn
+           ANd A.RULEDEPT=707480016 -- c.get('PrivDept') РЈРїСЂР°РІР»РµРЅРёРµ СЃС‚СЂР°С…РѕРІР°РЅРёСЏ РїСѓС‚РµС€РµСЃС‚РІСѓСЋС‰РёС…
+           and r.subjisn=t1.subjisn
+         Group by R.agrisn,t1.subjisn ) S
+  On (D.agrisn=S.agrisn and D.subjisn=S.subjisn)
+  WHEN MATCHED THEN Update Set D.SHAREPC=S.SHAREPC,D.DATEBEG=S.DATEBEG,D.Dateend=S.Dateend,D.outcompc=S.outcompc
+  WHEN NOT MATCHED THEN INSERT (d.Isn,D.AgrIsn, D.subjisn,D.SHAREPC,D.outcompc,D.DATEBEG,D.Dateend)
+         VALUES (Seq_Reports.NEXTVAL,S.AgrIsn, S.subjisn,S.SHAREPC,S.outcompc,S.datebeg,S.Dateend);
+  commit;
+
+     -- РўСѓСЂРёСЃС‚С‹ С€РµРЅРіРµРќ
+  Merge Into Rep_AgrRe D
+  Using (select a.agrisn,5618616 subjisn, 100/3 SHAREPC, 90/3 outcompc
+         from REP_AGRTUR a
+         where a.isshengen=1) S
+  On (D.agrisn=S.agrisn)
+  WHEN MATCHED THEN
+    Update Set D.SHAREPC=S.SHAREPC,D.subjisn=S.subjisn,D.OUTCOMPC=S.OUTCOMPC
+  WHEN NOT MATCHED THEN
+    INSERT (D.Isn,D.AgrIsn, D.subjisn,D.SHAREPC,D.OUTCOMPC)
+    VALUES (Seq_Reports.NEXTVAL,S.AgrIsn, S.subjisn,S.SHAREPC,S.OUTCOMPC);
+
+  Commit;
+
+  */
+-- execute Immediate 'truncate Table Rep_AgrX';
+  If pLoadAgrx=1 then
+--- Рђ Р‘Р›РћРљРР РќРЈ РљРђ РЇ Р­РўРЈ РњРЈРўР¬ РЎ Р”РћР“РћР’РћР РђРњР РџРћРљР Р«РўРРЇ РљРђРЎРљРћ, Р’Р Р•РњР•РќРќРћ, РџРћР“Р›РЇР”РРњ ;-)
+--delete from rep_agrx where isn in (Select isn from ais.agrx);
+
+    execute Immediate 'truncate Table Rep_AgrX';
+
+    --{EGAO 13.03.2012 Р”РѕР±Р°РІРёР» join СЃ repagr, С‚.Рє. РґР»СЏ РІС…РѕРґСЏС‰РёС… РѕР±Р»РёРіР°С‚РѕСЂРѕРІ РІРјРµСЃС‚Рѕ Р·РЅР°С‡РµРЅРёСЏ РїРѕР»Рµ objisn РёР· agrx РЅР°РґРѕ Р±СЂР°С‚СЊ 0.
+    -- Р”Р»СЏ РІС…РѕРґСЏС‰РёС… РѕР±Р»РёРіР°С‚РѕСЂРѕРІ РІ СЌС‚РѕРј РїРѕР»Рµ СѓРєР°Р·С‹РІР°РµС‚СЃСЏ isn СЃРµРєС†РёРё СЌС‚РѕРіРѕ РѕР±Р»РёРіР°С‚РѕСЂР°.
+    /*Insert Into Rep_AgrX(isn,
+                         agrisn,
+                         sectisn,
+                         objisn,
+                         riskisn,
+                         reisn,
+                         xpc,
+                         datebeg,
+                         dateend,
+                         iscalc,
+                         limitusd,
+                         loadisn,
+                         gr,
+                         grp,
+                         norig,
+                         shareneorig
+                         )
+    Select min(isn) isn, agrisn,sectisn,objisn,riskisn,reisn,xpc,DateBeg,DateEnd,1,0,pLoadIsn,gr,grp,1 norig, nvl(shareneorig,100) AS shareneorig
+    From ais.agrx
+    group by agrisn,sectisn,objisn,riskisn,reisn,xpc,DateBeg,DateEnd,gr,grp,nvl(shareneorig,100);*/
+    Insert Into Rep_AgrX(isn,
+                         agrisn,
+                         sectisn,
+                         objisn,
+                         riskisn,
+                         reisn,
+                         xpc,
+                         datebeg,
+                         dateend,
+                         iscalc,
+                         limitusd,
+                         loadisn,
+                         gr,
+                         grp,
+                         norig,
+                         shareneorig
+                         )
+    SELECT /*+  Full(x) Parallel(x,32) ordered use_nl ( x ra ) index ( ra X_REPAGR_AGR )*/
+           min(x.isn) isn, x.agrisn,x.sectisn,
+           CASE WHEN NVL(ra.classisn,0)=9020 THEN 0 ELSE x.objisn END AS objisn,
+           x.riskisn,x.reisn,x.xpc,x.DateBeg,x.DateEnd,1,0,-1 AS pLoadIsn,x.gr,x.grp,1 norig, nvl(x.shareneorig,100) AS shareneorig
+    From ais.agrx x, repagr ra
+    WHERE ra.agrisn(+)=x.agrisn
+    group by x.agrisn,x.sectisn,CASE WHEN NVL(ra.classisn,0)=9020 THEN 0 ELSE x.objisn END,x.riskisn,x.reisn,x.xpc,x.DateBeg,x.DateEnd,x.gr,x.grp,nvl(x.shareneorig,100);
+
+    Commit;
+  end if;
+  SesId:=Parallel_Tasks.createnewsession();
+
+  vMinIsn:=-1;
+
+  loop
+  vLMaxIsn:=cut_table(PTABLENAME=>'storages.Rep_AgrX', PCOLUMNNAME=>'isn', PMINISN=>vMinIsn,  PROWCOUNT=>vLoadObjCnt);
+
+  /*
+    select Max (Agrisn) into vLMaxIsn
+    From
+     (Select /*+ Index_Asc (a X_REP_AGRX_AGR) / Agrisn
+      from Rep_AgrX a
+      where Agrisn > vMinIsn
+        and rownum <= vLoadObjCnt);
+*/
+    Exit When vLMaxIsn is null;
+
+    vSql:='Begin
+      storages.INSERT_AGRRE_BY_ISNS('|| vMinIsn||','||vLMaxIsn||','||pLoadIsn||');
+      Commit;
+      End;';
+
+    System.Parallel_Tasks.processtask(sesid,vsql);
+
+    Select /*+ Index (a X_REP_AGRX) */ vCnt+Count(*) into vCnt
+    from Rep_AgrX a
+    where Isn>vMinIsn and Isn<=vLMaxIsn;
+
+    vCnt:=vCnt+1;
+
+    vMinIsn:=vLMaxIsn;
+    DBMS_APPLICATION_INFO.set_module('Load Agrre','Loaded: '||vCnt);
+  end loop;
+-- Р¶РґРµРј, РїРѕРєР° Р·Р°РІРµСЂС€Р°С‚СЃСЏ РІСЃРµ РґР¶РѕР±С‹
+  Parallel_Tasks.endsession(sesid);
+ -- EXPORT_DATA.export_to_owb_by_FLD('rep_agrre','AgrIsn');
+  DBMS_APPLICATION_INFO.set_module('','');
+END; -- Procedure
+
+
+  CREATE OR REPLACE PROCEDURE "STORAGES"."INSERT_AGRRE_BY_ISNS" (vMinIsn number, vMaxIsn Number,pLoadIsn Number) IS
+BEGIN
+
+  delete from tt_RowId;
+  Insert Into tt_RowId(Isn)
+  Select /*+ Index(x) */ Isn
+  from Rep_AgrX x
+  where Isn>vMinIsn and Isn<=vMaxIsn;
+
+  INSERT_AGRRE_BY_TT_ROWID(pLoadIsn);
+END; -- Procedure
+
+  CREATE OR REPLACE PROCEDURE "STORAGES"."INSERT_AGRRE_BY_TT_ROWID" (pLoadIsn number,pIsFull Number:=1) IS
+  p number;
+  S number;
+  L Number;
+
+
+pOld Number;
+vOldRate Number;
+  isum number;
+
+  xper number:=0;
+  vAgr Number:=0;
+--  vObj Number:=0;
+--  vRisk Number:=0;
+--  db date;
+--  de date;
+  com1 Number;
+  com2 Number;
+  vRate Number;
+  vDept0Isn Number;
+  vSharePc Number:=0;
+  vDpremsum number;
+  vFlatPrem number;
+  vEpi number;
+  vAgrxInsuredSum NUMBER := 0; -- EGAO 12.08.2011
+  vAgrxInsuredCurrDate DATE; -- EGAO 16.08.2011
+
+
+  vCnt number:=1;
+
+  TYPE TAgrxInsuredRec IS RECORD(
+    InsuredSum NUMBER,
+    CurrDate DATE
+  );
+
+  AgrxInsuredRec TAgrxInsuredRec;
+
+
+  TYPE TAgrxInsuredTab IS TABLE OF TAgrxInsuredRec INDEX BY VARCHAR2(100);
+  AgrxInsuredTab TAgrxInsuredTab;
+BEGIN
+  If pIsFull=0 then
+    delete from Rep_AgrRe Where agrisn In (select Isn from tt_rowId);
+    commit;
+
+    Insert Into Rep_AgrRe
+      (isn, agrisn, subjisn, sharepc, outcompc, datebeg, dateend)
+    Select Seq_Reports.NEXTVAL, agrisn, subjisn, sharepc,
+      decode(BasePC,0,0,Least (100,Greatest (0,100*ComBasePC/BasePC))),trunc(Datebeg),trunc(Dateend)
+    From
+      (select a.agrisn,A.subjisn,
+         nvl (sum (Decode(sumclassisn,427,0,A.sharepc)),0) sharepc,
+         nvl (sum (Decode(sumclassisn,427,0,A.base)),0) BasePC,
+         nvl (sum (Decode(sumclassisn,427,A.base,0)),0) ComBasePC,
+         Min(Datebeg) Datebeg,Max(Dateend) Dateend
+       from tt_rowId t, Ais.agrrole a
+       where t.isn=a.agrisn
+         And A.orderno>0
+         and A.classisn=435 -- РџР•Р Р•РЎРўР РђРҐРћР’Р©РРљ
+         and nvl(A.sumclassisn,0) in (0,414,427)
+         and A.sharepc<>0
+         and A.calcflg='Y'
+         and (nvl(A.sumclassisn,0)=427 or instr(upper(A.formula),'SI')>0)
+       group by a.agrisn, A.subjisn) S;
+    Commit;
+
+    -- РўСѓСЂРёСЃС‚С‹
+    Merge Into Rep_AgrRe D
+    Using (select --+   ordered Use_Nl ( r t1 a) Index(a x_repagr_agr)
+             R.agrisn, t1.subjisn, Max(t1.reinspc) SHAREPC, Min(trunc(r.Datebeg)) Datebeg,
+             Max(trunc(r.Dateend)) Dateend, Max(T1.REINSCOMMI) outcompc
+           from tt_rowId t,Ais.agrrole r,repagr a,finance.tourreinsurers t1
+           where t.isn=r.agrisn
+             And A.AgrIsn= r.agrisn
+             ANd A.RULEDEPT=707480016 -- c.get('PrivDept')
+             and r.subjisn = t1.subjisn
+           Group by R.agrisn,t1.subjisn ) S
+    On (D.agrisn=S.agrisn and D.subjisn=S.subjisn)
+    WHEN MATCHED THEN Update Set D.SHAREPC=S.SHAREPC,D.DATEBEG=S.DATEBEG,D.Dateend=S.Dateend,D.outcompc=S.outcompc
+    WHEN NOT MATCHED THEN INSERT (d.Isn,D.AgrIsn, D.subjisn,D.SHAREPC,D.outcompc,D.DATEBEG,D.Dateend)
+      VALUES (Seq_Reports.NEXTVAL,S.AgrIsn, S.subjisn,S.SHAREPC,S.outcompc,S.datebeg,S.Dateend);
+    commit;
+
+     -- РўСѓСЂРёСЃС‚С‹ С€РµРЅРіРµРќ
+    Merge Into Rep_AgrRe D
+    Using (select a.agrisn,5618616 subjisn, 100/3 SHAREPC, 90/3 outcompc
+           from tt_rowId t,REP_AGRTUR a
+           where a.isshengen=1 and t.isn=a.agrisn) S
+    On (D.agrisn=S.agrisn)
+    WHEN MATCHED THEN Update Set D.SHAREPC=S.SHAREPC,D.subjisn=S.subjisn,D.OUTCOMPC=S.OUTCOMPC
+    WHEN NOT MATCHED THEN INSERT (D.Isn,D.AgrIsn, D.subjisn,D.SHAREPC,D.OUTCOMPC)
+      VALUES (Seq_Reports.NEXTVAL,S.AgrIsn, S.subjisn,S.SHAREPC,S.OUTCOMPC);
+
+    Commit;
+  end if;
+
+  xper:=0;
+  for R in
+    (select --+ ordered USE_NL (x  A A1 S) Index (x X_Rep_AgrX)
+       a.isn aisn, x.isn xisn,trunc(a.datebeg) AS datebeg/*EGAO 20.10.2010 a.datebeg*/,trunc(a.dateend) AS dateend/*EGAO 20.10.2010 a.dateend*/,
+       a.insuredsum, s.Rate, a1.classisn reclassisn, a1.deptisn redeptisn,
+       a.limitsum,a1.datebase,a.currisn agrcurrisn,
+       x.sectisn,x.xpc,nvl(a.reinspc,0) reinspc,nvl(a.sharepc,100) sharepc,s.secttype,/*s.currisn,*/
+       s.limiteverymode,s.optionalcode,x.objisn,x.riskisn,x.reisn,
+       Case When a1.datebase='I'and a.datebeg between s.DateBeg and s.DateEnd then a.datebeg
+       else   greatest(s.datebeg,a.datebeg) end xDateBeg,
+       Case When a1.datebase='I'and a.datebeg between s.DateBeg and s.DateEnd then a.dateend
+       else  Least(s.dateend,a.dateend) end  xDateEnd,
+
+       s.datebeg sDatebeg,
+       s.dateEnd sDateEnd,
+       x.ISCALC,x.limitusd,
+       A1.clientisn SubjIsn,
+       s.currisn sCurrIsn,
+       s.premiumtype,
+       1 nOrig,
+       x.shareneorig,
+       a1.id AS reid -- EGAO 27.03.2012
+     from tt_rowId t, Rep_AgrX x, ais.agreement a, ais.agreement a1, ais.resection S
+     where t.isn=X.Isn
+       and a.isn=x.agrisn and x.sectisn=s.isn and a1.isn=x.reisn
+       and a1.status in ('Р’','Р”','Р©','РЎ')
+     order by a.isn, nvl(x.objisn,0),nvl(x.riskisn,0), nvl(to_char(s.orderno),s.secttype||s.id))
+  loop
+
+
+  DBMS_APPLICATION_INFO.set_module('Load Agrre By Isns','Loading: '||vCnt);
+  vCnt:=vCnt+1;
+      Begin
+         vRate:=0;
+         vSharePc:=0;
+         vDpremsum:=0;
+         vFlatPrem:=0;
+         p:=0;
+
+
+
+        SELECT Nvl(Least(100, Sum(s1)/Sum(S2))/100,0), -- РґРѕР»СЏ СЂР°Р·РјРµС‰РµРЅРёСЏ СЃРµРєС†РёРё СЃ СѓС‡РµС‚РѕРј СЂР°Р·РјРµС‰РµРЅРёСЏ РєР°Р¶РґРѕРіРѕ Р»РµР№СЂР° (СЃ СѓС‡РµС‚РѕРј РїСЂРѕРїРѕСЂС†РёРё Р»РµР№СЂРѕРІ)
+             Nvl(gcc2.gcc2( Sum(Epi),r.scurrisn,53,r.sdatebeg),0),
+             Nvl(Sum(Rate),0),
+             Nvl(Sum(Dpremsum),0),
+             Nvl(Sum(FlatPrem),0)
+        Into vSharePc,vEpi,vRate,vDpremsum,vFlatPrem
+        From
+          (SELECT
+             Max(decode(Nvl(rc.Rate,0),0,Decode(Nvl(rc.depospremsum,0),0,1,rc.depospremsum),rc.Rate))*Sum(sp.sharepc) s1,
+             Max(decode(Nvl(rc.Rate,0),0,Decode(Nvl(rc.depospremsum,0),0,1,rc.depospremsum),rc.Rate)) s2,
+             Max(Epi) Epi,
+             Max(rc.Rate) Rate,
+             gcc2.gcc2(Max(Case When r.reclassisn<>9018 and Nvl(r.rate,0)>0 then rc.depospremsum else 0 end),R.SCurrIsn,53,r.sDatebeg) Dpremsum,
+             gcc2.gcc2(Max( Case When r.reclassisn=9018 Or Nvl(r.rate,0)=0 then  rc.depospremsum else 0 end),R.SCurrIsn,53,r.sDatebeg) FlatPrem
+
+           FROM recond rc, RESUBJPERIOD sp
+           WHERE rc.SectIsn= r.sectisn
+             And sp.CONDISN=rc.isn
+             and sp.parentisn is null
+           group by rc.isn);
+
+
+
+
+      Com1:=0;
+
+      if r.secttype='QS' then --1
+
+        select RECOMMISS,OVRCOMMISS into Com1, Com2
+        from Ais.recond
+        where sectisn=r.sectisn;
+
+
+
+
+
+
+         If vRate=0 then -- РµСЃР»Рё СЃРѕР±СЃ СѓРґРµСЂР¶Р°РЅРёРµ РЅРµ СѓРєР°Р·Р°РЅРЅРѕ, СЃС‡РёС‚Р°РµРј РґРѕР»СЋ РІ РґРѕРі-СЂРµ(p)
+              select
+                 gcc2.gcc2(limitsum,r.scurrisn/*r.currisn*/,r.agrcurrisn,r.sdatebeg)
+              into L from recond where sectisn=r.sectisn;
+
+
+
+                 if r.ObjIsn>0 or r.riskisn>0 then
+                   r.insuredsum:=getisum2(r.aisn,r.agrcurrisn,r.datebeg,r.ObjIsn,r.riskisn,r.limiteverymode,r.sectisn);
+                   r.limitsum:=0;
+                elsif r.limiteverymode='Y' then
+                      ----EGAO 10.03.2011 r.insuredsum:=getisum2(r.aisn,r.agrcurrisn,r.datebeg,0,0,'Y');
+                      SELECT max(SUM(limitsum))
+                      INTO r.insuredsum
+                      FROM(
+                      SELECT connect_by_root(objisn) AS prnobj, a.limitsum
+                      FROM (SELECT gcc2.gcc2(nvl(x.limiteverysum, x.limitsum), b.currisn, r.agrcurrisn, r.datebeg) AS limitsum, b.objisn, b.parentobjisn
+                            FROM agrcond x, repcond b WHERE b.condisn=x.isn AND x.agrisn=r.aisn) a
+                      START WITH a.parentobjisn IS NULL
+                      CONNECT BY PRIOR a.objisn=a.parentobjisn
+                      )
+                      GROUP BY prnobj;
+
+                      r.limitsum:=0;
+                end if;
+
+                isum:=((Nvl(r.insuredsum,0)+Nvl(r.limitsum,0))*Nvl(r.sharepc,100)/100);
+
+                 --dbms_output.put_line(l);
+                 --dbms_output.put_line(isum);
+
+
+                  if isum>0 then
+                      p:=Least(1,l/isum)*vSharePc; -- РµСЃР»Рё L=null - С‚Рѕ СЃРµРєС†РёСЏ Р±РµСЃРєРѕРЅРµС‡РЅР°СЏ
+                      vRate:=P;
+                  else p:=0; end if;
+
+
+              If Nvl(p,0)=0 then -- РµСЃР»Рё РґР»СЏ РєРІРѕС‚С‹ С‡С‚Рѕ-С‚Рѕ РЅРµ РїРѕР»СѓС‡РёР»РѕСЃСЊ - РѕРЅР° СЂР°РІРЅР° РґРѕР»Рё СЂР°Р·РјРµС‰РµРЅРёСЏ
+              p:=vSharePc;
+             end if;
+
+          else
+             p:=(1-vRate/100); -- РµСЃР»Рё СЃРѕР±СЃ СѓРґРµСЂР¶Р°РЅРёРµ  СѓРєР°Р·Р°РЅРЅРѕ, СЃС‡РёС‚Р°РµРј РґРѕР»СЏ (p) = 1 - СЃРѕР±СЃ СѓРґРµСЂР¶Р°РЅРёРµ
+             r.NOrig:=1;
+
+           end if;
+
+      else Com2:=0;
+      END IF;
+
+
+ if r.secttype='SP' then -- СЂР°СЃСЃС‡РµС‚ РґРѕР»Рё РґР»СЏ SP - РІСЃРµРіРґР° СЃС‡РёС‚Р°РµРј
+   select gcc2.gcc2(prioritysum,r.scurrisn/*r.currisn*/,r.agrcurrisn,r.sdatebeg),
+          gcc2.gcc2(limitsum,r.scurrisn/*r.currisn*/,r.agrcurrisn,r.sdatebeg)
+          into S,L from recond where sectisn=r.sectisn;
+/*
+dbms_output.put_line('r.currisn '||r.currisn);
+dbms_output.put_line('agrcurrisn '||r.agrcurrisn);
+dbms_output.put_line('sdatebeg '||r.sdatebeg);
+
+dbms_output.put_line('s '||s);
+dbms_output.put_line('l '||l);
+*/
+          if r.ObjIsn>0 or r.riskisn>0 then
+           r.insuredsum:=getisum2(r.aisn,r.agrcurrisn,r.datebeg,r.ObjIsn,r.riskisn,r.limiteverymode,r.sectisn);
+           r.limitsum:=0;
+          elsif r.limiteverymode='Y' then
+              --EGAO 10.03.2011 r.insuredsum:=getisum2(r.aisn,r.agrcurrisn,r.datebeg,0,0,'Y');
+              SELECT max(SUM(limitsum))
+              INTO r.insuredsum
+              FROM(
+              SELECT connect_by_root(objisn) AS prnobj, a.limitsum
+              FROM (SELECT gcc2.gcc2(nvl(x.limiteverysum, x.limitsum), b.currisn, r.agrcurrisn, r.datebeg) AS limitsum, b.objisn, b.parentobjisn
+                    FROM agrcond x, repcond b WHERE b.condisn=x.isn AND x.agrisn=r.aisn) a
+              START WITH a.parentobjisn IS NULL
+              CONNECT BY PRIOR a.objisn=a.parentobjisn
+              )
+              GROUP BY prnobj;
+
+
+              r.limitsum:=0;
+          end if;
+
+          isum:=((r.insuredsum+r.limitsum)*r.sharepc/100);
+
+--dbms_output.put_line('isum '||isum);
+
+--   If isum>0 and (s is null or L is null) then
+  --     p:=vSharePc/100;-- РµСЃР»Рё L=null - С‚Рѕ СЃРµРєС†РёСЏ Р±РµСЃРєРѕРЅРµС‡РЅР°СЏ
+
+   if isum>0 then
+       p:=Least(Greatest((isum-S)/isum,0),( L-S)/isum)*vSharePc;-- РµСЃР»Рё L=null - С‚Рѕ СЃРµРєС†РёСЏ Р±РµСЃРєРѕРЅРµС‡РЅР°СЏ
+   else p:=0; end if;
+
+ end if;
+
+
+      if r.secttype='XL' then --1
+
+
+           If vRate>0 then -- and (r.Datebase='I' or R.reclassisn=9018) then -- СѓРєР°Р·Р°РЅРЅР° СЃС‚Р°РІРєР° РїРµСЂРµСЂР°СЃС‡РµС‚Р°
+             p:=(vRate/100)*(vSharePc);
+           end if;
+           --els
+           if vEpi>0 and vFlatPrem>0 then -- РµСЃР»Рё РµСЃС‚СЊ Epi Рё СѓРєР°Р·Р°РЅРЅР° С„Р»СЌС‚-РїСЂРµРјРёСЏ
+             p:=0;--(vSharePc/100)*(vFlatPrem/vEpi);
+
+            elsIf (Nvl(vEpi,0)=0) and Nvl(vFlatPrem,0)>0 then -- РµСЃР»Рё РЅРµС‚ Epi Рё СѓРєР°Р·Р°РЅРЅР° С„Р»СЌС‚-РїСЂРµРјРёСЏ, С‚Рѕ СЃС‡РёС‚Р°РµРј РµРіРѕ
+              Select --+ Ordered Use_Nl(rc) index ( rc X_REPCOND_AGR )
+                Decode(Sum(rc.premusd*NORIG),0,1,Sum(rc.premusd*NORIG))
+              Into vEpi
+             from rep_agrx ax, repcond rc
+             Where ax.sectisn=r.sectisn
+                 and rc.agrisn=ax.agrisn
+                 and rc.newaddisn is null
+                 and (ax.ObjIsn=0 or Rc.PARENtObjIsn=ax.ObjIsn or Rc.ObjIsn=ax.ObjIsn )
+                 and ( ax.RiskIsn=0 or Rc.PARENTRISKISN=ax.RiskIsn or Rc.RiskIsn=ax.RiskIsn );
+
+               p:=0;--(vSharePc/100)*(vFlatPrem/vEpi);
+
+            end if;
+--         end if;
+
+      end if;
+
+
+-- СЃС‚Р°СЂС‹Р№ РјРµС‚РѕРґ СЂР°СЃСЃС‡РµС‚Р° РґРѕР»Рё
+ vOldRate:=1;
+      If nvl(r.xpc,0)=0 Then
+        begin
+          pOld:=Storages.GetAgrReInfo(r.aisn,r.sectisn,r.ObjIsn,r.riskisn);
+        exception when others then
+          --dbms_output.put_line('Agrisn '||r.aisn||'Sectisn '||r.sectisn);
+          raise;
+        end;
+     ELSE
+        pOld:=r.xpc;
+      end if; --nvl(r.xpc,0)=0
+
+
+      if r.secttype='XL' then --1
+        Select Decode(nvl(r.Rate/100,1),0,1,nvl(r.Rate/100,1)) into vOldRate
+        From Dual;
+
+        If r.reclassisn=9018 and nvl(r.Rate,0)=0 then
+          Select Getcrosscover(Sum(rc.depospremsum),R.SCurrIsn,53,r.xDatebeg) Into vOldRate
+          from recond rc
+          where Sectisn=r.sectisn;
+
+          Select /*+ Ordered Use_Nl(rc) index ( rc X_REPCOND_AGR) */
+            vOldRate/Decode(Sum(rc.premusd),0,1,Sum(rc.premusd)) Into vOldRate
+          from rep_agrx ax, repcond rc
+          Where ax.sectisn=r.sectisn
+            and rc.agrisn=ax.agrisn
+            and rc.newaddisn is null
+            and (Nvl(Rc.PARENtObjIsn,Rc.ObjIsn)=ax.ObjIsn or ax.ObjIsn=0)
+            and (Nvl(Rc.PARENTRISKISN,Rc.RiskIsn)=ax.RiskIsn or ax.RiskIsn=0);
+
+          If vOldRate>1 then vOldRate:=1; end if;
+
+          If Nvl(vOldRate,0)>0 Then
+             pOld:=100*vSharePc;
+          end if;
+        end if;
+      end if;
+
+-- СЃС‚Р°СЂС‹Р№ РјРµС‚РѕРґ СЂР°СЃСЃС‡РµС‚Р° РґРѕР»Рё
+
+
+
+
+
+
+      select /*+ Index(r X_REPCOND_AGR)*/ max(agrisn) into vAgr
+      from repcond r
+      where agrisn=r.aisn and rownum=1; -- РїСЂРѕРІРµСЂРєР° РЅР° СЂРµС‚СЂРѕС†РµСЃСЃРёСЋ РёР»Рё РґРѕРіРѕРІРѕСЂ Р±РµР· РєРѕРЅРґРѕРІ
+
+      select nvl(max(isn),0) into vDept0Isn
+      from subdept
+      where parentisn=0
+      start with isn=r.redeptisn connect by prior parentisn=isn;
+
+      --{EGAO 12.08.2011
+      IF AgrxInsuredTab.Exists(to_char(r.xisn)) THEN
+        vAgrxInsuredSum :=  AgrxInsuredTab(to_char(r.xisn)).InsuredSum;
+        vAgrxInsuredCurrDate := AgrxInsuredTab(to_char(r.xisn)).CurrDate;
+      ELSE
+        pparam.Clear;
+        pparam.SetParamN('AgrxIsn',r.xisn);
+
+        SELECT NVL(MAX(a.InsuredSum),0), MAX(a.currdate)
+        INTO vAgrxInsuredSum, vAgrxInsuredCurrDate
+        FROM v_agrxinsuredsum a;
+
+        AgrxInsuredRec.InsuredSum := vAgrxInsuredSum;
+        AgrxInsuredRec.CurrDate := vAgrxInsuredCurrDate;
+        AgrxInsuredTab(to_char(r.xisn)) := AgrxInsuredRec;
+
+      END IF;
+      --}
+
+      if (vAgr is null) or (r.ObjIsn=0 and r.RiskIsn=0) then
+        Insert Into Rep_AgrRe
+         (isn,loadisn,agrisn, objisn, riskisn, sectisn, reisn, sharepc, datebase, datebeg, dateend, condisn, datebegx, dateendx,
+          agrxisn, OUTCOMPC, OUTCOMPC1, reclassisn, redept0isn, SubjIsn, RESHAREPC, DEPPREMUSD,
+          Rate,premiumtype,EPI,NORIG,FLATPREMUSD,sDatebeg,sDateEnd,secttype,OLDSHAREPC, AgrxInsuredSum, shareneorig, AgrxInsuredCurrDate, sectcurrisn,
+          agrdatebeg, agrdateend, reid)
+        Values
+         (Seq_Reports.NEXTVAL, pLoadIsn,r.aisn, r.objisn, r.riskisn, r.sectisn, r.reisn,  p, r.datebase, r.datebeg, r.dateend, null,
+          r.Xdatebeg, r.Xdateend, r.xisn, Com1, Com2, r.reclassisn, vDept0Isn, r.SubjIsn, vSharePc, vDpremsum,
+          r.rate,r.premiumtype,vEPI,r.nOrig,vFLATPREM,r.sDatebeg,r.sDateEnd,r.secttype,pOld*vOldRate, vAgrxInsuredSum, r.shareneorig, vAgrxInsuredCurrDate, r.scurrisn,
+          r.datebeg, r.dateend, r.reid);
+      else
+
+       /*kgs 13.07.2012 С‡С‚РѕР±С‹ РїСЂР°РІРёР»СЊРЅРѕ РїРѕРїР°РґР°С‚СЊ РІ РёРЅРґРµРєСЃС‹ РґРµР»Р°РµРј 3 РёРЅСЃРµСЂС‚Р°, РёРЅР°С‡Рµ С‚СѓРїРѕ РґРѕР»РіРѕ РЅР° РґРѕРіРѕРІРѕСЂР°С… СЃ Р±РѕР»СЊС€Рё С‡РёСЃР»РѕРј РєРѕРЅРґРѕРІ */
+
+       IF (r.ObjIsn=0) and  (r.RiskIsn>0)  then /* РІСЃРµ РѕР±СЉРµРєС‚С‹ РЅРµ РІСЃРµ СЂРёСЃРєРё */
+         Insert Into Rep_AgrRe
+         (isn, loadisn,agrisn, objisn, riskisn, sectisn, reisn, sharepc, datebase, datebeg, dateend, condisn, datebegx, dateendx,
+          agrxisn, OUTCOMPC, OUTCOMPC1, reclassisn, redept0isn, SubjIsn, RESHAREPC, DEPPREMUSD,
+          Rate,premiumtype,EPI,NORIG,FLATPREMUSD,sDatebeg,sDateEnd,secttype,OLDSHAREPC,AgrxInsuredSum, shareneorig, AgrxInsuredCurrDate, sectcurrisn,
+          agrdatebeg, agrdateend, reid)
+        select Seq_Reports.NEXTVAL,pLoadIsn,S.*
+        From
+          (Select --+ Use_Concat(rc)
+             Rc.agrisn, r.objisn, r.riskisn, r.sectisn, r.reisn, p, r.datebase,
+             Nvl(rc.Datebeg,r.datebeg), Nvl(rc.Dateend,r.dateend), rc.condisn, r.Xdatebeg, r.Xdateend, r.xisn,
+             com1, com2, r.reclassisn, vDept0Isn,r.SubjIsn,vSharePc,vDpremsum,r.rate,r.premiumtype,
+             vEPI,r.nOrig,vFLATPREM,r.sDatebeg,r.sDateEnd,r.secttype,pOld*vOldRate, vAgrxInsuredSum, r.shareneorig, vAgrxInsuredCurrDate, r.scurrisn,
+             r.datebeg, r.dateend, r.reid
+           from repcond rc
+           where Nvl(Rc.AgrIsn,0) = r.aisn -- С‡С‚РѕР±С‹ РІ РёРЅРґРµРєСЃ РїРѕ РґРѕРіРѕРІРѕСЂСѓ РЅРµ РїРѕРїР°РґР°С‚СЊ
+--             and  (Rc.ObjIsn=r.ObjIsn or Rc.ParentObjIsn=r.ObjIsn or r.ObjIsn=0 )
+             and (Rc.PARENTRISKISN=r.RiskIsn Or Rc.RiskIsn=r.RiskIsn)
+--             and rc.newaddisn is null /*KGS 20.06.2011*/
+                  ) S;
+         end if;    --(r.ObjIsn=0) and  (r.RiskIsn>0)
+
+       IF (r.ObjIsn>0) and  (r.RiskIsn=0)  then /* РІСЃРµ СЂРёСЃРєРё РЅРµ РІСЃРµ  РѕР±СЉРµРєС‚С‹ */
+         Insert Into Rep_AgrRe
+         (isn, loadisn,agrisn, objisn, riskisn, sectisn, reisn, sharepc, datebase, datebeg, dateend, condisn, datebegx, dateendx,
+          agrxisn, OUTCOMPC, OUTCOMPC1, reclassisn, redept0isn, SubjIsn, RESHAREPC, DEPPREMUSD,
+          Rate,premiumtype,EPI,NORIG,FLATPREMUSD,sDatebeg,sDateEnd,secttype,OLDSHAREPC,AgrxInsuredSum, shareneorig, AgrxInsuredCurrDate, sectcurrisn,
+          agrdatebeg, agrdateend, reid)
+        select Seq_Reports.NEXTVAL,pLoadIsn,S.*
+        From
+          (Select --+ Use_Concat(rc)
+             Rc.agrisn, r.objisn, r.riskisn, r.sectisn, r.reisn, p, r.datebase,
+             Nvl(rc.Datebeg,r.datebeg), Nvl(rc.Dateend,r.dateend), rc.condisn, r.Xdatebeg, r.Xdateend, r.xisn,
+             com1, com2, r.reclassisn, vDept0Isn,r.SubjIsn,vSharePc,vDpremsum,r.rate,r.premiumtype,
+             vEPI,r.nOrig,vFLATPREM,r.sDatebeg,r.sDateEnd,r.secttype,pOld*vOldRate, vAgrxInsuredSum, r.shareneorig, vAgrxInsuredCurrDate, r.scurrisn,
+             r.datebeg, r.dateend, r.reid
+           from repcond rc
+           where Nvl(Rc.AgrIsn,0) = r.aisn -- С‡С‚РѕР±С‹ РІ РёРЅРґРµРєСЃ РїРѕ РґРѕРіРѕРІРѕСЂСѓ РЅРµ РїРѕРїР°РґР°С‚СЊ
+             and  (Rc.ObjIsn=r.ObjIsn or Rc.ParentObjIsn=r.ObjIsn  )
+--             and (Rc.PARENTRISKISN=r.RiskIsn Or Rc.RiskIsn=r.RiskIsn)
+--             and rc.newaddisn is null /*KGS 20.06.2011*/
+                  ) S;
+         end if;    --(r.ObjIsn>0) and  (r.RiskIsn=0)
+
+
+       IF (r.ObjIsn>0) and  (r.RiskIsn>0)  then /* РЅРµ РІСЃРµ СЂРёСЃРєРё РЅРµ РІСЃРµ  РѕР±СЉРµРєС‚С‹ */
+         Insert Into Rep_AgrRe
+         (isn, loadisn,agrisn, objisn, riskisn, sectisn, reisn, sharepc, datebase, datebeg, dateend, condisn, datebegx, dateendx,
+          agrxisn, OUTCOMPC, OUTCOMPC1, reclassisn, redept0isn, SubjIsn, RESHAREPC, DEPPREMUSD,
+          Rate,premiumtype,EPI,NORIG,FLATPREMUSD,sDatebeg,sDateEnd,secttype,OLDSHAREPC,AgrxInsuredSum, shareneorig, AgrxInsuredCurrDate, sectcurrisn,
+          agrdatebeg, agrdateend, reid)
+        select Seq_Reports.NEXTVAL,pLoadIsn,S.*
+        From
+          (Select --+ Use_Concat(rc)
+             Rc.agrisn, r.objisn, r.riskisn, r.sectisn, r.reisn, p, r.datebase,
+             Nvl(rc.Datebeg,r.datebeg), Nvl(rc.Dateend,r.dateend), rc.condisn, r.Xdatebeg, r.Xdateend, r.xisn,
+             com1, com2, r.reclassisn, vDept0Isn,r.SubjIsn,vSharePc,vDpremsum,r.rate,r.premiumtype,
+             vEPI,r.nOrig,vFLATPREM,r.sDatebeg,r.sDateEnd,r.secttype,pOld*vOldRate, vAgrxInsuredSum, r.shareneorig, vAgrxInsuredCurrDate, r.scurrisn,
+             r.datebeg, r.dateend, r.reid
+           from repcond rc
+           where Nvl(Rc.AgrIsn,0) = r.aisn -- С‡С‚РѕР±С‹ РІ РёРЅРґРµРєСЃ РїРѕ РґРѕРіРѕРІРѕСЂСѓ РЅРµ РїРѕРїР°РґР°С‚СЊ
+             and  (Rc.ObjIsn=r.ObjIsn or Rc.ParentObjIsn=r.ObjIsn  )
+              and (Rc.PARENTRISKISN=r.RiskIsn Or Rc.RiskIsn=r.RiskIsn)
+--             and rc.newaddisn is null /*KGS 20.06.2011*/
+                  ) S;
+         end if;    --(r.ObjIsn>0) and  (r.RiskIsn=0)
+
+
+
+      end if;
+    exception When No_Data_Found THen
+      Null;
+    end;
+--end if; --BAG!!! ---33
+  end loop;
+  commit;
+END; -- Procedure
+
+
+  CREATE OR REPLACE PROCEDURE "STORAGES"."MAKE_REPBUH2RESECTION" is
+  sesId NUMBER;
+  vSQL VARCHAR2(4000);
+  vCnt NUMBER := 0;
+  vMaxIsn NUMBER := -1;
+  vMinIsn NUMBER := -1;
+  vLoadObjCnt NUMBER := 10000;
+BEGIN
+  EXECUTE IMMEDIATE 'TRUNCATE TABLE storages.repbuh2resection REUSE STORAGE';
+  store_and_drop_table_index('storages.repbuh2resection');
+  sesId:=Parallel_Tasks.createnewsession();
+  LOOP
+    SELECT max (agrisn)
+    INTO vMaxIsn
+    FROM (
+          SELECT --+ index (b X_REP_AGRRE_AGR)
+                 agrIsn
+          FROM rep_agrre b
+          WHERE agrisn > vMinIsn
+            AND ROWNUM <= vLoadObjCnt
+         );
+    IF (vMaxIsn IS NULL) THEN EXIT; END IF;
+    
+    vSql:='declare
+              vMinIsn number :='||vMinIsn||';
+              vMaxIsn number :='||vMaxIsn||';
+              vCnt    number :='||vCnt||';
+           begin
+             dbms_application_info.set_module(''repbuh2resection'',''Thread: ''||vCnt);
+             storages.make_repbuh2resection_by_isn(vMinIsn, vMaxIsn);
+           end;';
+    System.Parallel_Tasks.processtask(sesid,vsql);
+    vCnt:=vCnt+1;
+    vMinIsn:=vMaxIsn;
+    DBMS_APPLICATION_INFO.set_module('repbuh2resection','Applied: '||vCnt*vLoadObjCnt);
+  END LOOP;
+  Parallel_Tasks.endsession(sesid);
+  restore_table_index('storages.repbuh2resection');
+END;
+
+
+  CREATE OR REPLACE PROCEDURE "STORAGES"."MAKE_REPBUH2RESECTION_BY_ISN" (pMinagrIsn IN NUMBER, pMaxAgrIsn IN NUMBER)
+IS 
+BEGIN
+  pparam.clear;
+  pparam.SetParamN('minagrisn', pMinagrIsn);
+  pparam.SetParamN('maxagrisn', pMaxAgrIsn);
+  
+  DELETE FROM tt_repbuh2resection;
+  
+  INSERT INTO tt_repbuh2resection(
+        agrisn, bodyisn, buhcurrisn, buhamount, buhamountrub, buhamountusd,
+        amount, amountrub, amountusd, statcode, dateval, sagroup, rptgroupisn,
+        motivgroupisn, rptclass, rptclassisn, budgetgroupisn, refundisn,
+        refundextisn, reisn, sectisn, sectpc, shareneorig, reinsuranceperiodpc, reagrclassisn, buhisn
+        )
+  SELECT agrisn, bodyisn, buhcurrisn, buhamount, buhamountrub, buhamountusd,
+         amount, amountrub, amountusd, statcode, dateval, sagroup, rptgroupisn,
+         motivgroupisn, rptclass, rptclassisn, budgetgroupisn, refundisn,
+         refundextisn, reisn, sectisn, sectpc, shareneorig, reinsuranceperiodpc, reagrclassisn, buhisn
+  FROM v_repbuh2resection a;
+
+  INSERT INTO repbuh2resection(
+   isn, agrisn, bodyisn, buhcurrisn, buhamount, buhamountrub, buhamountusd,
+   amount, amountrub, amountusd, statcode, dateval, sagroup, rptgroupisn,
+   motivgroupisn, rptclass, rptclassisn, budgetgroupisn, refundisn,
+   refundextisn, reisn, sectisn, sectpc, shareneorig, reinsuranceperiodpc, reagrclassisn, buhisn
+   )
+  SELECT seq_re.nextval, agrisn, bodyisn, buhcurrisn, buhamount, buhamountrub, buhamountusd,
+        amount, amountrub, amountusd, statcode, dateval, sagroup, rptgroupisn,
+        motivgroupisn, rptclass, rptclassisn, budgetgroupisn, refundisn,
+        refundextisn, reisn, sectisn, sectpc, shareneorig, reinsuranceperiodpc, reagrclassisn, buhisn
+  FROM tt_repbuh2resection a;
+
+  COMMIT;
+
+END;
+
+
+  CREATE OR REPLACE PROCEDURE "STORAGES"."MAKE_REPBUHRE2DIRECTANALYTICS" 
+IS
+  sesId NUMBER;
+  vSQL VARCHAR2(4000);
+  vCnt NUMBER := 0;
+  vMaxIsn NUMBER := -1;
+  vMinIsn NUMBER := -1;
+  vLoadObjCnt NUMBER := 50000;
+BEGIN
+  EXECUTE IMMEDIATE 'truncate table repbuhre2directanalytics reuse storage';
+  EXECUTE IMMEDIATE 'truncate table storages.tt_buhre2directanalytics';
+  EXECUTE IMMEDIATE 'truncate table storages.tt_pay_re'; -- РґРѕР»СЏ РїРµСЂРµСЃС‚СЂР°С…РѕРІС‰РёРєРѕРІ РІ РІС‹РїР»Р°С‚Р°С…
+  --dbms_lock.sleep(10);
+  store_and_drop_table_index('storages.repbuhre2directanalytics',1);
+
+
+  DBMS_APPLICATION_INFO.set_module('repbuhre2directanalytics','fill tt_pay_re');
+  -- Р·Р°РїРѕР»РЅРµРЅРёРµ tt_pay_re
+  INSERT INTO tt_pay_re(bodyisn,
+                        dateval,
+                        refundisn,
+                        claimcurrisn,
+                        reamount,
+                        repc,
+                        refundextisn,
+                        dateloss)
+  SELECT --+ parallel ( r 32 )
+    bodyisn,
+    MAX(r.dateval),
+    r.refundisn,
+    max(r.claimcurrisn),
+    sum(reamount) AS reamount, Sum(-reamount)/SUM(gcc2p(gcc2p(r.buhamount,r.BUHCURRISN,r.refundcurrisn,r.dateval),r.refundcurrisn,r.claimcurrisn,r.repdateloss)) RePc,
+    r.refundextisn,
+    MIN(r.repdateloss) AS dateloss
+  FROM storage_source.rep_refund_payments_re r
+  GROUP BY r.bodyisn,r.refundisn, r.refundextisn
+  HAVING SUM(buhamount)<>0;
+
+  --РѕС‚СЃР°Р¶РёРІР°РµРј РёСЃС…. РїСЂРѕРІРѕРґРєРё СЃ РЅРµСЂР°СЃС€РёС„СЂРѕРІР°РЅРЅРѕР№ РЈР“
+  DBMS_APPLICATION_INFO.set_module('repbuhre2directanalytics','fill tt_buhre2directanalytics');
+  INSERT  INTO tt_buhre2directanalytics(
+    bodyisn, 
+    dateval, 
+    statcode, 
+    sagroup,
+    amount, amountusd, amountrub,  
+    buhcurrisn, 
+    buhamount,buhamountusd,buhamountrub,
+    DeptIsn, 
+    subaccisn
+    )
+    SELECT --+ full ( a ) parallel ( a 32 )
+           a.bodyisn,
+           MAX(a.dateval) AS dateval,
+           MAX(a.statcode) AS statcode,
+           MAX(a.sagroup) AS sagroup,
+           SUM(a.amount) AS amount,
+           SUM(a.amountusd) AS amountusd,
+           SUM(a.amountrub) AS amountrub,
+           MAX(a.buhcurrisn) AS currisn,
+           MAX(a.buhamount) AS buhamount,
+           MAX(a.buhamountusd) AS buhamountusd,
+           MAX(a.buhamountrub) AS buhamountrub,
+           max(a.deptisn) AS deptisn,
+           max(a.subaccisn) AS subaccisn
+    FROM repbuh2cond a
+    WHERE a.statcode IN (27,33,35, 351, 924)
+      AND a.agrclassisn IN (9018, 9058)
+      AND a.refundisn IS NULL
+      AND a.sagroup IN (1, 3)
+     -- KGS. РўРёРїР° РІСЃРµ РЅР°РґРѕ РјР°Р·Р°С‚СЊ РЅР° РїСЂСЏРјС‹Рµ РґРѕРіРѕРІРѕСЂС‹ РЅРµ СЃРјРѕС‚СЂСЏ РЅРµ РЅР° С‡С‚Рѕ
+     -- AND a.rptgroupisn=0
+    GROUP BY a.bodyisn;
+
+  COMMIT;
+
+  --РїС‹С‚Р°РµРјСЃСЏ РїСЂРѕСЃС‚Р°РІРёС‚СЊ РЈР“
+  vMaxIsn := -1;
+  vMinIsn := -1;
+  vCnt := 0;
+  vLoadObjCnt := 100;
+  sesId:=Parallel_Tasks.createnewsession();
+  LOOP
+    vMaxIsn:=Cut_Table('tt_buhre2directanalytics','bodyisn',vMinIsn,pRowCount=>vLoadObjCnt);
+    EXIT WHEN vMaxIsn IS NULL;
+
+    vSql:='declare
+              vMinIsn number :='||vMinIsn||';
+              vMaxIsn number :='||vMaxIsn||';
+              vCnt    number :='||vCnt||';
+           begin
+             pparam.clear;
+             pparam.SetParamN(''MinIsn'', vMinIsn);
+             pparam.SetParamN(''MaxIsn'', vMaxIsn);
+             DBMS_APPLICATION_INFO.SET_MODULE(''repbuhre2directanalytics'',''Thread#''||vCNT);
+             
+             delete from storages.tt_repbuhre2directanalytics;
+
+
+            insert into storages.tt_repbuhre2directanalytics
+            select bodyisn,
+                   dateval,statcode,sagroup,buhcurrisn,buhamount,buhamountusd,buhamountrub,
+                   amount,amountusd,amountrub,agrisn,docsumisn,directpc,rptgroupisn,motivgroupisn,
+                   deptisn,reisn,rptclassisn,rptclass,budgetgroupisn,subaccisn,sectisn
+            from storages.v_repbuhre2directanalytics a;
+            
+            INSERT INTO storages.tt_repbuhre2directanalytics
+            SELECT --+ use_hash ( x ) no_merge( x ) index ( a X_REPBUH2COND_BODYISN )
+                   a.bodyisn,
+                   max(a.dateval),
+                   max(a.statcode),
+                   max(a.sagroup),
+                   MAX(a.buhcurrisn),
+                   MAX(a.buhamount),
+                   MAX(a.buhamountusd),
+                   MAX(a.buhamountrub),
+                   SUM(a.amount)*MAX(x.pc),
+                   SUM(a.amountusd)*MAX(x.pc),
+                   SUM(a.amountrub)*MAX(x.pc),
+                   a.agrisn,
+                   a.docsumisn,
+                   1,
+                   a.rptgroupisn,
+                   a.motivgroupisn,
+                   a.DeptIsn,
+                   a.agrisn,
+                   a.rptclassisn,
+                   a.rptclass,
+                   a.budgetgroupisn,
+                   a.subaccisn,
+                   to_number(null)
+            FROM  (SELECT a.bodyisn, 1-CASE WHEN sum(a.amount)=0 THEN 0 ELSE sum(a.amount)/MAX(a.buhamount) END  AS pc
+                   from storages.tt_repbuhre2directanalytics a 
+                   GROUP BY a.bodyisn
+                   HAVING CASE WHEN sum(a.amount)=0 THEN 0 ELSE round(sum(a.amount)/MAX(a.buhamount),4) END<>1 
+                   UNION ALL
+                   SELECT a.bodyisn, 1 AS pc
+                   FROM storages.tt_buhre2directanalytics a, (SELECT DISTINCT bodyisn FROM storages.tt_repbuhre2directanalytics) b 
+                   WHERE a.bodyisn>pparam.GetParamN(''MinIsn'') AND a.bodyisn<=pparam.GetParamN(''MaxIsn'')
+                     AND b.bodyisn(+)=a.bodyisn AND b.bodyisn IS NULL 
+                  ) x, 
+                  repbuh2cond a 
+            WHERE a.bodyisn>pparam.GetParamN(''MinIsn'') AND a.bodyisn<=pparam.GetParamN(''MaxIsn'')
+              AND x.bodyisn=a.bodyisn
+            GROUP BY a.bodyisn,a.agrisn,a.docsumisn,a.rptgroupisn,a.motivgroupisn,
+                     a.DeptIsn,a.rptclassisn,a.rptclass,a.budgetgroupisn,a.subaccisn;
+
+            insert into repbuhre2directanalytics(
+              bodyisn,
+              dateval,statcode,sagroup,buhcurrisn,buhamount,buhamountusd,
+              buhamountrub,amount,amountusd,amountrub,agrisn,docsumisn,
+              directpc,rptgroupisn,motivgroupisn,deptisn,reisn,
+              rptclassisn,rptclass,budgetgroupisn,subaccisn,sectisn
+            ) 
+            select bodyisn,dateval,statcode,sagroup,buhcurrisn,
+                   buhamount,buhamountusd,buhamountrub,amount,amountusd,
+                   amountrub,agrisn,docsumisn,directpc,rptgroupisn,
+                   motivgroupisn,deptisn,reisn,rptclassisn,rptclass,budgetgroupisn,subaccisn,sectisn 
+            from storages.tt_repbuhre2directanalytics;
+            commit;
+           end;';
+    System.Parallel_Tasks.processtask(sesid,vsql);
+
+    vCnt:=vCnt+1;
+
+    vMinIsn:=vMaxIsn;
+    DBMS_APPLICATION_INFO.set_module('repbuhre2directanalytics','Applied: '||vCnt*vLoadObjCnt);
+
+  END LOOP;
+
+  Parallel_Tasks.endsession(sesid);
+
+  --РїСЂРѕРІРѕРґРєРё, РЈР“ РєРѕС‚РѕСЂС‹С… Р±РµСЂСѓСЋС‚СЃСЏ РёР· repbuh2cond РєР°Рє РµСЃС‚СЊ
+  INSERT  INTO repbuhre2directanalytics(bodyisn,
+                                          dateval,
+                                          statcode,
+                                          sagroup,
+                                          buhcurrisn,
+                                          buhamount,
+                                          buhamountusd,
+                                          buhamountrub,
+                                          amount,
+                                          amountusd,
+                                          amountrub,
+                                          agrisn,
+                                          docsumisn,
+                                          directpc,
+                                          rptgroupisn,
+                                          motivgroupisn,
+                                          DeptIsn,
+                                          reisn, -- ??? С‡С‚Рѕ РІ СЌС‚РѕРј СЃР»СѓС‡Р°Рµ РІРµРґСЊ РЅРµС‚ РїСЂРјРѕРіРѕ РґРѕРіРѕРІРѕСЂР° (РїРѕРєР° С‚Р°Рє) KGS - С‚Р°Рє РІСЃРµРіРґР° Рё Р±С‹Р»Рѕ - Р·РЅР°С‡РёС‚ РїСЂР°РІРёР»СЊРЅРѕ
+                                          rptclassisn,
+                                          rptclass,
+                                          budgetgroupisn,
+                                          subaccisn
+
+
+                                          )
+  SELECT --+ full ( a ) parallel ( a 32 )
          a.bodyisn,
+         max(a.dateval),
+         max(a.statcode),
+         max(a.sagroup),
+         MAX(a.buhcurrisn),
+         MAX(a.buhamount) AS buhamount,
+         MAX(a.buhamountusd) AS buhamountusd,
+         MAX(a.buhamountrub) AS buhamountrub,
+
+         SUM(a.amount) AS amount,
+         SUM(a.amountusd) AS amountusd,
+         SUM(a.amountrub) AS amountrub,
+
+         a.agrisn,
+         a.docsumisn,
+         1,
          a.rptgroupisn,
          a.motivgroupisn,
-         a.budgetgroupisn, a.rptclass, a.rptclassisn, a.refundisn, a.refundextisn,
-         a.sectisn,
-         a.shareneorig
-;
+         a.DeptIsn,
+         a.agrisn,
+         a.rptclassisn,
+         a.rptclass,
+         a.budgetgroupisn,
+         a.subaccisn
 
-  CREATE OR REPLACE FORCE VIEW "STORAGES"."V_REPBUHRE2DIRECTANALYTICS" ("BODYISN", "DATEVAL", "STATCODE", "SAGROUP", "BUHCURRISN", "BUHAMOUNT", "BUHAMOUNTUSD", "BUHAMOUNTRUB", "AGRISN", "DOCSUMISN", "RPTGROUPISN", "DIRECTPC", "AMOUNT", "AMOUNTUSD", "AMOUNTRUB", "MOTIVGROUPISN", "DEPTISN", "REISN", "RPTCLASSISN", "RPTCLASS", "BUDGETGROUPISN", "SUBACCISN", "SECTISN") AS 
-  SELECT a.bodyisn, -- исх. проводка
-       a.dateval, -- дата исх. проводки
-       a.statcode, -- тип исх. проводки
-       a.sagroup,  -- тип суммы исх. проводки
-       a.buhcurrisn, -- валюта исх. проводки
-       a.buhamount, -- сумма исх. прводки (неаддитивная)
-       a.buhamountusd,
-       a.buhamountrub,
-       a.agrisn,
-       a.docsumisn,
-       NVL(a.rptgroupisn,0) AS rptgroupisn, -- УГ (аналитика прямой проводки)
-       directpc, -- доля суммы исх. проводки, приходящаяся на текущию строку
-       a.amount*a.directpc AS amount, -- сумма исх. проводки (аддитивная)
-       a.amountusd*a.directpc AS amountusd,
-       a.amountrub*a.directpc AS amountrub,
-       NVL(a.motivgroupisn,0) AS motivgroupisn, -- мотивационная группа (аналитика прямой проводки)
-       a.deptisn,
-       a.reisn, -- договор исх. проводки
-       a.rptclassisn, a.rptclass, a.budgetgroupisn, a.subaccisn, a.sectisn
-FROM (
-      SELECT a.bodyisn, a.docsumisn, a.sectisn, a.dateval, a.statcode, a.sagroup, a.buhcurrisn,
-             a.amount, a.amountrub, a.amountusd,
-             a.buhamount, a.buhamountrub, a.buhamountusd,
-             a.rptgroupisn, a.agrisn,
-             a.motivgroupisn, a.deptisn, a.reisn,
-             a.rptclassisn, a.rptclass, a.budgetgroupisn, a.subaccisn,
-             CASE WHEN nvl(directamountruball,0)=0 THEN CASE WHEN a.statcode=35 THEN 0 ELSE 1/allcnt END/*EGAO 20.06.2013 1/allcnt*/ ELSE directamountrub/directamountruball END AS directpc
-      from (
-            SELECT a.bodyisn, a.docsumisn, a.dateval, a.statcode, a.sagroup, a.buhcurrisn,
-                   a.amount, a.amountrub, a.amountusd,
-                   a.buhamount, a.buhamountrub, a.buhamountusd,
-                   a.agrisn, a.rptgroupisn,
-                   a.sectisn,
-                   a.deptisn,
-                   a.motivgroupisn, a.directamountrub, a.reisn,
-                   a.rptclassisn, a.rptclass, a.budgetgroupisn, a.subaccisn,
-                   SUM(a.directamountrub) over (PARTITION BY a.bodyisn, a.sectisn, a.docsumisn) AS directamountruball,
-                   COUNT(1) over (PARTITION BY a.bodyisn, a.sectisn, a.docsumisn) AS allcnt -- EGAO 27.07.2011
-            FROM (
-                  SELECT --+ no_merge ( a ) use_nl ( a c ) index ( c x_directsum2resection_reisn )
-                         a.docsumisn, a.bodyisn,
-                         a.sectisn,
-                         max(a.dateval) AS dateval, max(a.statcode) AS statcode, max(a.sagroup) AS sagroup,
-                         MAX(a.buhcurrisn) AS buhcurrisn,
-                         max(a.amount) AS amount, MAX(a.amountrub) AS amountrub, MAX(a.amountusd) AS amountusd,
-                         max(a.agrisn) AS reisn, c.rptgroupisn, max(a.deptisn) AS deptisn,
-                         c.motivgroupisn,
-                         SUM(CASE
-                               WHEN c.statcode IN (220, 24) THEN
-                                 (SELECT c.amountrub*tre.repc
-                                  FROM storages.tt_pay_re tre
-                                  WHERE tre.refundisn=c.refundisn
-                                    AND nvl(tre.refundextisn,0)=nvl(c.refundextisn,0)
-                                    and tre.bodyisn=c.bodyisn
-                                    AND CASE c.reagrclassisn
-                                          WHEN 9018 THEN 1
-                                          WHEN 9058 THEN
-                                            CASE
-                                              WHEN sign(a.reaccperiod-90)=-1 AND trunc(tre.dateloss) BETWEEN a.reaccdatebeg AND a.reaccdateend THEN 1
-                                              WHEN sign(a.reaccperiod-90)>=0 AND trunc(c.dateval) BETWEEN a.reaccdatebeg AND a.reaccdateend THEN 1
-                                            END
-                                          ELSE 0
-                                        END = 1
-                                 )
-                               WHEN c.statcode IN (38, 34) THEN c.amountrub*c.reinsuranceperiodpc*c.shareneorig
-                             END) AS directamountrub,
-                        nvl(c.agrisn, a.agrisn) AS agrisn,
-                        C.rptclassisn,
-                        C.rptclass,
-                        c.budgetgroupisn,
-                        max(a.subaccisn) AS subaccisn,
-                        MAX(a.buhamount) AS buhamount, max(a.buhamountrub) AS buhamountrub, max(a.buhamountusd) AS buhamountusd
-                  FROM (
-                        SELECT --+ ordered use_nl ( a b ) index ( a X_TT_BUHRE2DIRANALYTICS_BODY )
-                               a.bodyisn, a.dateval, a.statcode,
-                               a.sagroup, a.deptisn, a.subaccisn, a.buhcurrisn,
-                               a.buhamount, a.buhamountrub, a.buhamountusd,
-                               a.amount*NVL(b.sectpc,1)*NVL(b.docsumpc,1) AS amount,
-                               a.amountrub*NVL(b.sectpc,1)*NVL(b.docsumpc,1) AS amountrub,
-                               a.amountusd*NVL(b.sectpc,1)*NVL(b.docsumpc,1) AS amountusd,
-                               b.docsumisn, b.sectisn, b.agrisn,
-                               b.reaccdateend-b.reaccdatebeg+1 AS reaccperiod,
-                               b.reaccdatebeg,
-                               b.reaccdateend
-                        FROM tt_buhre2directanalytics a,
-                             repbuhre2resection_new b -- EGAO 18.12.2013 repbuhre2resection b
-                        WHERE a.bodyisn>pparam.GetParamN('MinIsn') AND a.bodyisn<=pparam.GetParamN('MaxIsn')
-                          AND b.bodyisn(+)=a.bodyisn
-                       ) a, repbuh2resection c
-                  WHERE a.agrisn=c.reisn(+)
-                    AND CASE WHEN a.sectisn IS NULL THEN 1 WHEN a.sectisn=c.sectisn(+) THEN 1 END =1
-                    AND CASE
-                          WHEN a.statcode IN (27, 33, 351, 924) THEN
-                            CASE c.statcode(+)
-                              WHEN 38 THEN 1
-                              WHEN 34 THEN 1
-                              ELSE 0
+
+  FROM  repbuh2cond a
+  WHERE a.statcode IN (27,33,35, 351, 924)
+    AND NOT (nvl(a.agrclassisn,0) IN (9018, 9058) AND a.refundisn IS NULL
+    -- KGS РЎРј РІС‹С€Рµ Р°РЅР°Р»РѕРіРёС‡РЅС‹Р№ РєРѕРјРјРµРЅС‚Р°СЂРёР№
+    --AND a.rptgroupisn=0
+    )
+    AND a.sagroup IN (1, 3)
+  GROUP BY a.bodyisn,
+           a.agrisn,
+           a.docsumisn,
+           a.rptgroupisn,
+           a.motivgroupisn,
+           a.DeptIsn,
+           a.rptclassisn,
+           a.rptclass,
+           a.budgetgroupisn,
+           a.subaccisn
+           ;
+  COMMIT;
+
+  restore_table_index('storages.repbuhre2directanalytics');
+END;
+
+
+  CREATE OR REPLACE PROCEDURE "STORAGES"."MAKE_REPBUHRE2RESECTION" 
+IS
+  vMinIsn number:=-1;
+  vMaxIsn number;
+
+  vSql varchar2(4000);
+  SesId Number;
+  vLoadObjCnt number:=1000;
+  vCnt number:=0;
+BEGIN
+  /*DELETE \*+ FULL ( a )*\ FROM storages.repbuhre2resection a;
+  COMMIT;*/
+  EXECUTE IMMEDIATE 'truncate table storages.repbuhre2resection reuse storage';
+
+  store_and_drop_table_index('storages.repbuhre2resection',1);
+  SesId:=Parallel_Tasks.createnewsession();
+
+  LOOP
+    vMaxIsn:=Cut_Table('ais.reaccsum','reaccisn',vMinIsn,pRowCount=>vLoadObjCnt);
+    EXIT WHEN vMaxIsn IS NULL;
+    vSql:= 'DECLARE
+              vMinIsn number :='||vMinIsn||';
+              vMaxIsn number :='||vMaxIsn||';
+              vCnt    number :='||vCnt||';
+            BEGIN
+              DBMS_APPLICATION_INFO.SET_MODULE(''repbuhre2resection'',''Precess#''||vCNT);
+
+              pparam.SetParamN(''MinIsn'', vMinIsn);
+              pparam.SetParamN(''MaxIsn'', vMaxIsn);
+
+              INSERT INTO storages.repbuhre2resection(
+                                            bodyisn,dateval,statcode,subaccisn,buhcurrisn,
+                                            buhdeptisn,buhamount,amount,docsumisn,docisn,
+                                            dssubjisn,dscurrisn,dsclassisn,dsclassisn2,docsumpc,
+                                            sectisn,secttype,sectdatebeg,sectdateend,sectcurrisn,sectpc,
+                                            reaccisn,reaccdatebeg,reaccdateend,agrisn,agrclassisn,datebase,agrdatebeg,
+                                            agrdateend, isrevaluation)  
+              SELECT bodyisn,dateval,statcode,subaccisn,buhcurrisn,
+                     buhdeptisn,buhamount,amount,docsumisn,docisn,
+                     dssubjisn,dscurrisn,dsclassisn,dsclassisn2,docsumpc,
+                     sectisn,secttype,sectdatebeg,sectdateend,sectcurrisn,sectpc,
+                     reaccisn,reaccdatebeg,reaccdateend,agrisn,agrclassisn,datebase,agrdatebeg,
+                     agrdateend, isrevaluation 
+              FROM storages.v_repbuhre2resection;
+              COMMIT;
+
+           END;';
+    System.Parallel_Tasks.processtask(sesid,vsql);
+    vCnt:=vCnt+1;
+    vMinIsn:=vMaxIsn;
+    DBMS_APPLICATION_INFO.set_module('repbuhre2resection','Applied: '||vCnt*vLoadObjCnt);
+  END LOOP;
+  -- Р¶РґРµРј, РїРѕРєР° Р·Р°РІРµСЂС€Р°С‚СЃСЏ РІСЃРµ РґР¶РѕР±С‹
+  Parallel_Tasks.endsession(sesid);
+
+  -- СЃРѕР·РґР°РµРј РёРЅРґРµРєСЃС‹ РґР»СЏ СѓРєР°Р·Р°РЅРЅРѕР№ СЃРµРєС†РёРё
+  restore_table_index('storages.repbuhre2resection');
+END;
+
+
+  CREATE OR REPLACE PROCEDURE "STORAGES"."P_STORAGELOAD_SENDMAIL" (
+                            vSTAGE varchar2 -- BE - РЅР°С‡Р°Р»Рѕ EN - РєРѕРЅРµС† Р·Р°РіСЂСѓР·РєРё
+                            )
+as
+begin
+
+case vSTAGE
+ when 'BE'
+  then
+   for i in (Select 'storage_info@ingos.ru' MAILADDR from dual
+            /*select MAILADDR from V_STORAGELOAD_SENDMAIL*/ ) loop
+    ais.smtp.Init(i.MAILADDR);
+    ais.smtp.WrtM(490, i.MAILADDR, '<TR FONT face=Arial size=8>РЈРІР°Р¶Р°РµРјС‹Рµ РєРѕР»Р»РµРіРё,</FONT><BR>', 1, 'Р—Р°РіСЂСѓР·РєР° С…СЂР°РЅРёР»РёС‰Р°');
+    ais.smtp.WrtM(490, i.MAILADDR, '<TR FONT face=Arial size=8>Р—Р°РїСѓС‰РµРЅР° РІС‹РіСЂСѓР·РєР° РҐСЂР°РЅРёР»РёС‰Р° РґР°РЅРЅС‹С… РЅР° СЃРµСЂРІРµСЂРµ OLAP.</FONT><BR><BR>', 1, 'РўРµРјР°');
+    ais.smtp.WrtM(490, i.MAILADDR, '<TR FONT face=Arial size=8 style=bold><B>РџСЂРѕСЃСЊР±Р° РџСЂРёРѕСЃС‚Р°РЅРѕРІРёС‚СЊ РїСЂРѕРІРµРґРµРЅРёРµ Р»СЋР±С‹С… СЂРµРіР»Р°РјРµРЅС‚РЅС‹С… СЂР°Р±РѕС‚ РЅР° СЃРµСЂРІРµСЂРµ (Рѕ РІРѕР·РјРѕР¶РЅРѕСЃС‚Рё РІРѕР·РѕР±РЅРѕРІР»РµРЅРёСЏ Р±СѓРґРµС‚ СЃРѕРѕР±С‰РµРЅРѕ РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅРѕ).</B></FONT><BR><BR>', 1, 'РўРµРјР°');
+    ais.smtp.WrtM(490, i.MAILADDR, '<TR FONT face=Arial size=3>РЎ СѓРІР°Р¶РµРЅРёРµРј,</FONT>', 4, 'РўРµРјР°');
+    ais.smtp.WrtM(490, i.MAILADDR, '<TR FONT face=Arial size=3>РћС‚РґРµР» СЂР°Р·СЂР°Р±РѕС‚РєРё РѕС‚С‡РµС‚РЅРѕСЃС‚Рё.</FONT>', 4, 'РўРµРјР°');
+    ais.smtp.ClsM;
+   end loop;
+ when 'EN'
+  then
+   for i in (  Select 'storage_info@ingos.ru' MAILADDR from dual
+       /* select MAILADDR from V_STORAGELOAD_SENDMAIL */) loop
+    ais.smtp.Init(i.MAILADDR);
+    ais.smtp.WrtM(490, i.MAILADDR, '<TR FONT face=Arial size=8>РЈРІР°Р¶Р°РµРјС‹Рµ РєРѕР»Р»РµРіРё,</FONT><BR>', 1, 'Р—Р°РіСЂСѓР·РєР° С…СЂР°РЅРёР»РёС‰Р°');
+    ais.smtp.WrtM(490, i.MAILADDR, '<TR FONT face=Arial size=8>Р’С‹РіСЂСѓР·РєР° РҐСЂР°РЅРёР»РёС‰Р° РґР°РЅРЅС‹С… РЅР° СЃРµСЂРІРµСЂРµ OLAP Р·Р°РєРѕРЅС‡РµРЅР°.</FONT><BR><BR>', 1, 'РўРµРјР°');
+    ais.smtp.WrtM(490, i.MAILADDR, '<TR FONT face=Arial size=3>РЎ СѓРІР°Р¶РµРЅРёРµРј,</FONT>', 4, 'РўРµРјР°');
+    ais.smtp.WrtM(490, i.MAILADDR, '<TR FONT face=Arial size=3>РћС‚РґРµР» СЂР°Р·СЂР°Р±РѕС‚РєРё РѕС‚С‡РµС‚РЅРѕСЃС‚Рё.</FONT>', 4, 'РўРµРјР°');
+    ais.smtp.ClsM;
+   end loop;
+ else null;
+end case;
+
+null;
+END;
+
+  CREATE OR REPLACE PROCEDURE "STORAGES"."REPLOAD_U" 
+   (
+  pIsn In number,
+  pLastisnloaded  In  number:=Null,
+  pLastrundate  In date:=Null,
+  pLastenddate  In date:=Null
+   )
+IS
+JId number;
+vSql Varchar2(4000);
+vnullData Date:=to_date('01.01.1900','dd.mm.yyyy');
+
+BEGIN
+
+vSql:=' Begin
+  Update
+   Repload
+  Set
+   Lastisnloaded=Decode('||Nvl(pLastisnloaded,0)||',0,Lastisnloaded,'||Nvl(pLastisnloaded,0)||'),
+   Lastrundate=Decode('''||Nvl(pLastrundate,vnullData)||''','''||vnullData||''',Lastrundate,'''||Nvl(pLastrundate,vnullData)||'''),
+   Lastenddate=Decode('''||Nvl(pLastenddate,vnullData)||''','''||vnullData||''',Lastenddate,'''||Nvl(pLastenddate,vnullData)||''')
+ Where Isn='||pIsn||';
+Commit;
+end;';
+
+
+--dbms_output.put_line(substr(vSql,1,255));
+--dbms_output.put_line(substr(vSql,255,255));
+Dbms_Job.submit(JId,vSql,SYSDATE,null);
+Commit;
+
+
+END; -- Procedure
+
+  CREATE OR REPLACE PROCEDURE "STORAGES"."SET_AGR_BUHDATE_BY_BUH" 
+-- РљСЂР°СЃСЋРєРѕРІ
+IS
+Begin
+update
+ Report_BuhBody_List A
+Set
+ agrbuhdate= (Case
+              When (StatCode = 38 and DeptIsn = 707480016 and agrbuhdate is Null) Then
+                nvl (A.Agrdatebeg,A.datepay)
+              When (StatCode = 38 and DeptIsn = 707480016 and agrbuhdate is not Null) Then
+                agrbuhdate
+              When Exists(SELECT 1
+                            FROM AgrClause ac
+                            WHERE ac.Agrisn=a.AgrIsn
+                             and ac.classisn=742561400 --c.get('clsValidAfterPayment')
+                             and RowNum<=1) Then
+                     (select min (datepay)
+                      from docsum
+                      where parentisn = docsumisn
+                       and discr = 'F')
+              When (Months_Between(AgrDateEnd,AgrDAteBeg)<13)
+               And AgrStatus  Not in ('Р”','Р©')
+               ANd DeptIsn<>505
+               Then Greatest(Decode(DeptIsn,11414319,Nvl(adddatebeg,AgrDatebeg),Nvl(Nvl(addsign,addDateBeg),AgrDatebeg)),Nvl(AddDatebeg,Agrdatebeg))
+              Else ais.Get_Agr_BuhDate(nvl (addisn,agrisn), docsumisn, deptisn, statcode)
+             end)
+Where Statcode in (38,34,32,99,221,241)
+      And nvl (AgrClassIsn,0)not in (9020,9058)
+      And deptisn  not in (0,504,1002858925) and sagroup in (1,3);
+
+update
+ Report_BuhBody_List A
+Set
+ agrbuhdate= (Case
+                   When Exists(SELECT 1
+                            FROM AgrClause ac
+                            WHERE ac.Agrisn=a.AgrIsn
+                             and ac.classisn=742561400 --c.get('clsValidAfterPayment')
+                             and RowNum<=1) Then
+                     (select min (datepay)
+                      from docsum
+                      where parentisn = docsumisn
+                       and discr = 'F')
+              When (Months_Between(AgrDateEnd,AgrDAteBeg)<13)
+               And AgrStatus Not in ('Р”','Р©')
+               ANd DeptIsn<>505
+               Then Greatest(Decode(DeptIsn,11414319,Nvl(adddatebeg,AgrDatebeg),Nvl(Nvl(addsign,addDateBeg),AgrDatebeg)),Nvl(AddDatebeg,Agrdatebeg))
+              Else ais.Get_Agr_BuhDate(nvl (addisn,agrisn), docsumisn, deptisn, statcode)
+
+                 end)
+Where Statcode in (38,34,32,99,221,241)
+      And nvl (AgrClassIsn,0)not in (9020,9058)
+      And deptisn  not in (0,504,707480016,1002858925)
+      And agrbuhdate is Null  and sagroup in (1,3);
+end;
+
+  CREATE OR REPLACE PROCEDURE "STORAGES"."SET_BUDGETROUPISN_BY_COND" 
+   IS
+BEGIN
+  -----------------------------------------
+  -- Р›Р‘ СЃРѕРіР»Р°СЃРЅРѕ СЃС‚СЂР°С…РѕРІРѕРјСѓ РїСЂРѕРґСѓРєС‚Сѓ (DICX)
+  -----------------------------------------
+/*
+  UPDATE STORAGES.REP_COND_LIST a
+   SET (BUDGETGROUPISN, motivgroupisn) = (SELECT MAX(Dx.classisn2),MAX(Dx.classisn2)
+                                          FROM dicX dx
+                                           WHERE Classisn=2366708603 -- РѕС‚РЅРѕС€РµРЅРёРµ "РџР РћР”РЈРљРў Р”РћР“РћР’РћР Рђ=>Р›РРќРРЇ Р‘РР—РќР•РЎРђ (NEW)" (classisn1 - РїСЂРѕРґСѓРєС‚, classisn2 - Р»РёРЅРёСЏ)
+                                          AND (a.ruleisnagr in (Select Isn from dicti Start With Isn=classisn1 connect By Prior Isn=PArentIsn)));
+
+KGS 11.05.2012
+*/
+
+/* РєРѕРґ СЃС‚СЂР°С€РЅС‹Р№, РѕРґРЅР°РєРѕ: РѕС‚ РїСЂРѕРґСѓРєС‚Р° РёРґРµРј РІРІРµСЂС… РїРѕ РґРµСЂРµРІСѓ. Р”Р»СЏ РєР°Р¶РґРѕРіРѕ СѓР·Р»Р° РёС‰РµРј РЅР°СЃС‚СЂРѕР№РєСѓ РІ DicX
+
+Р‘РµСЂРµРј РїРµСЂРІСѓСЋ РЅРµ РїСѓСЃС‚СѓСЋ Рё Р±Р»РёР¶Р°Р№С€СѓСЋ РїРѕ СѓСЂРѕРІРЅСЋ.
+ */
+
+  UPDATE STORAGES.REP_COND_LIST a
+   SET (BUDGETGROUPISN, motivgroupisn )=
+              (
+              select
+             Max( (SELECT MAX(Dx.classisn2)
+                   FROM dicX dx
+                   WHERE Classisn=2366708603
+                     and ClassIsn1=D.Isn ) )  keep (dense_rank First Order by Decode((
+                                                                    SELECT MAX(Dx.classisn2)
+                                                                    FROM dicX dx
+                                                                    WHERE Classisn=2366708603
+                                                                      and ClassIsn1=D.Isn
+                                                                     ),null,1,0),Level),
+             Max( (SELECT MAX(Dx.classisn2)
+                   FROM dicX dx
+                   WHERE Classisn=2366708603
+                     and ClassIsn1=D.Isn ) )  keep (dense_rank First Order by Decode((
+                                                                    SELECT MAX(Dx.classisn2)
+                                                                    FROM dicX dx
+                                                                    WHERE Classisn=2366708603
+                                                                      and ClassIsn1=D.Isn
+                                                                     ),null,1,0),Level)
+
+       from dicti d
+      Start With Isn=A.ruleisnagr
+      connect By Prior PArentIsn=Isn
+      );
+
+
+   -----------------------------------
+   -- Р›Р‘ СЃРѕРіР»Р°СЃРЅРѕ РґРµС‚Р°Р»РёР·Р°С†РёРё РїСЂРѕРґСѓРєС‚Р°
+   -----------------------------------
+   --  Р¤Р“РЈРџ "РљРћРЎРњРР§Р•РЎРљРђРЇ РЎР’РЇР—Р¬"
+  UPDATE STORAGES.REP_COND_LIST A
+  SET BUDGETGROUPISN=2366821803, -- РљРћРЎРњ. РЎРўР РђРҐ-Р• Р¤Р“РЈРџ РљРћРЎРњ-РЇ РЎР’РЇР—Р¬
+      motivgroupisn =2366821803
+  Where a.ruleisnagr IN (SELECT d.isn
+                         FROM dicti d
+                         START WITH d.isn IN(683213616, 36626416)
+                         CONNECT BY PRIOR d.isn=d.parentisn
+                        )
+    and a.AgrIsn In (Select  Agrisn  from agrext Where x1 =2314945103 );
+
+  --  РђРіСЂРѕРїСЂРѕРјС‹С€Р»РµРЅРЅРѕРµ СЃС‚СЂР°С…РѕРІР°РЅРёРµ
+
+
+  UPDATE STORAGES.REP_COND_LIST A
+  SET BUDGETGROUPISN=2366843303, -- РЎС‚СЂР°С…РѕРІР°РЅРёРµ СЃРµР»СЊСЃРєРѕС…РѕР·СЏР№СЃС‚РІРµРЅРЅС‹С… СЂРёСЃРєРѕРІ
+      motivgroupisn =2366843303
+  Where a.ruleisnagr IN (SELECT d.isn
+                         FROM dicti d
+                         START WITH d.isn=1104369003 -- РРњРЈР©Р•РЎРўР’Рћ Р®Р . Р›РР¦
+                         CONNECT BY PRIOR d.isn=d.parentisn
+                        )
+    and a.AgrIsn In (Select  Agrisn from agrext Where x1 =2933455203);
+
+  --{ EGAO 06.03.2013
+  /*-- KGR 11.03.2011  Р”РРў-10-4-121942
+
+  -- С‚РµРїРµСЂСЊ РІСЃРµ СЃРµР»СЊС…РѕР·СЂРёСЃРєРё РІ " РєСЂРѕРјРµ СЂР°СЃС‚РёРµРЅРёРІРѕРґСЃС‚РІР°"
+  UPDATE STORAGES.REP_COND_LIST A
+  SET BUDGETGROUPISN=3290674303,
+      motivgroupisn =3290674303
+  Where motivgroupisn=2366843303;
+
+
+-- Рё РІ "СЂР°СЃС‚РёРµРЅРёРІРѕРґСЃС‚РІРѕ" С‚РѕР»СЊРєРѕ С‚РµС…, РіРґРµ СЂР°СЃС‚РµРЅРёСЏ
+   UPDATE STORAGES.REP_COND_LIST A
+  SET BUDGETGROUPISN=3290673703,
+      motivgroupisn =3290673703
+  Where motivgroupisn=3290674303 and
+  objclassisn in ( SELECT d.isn
+                         FROM dicti d
+                         START WITH d.isn=2798546103 -- СЂР°СЃС‚РµРЅРёСЏ
+                         CONNECT BY PRIOR d.isn=d.parentisn);
+
+
+  -- KGR 11.03.2011  Р”РРў-10-4-121942*/
+  UPDATE STORAGES.REP_COND_LIST A
+  SET (a.BUDGETGROUPISN, a.motivgroupisn)=(
+                                           SELECT  
+                                                 CASE (SELECT COUNT(1) FROM dicti d
+                                                       WHERE d.isn=2798546103 -- СЂР°СЃС‚РµРЅРёСЏ
+                                                       START WITH d.isn=a.objclassisn
+                                                       CONNECT BY d.isn= PRIOR d.parentisn)
+                                                   WHEN 1 THEN 3290673703     
+                                                   ELSE 3290674303
+                                                 END,   
+                                                 CASE (SELECT COUNT(1) FROM dicti d
+                                                       WHERE d.isn=2798546103 -- СЂР°СЃС‚РµРЅРёСЏ
+                                                       START WITH d.isn=a.objclassisn
+                                                       CONNECT BY d.isn= PRIOR d.parentisn)
+                                                   WHEN 1 THEN 3290673703     
+                                                   ELSE 3290674303
+                                                 END
+                                           FROM dual 
+                                          ) 
+  Where a.motivgroupisn=2366843303;
+  
+  --} EGAO 06.03.2013
+
+
+  -------------------------------------
+  -- Р›Р‘ СЃРѕРіР»Р°СЃРЅРѕ СѓСЃР»РѕРІРёСЏРј РґРѕРіРѕРІРѕСЂРѕРІ Р”РљРЎ
+  -------------------------------------
+  -- РїРѕРїСЂР°РІРєРё РЅР° Р”РЎРђР“Рћ Рё РђР’РўРћ РќРЎ
+
+  UPDATE STORAGES.REP_COND_LIST A
+  SET BUDGETGROUPISN =   CASE  (Select Nvl(Max(d.Isn),0)
+                                from dicti d
+                                Where D.isn in (2041,2066)
+                               Start With d.isn= a.rptclassIsn
+                               connect by prior parentisn=ISN
+                               )
+                          WHEN 2041 THEN 2366827803 -- РђР’РўРћ РќРЎ
+                          WHEN 2066 THEN 2366827703 -- Р”РЎРђР“Рћ
+                       END,
+      motivgroupisn  =  CASE (Select Nvl(Max(d.Isn),0)
+                                from dicti d
+                                Where D.isn in (2041,2066)
+                               Start With d.isn= a.rptclassIsn
+                               connect by prior parentisn=ISN
+                               )
+                          WHEN 2041 THEN 2366827803 -- РђР’РўРћ РќРЎ
+                          WHEN 2066 THEN 2366827703 -- Р”РЎРђР“Рћ
+                        END
+  WHERE a.BUDGETGROUPISN=2366826703 -- РђР’РўРћРљРђРЎРљРћ
+    AND a.rptclassisn IN (select ISN from dicti
+                          start with isn in (2041, 2066)
+                          Connect By Prior isn=Parentisn );
+
+  --------------------------------------
+  -- Р›Р‘ СЃРѕРіР»Р°СЃРЅРѕ СЃРѕРіР»Р°СЃРЅРѕ РїСЂРѕРіСЂР°РјРјР°Рј Р”РњРЎ
+  --------------------------------------
+  UPDATE STORAGES.REP_COND_LIST A
+  SET a.budgetgroupisn= CASE
+                          WHEN a.datebeg < TO_DATE('01.07.2006','DD.MM.YYYY') THEN
+                            CASE a.bizflg
+                              WHEN 'Р¤' THEN
+                                CASE
+                                  WHEN (SELECT MAX(1)
+                                        FROM dicti d
+                                        WHERE d.isn IN (SELECT x.isn
+                                                        FROM dicti x
+                                                        START WITH x.isn=686160416
+                                                        CONNECT BY PRIOR x.isn = x.parentisn AND x.isn<>840792401
+                                                       )
+                                        START WITH d.isn=a.ruleisnagr
+                                        CONNECT BY PRIOR d.parentisn=d.isn
+                                       ) IS NOT NULL THEN  2366837603 -- СЃРїРµС†РёР°Р»СЊРЅРѕРµ РґРјСЃ
+                                  WHEN (SELECT MAX(1)
+                                        FROM dicti d
+                                        WHERE d.isn = 840792401
+                                        START WITH d.isn=a.ruleisnagr
+                                        CONNECT BY PRIOR d.parentisn=d.isn
+                                       ) IS NOT NULL THEN  2366837703 -- СЃС‚Р°РЅРґР°СЂС‚РЅРѕРµ РґРјСЃ
+                                END
+                              ELSE
+                                CASE
+                                  WHEN (SELECT MAX(1)
+                                        FROM dicti d
+                                        WHERE d.isn IN (2317815203,3358966203)--EGAO 30.08.2011 РІ СЂР°РјРєР°С… 24383164503 (1500758503, 2293897603, 2317815203)
+                                        START WITH d.isn = a.riskclassisn -- РґРµРїРѕР·РёС‚РЅС‹Рµ РїСЂРѕРіСЂР°РјРјР° Р”РњРЎ
+                                        CONNECT BY PRIOR d.parentisn=d.isn
+                                       ) IS NOT NULL THEN 2366837603 -- СЃРїРµС†РёР°Р»СЊРЅРѕРµ РґРјСЃ
+                                  ELSE 2366837703 -- СЃС‚Р°РЅРґР°СЂС‚РЅРѕРµ РґРјСЃ
+                                END
                             END
-                          WHEN a.statcode IN (35) THEN
-                            CASE c.statcode(+)
-                              WHEN 220 THEN 1
-                              WHEN 24 THEN 1
-                              ELSE 0
+                          ELSE
+                            CASE NVL((SELECT --+ index ( ext X_AGREXT_AGR )
+                                      MAX(CASE ext.x1 WHEN 1083092225 THEN 1 WHEN 1083092025 THEN 2  WHEN 2513069503 THEN 2 END )
+                                      FROM agrext ext
+                                      WHERE ext.agrisn=a.agrisn
+                                        AND ext.classisn=1071774425
+                                     ),2)
+                              WHEN 1 THEN 2366837603 -- РѕРіСЂР°РЅРёС‡РµРЅРЅС‹Р№ -> СЃРїРµС†РёР°Р»СЊРЅРѕРµ РґРјСЃ
+                              WHEN 2 THEN
+                                CASE
+                                  WHEN (SELECT MAX(1)
+                                        FROM dicti d
+                                        WHERE d.isn IN (2317815203,3358966203)--EGAO 30.08.2011 РІ СЂР°РјРєР°С… 24383164503 (1500758503, 2293897603, 2317815203)
+                                        START WITH d.isn=a.riskclassisn -- РґРµРїРѕР·РёС‚РЅС‹Рµ РїСЂРѕРіСЂР°РјРјР° Р”РњРЎ
+                                        CONNECT BY PRIOR d.parentisn=d.isn
+                                       ) IS NOT NULL THEN 2366837603 -- СЃРїРµС†РёР°Р»СЊРЅРѕРµ РґРјСЃ
+                                  ELSE 2366837703 -- СЃС‚Р°РЅРґР°СЂС‚РЅРѕРµ РґРјСЃ
+                                END
                             END
-                        END = 1
-                  GROUP BY a.docsumisn, a.bodyisn,
-                           a.sectisn,
-                           c.rptgroupisn,
-                           c.motivgroupisn,
-                           NVL(c.agrisn, a.agrisn),
-                           c.rptclassisn,
-                           c.rptclass,
-                           c.budgetgroupisn
+                        END,
+      a.motivgroupisn = CASE
+                          WHEN a.datebeg < TO_DATE('01.07.2006','DD.MM.YYYY') THEN
+                            CASE a.bizflg
+                              WHEN 'Р¤' THEN
+                                CASE
+                                  WHEN (SELECT MAX(1)
+                                        FROM dicti d
+                                        WHERE d.isn IN (SELECT x.isn
+                                                        FROM dicti x
+                                                        START WITH x.isn=686160416
+                                                        CONNECT BY PRIOR x.isn = x.parentisn AND x.isn<>840792401
+                                                       )
+                                        START WITH d.isn=a.ruleisnagr
+                                        CONNECT BY PRIOR d.parentisn=d.isn
+                                       ) IS NOT NULL THEN  2366837603 -- СЃРїРµС†РёР°Р»СЊРЅРѕРµ РґРјСЃ
+                                  WHEN (SELECT MAX(1)
+                                        FROM dicti d
+                                        WHERE d.isn = 840792401
+                                        START WITH d.isn=a.ruleisnagr
+                                        CONNECT BY PRIOR d.parentisn=d.isn
+                                       ) IS NOT NULL THEN  2366837703 -- СЃС‚Р°РЅРґР°СЂС‚РЅРѕРµ РґРјСЃ
+                                END
+                              ELSE
+                                CASE
+                                  WHEN (SELECT MAX(1)
+                                        FROM dicti d
+                                        WHERE d.isn IN (2317815203,3358966203)--EGAO 30.08.2011 РІ СЂР°РјРєР°С… 24383164503 (1500758503, 2293897603, 2317815203)
+                                        START WITH d.isn = a.riskclassisn -- РґРµРїРѕР·РёС‚РЅС‹Рµ РїСЂРѕРіСЂР°РјРјР° Р”РњРЎ
+                                        CONNECT BY PRIOR d.parentisn=d.isn
+                                       ) IS NOT NULL THEN 2366837603 -- СЃРїРµС†РёР°Р»СЊРЅРѕРµ РґРјСЃ
+                                  ELSE 2366837703 -- СЃС‚Р°РЅРґР°СЂС‚РЅРѕРµ РґРјСЃ
+                                END
+                            END
 
-                 ) a
-           ) a
-     ) a
-WHERE NVL(a.amount*a.directpc,0)<>0
-;
+                          ELSE
+                            CASE NVL((SELECT --+ index ( ext X_AGREXT_AGR )
+                                      MAX(CASE ext.x1 WHEN 1083092225 THEN 1 WHEN 1083092025 THEN 2  WHEN 2513069503 THEN 2 END )
+                                      FROM agrext ext
+                                      WHERE ext.agrisn=a.agrisn
+                                        AND ext.classisn=1071774425
+                                     ),2)
+                              WHEN 1 THEN 2366837603 -- РѕРіСЂР°РЅРёС‡РµРЅРЅС‹Р№ -> СЃРїРµС†РёР°Р»СЊРЅРѕРµ РґРјСЃ
+                              WHEN 2 THEN
+                                CASE
+                                  WHEN (SELECT MAX(1)
+                                        FROM dicti d
+                                        WHERE d.isn IN (2317815203,3358966203)--EGAO 30.08.2011 РІ СЂР°РјРєР°С… 24383164503 (1500758503, 2293897603, 2317815203)
+                                        START WITH d.isn=a.riskclassisn -- РґРµРїРѕР·РёС‚РЅС‹Рµ РїСЂРѕРіСЂР°РјРјР° Р”РњРЎ
+                                        CONNECT BY PRIOR d.parentisn=d.isn
+                                       ) IS NOT NULL THEN 2366837603 -- СЃРїРµС†РёР°Р»СЊРЅРѕРµ РґРјСЃ
+                                  ELSE 2366837703 -- СЃС‚Р°РЅРґР°СЂС‚РЅРѕРµ РґРјСЃ
+                                END
+                            END
 
-  CREATE OR REPLACE FORCE VIEW "STORAGES"."V_REPBUHRE2RESECTION" ("BODYISN", "DATEVAL", "STATCODE", "SUBACCISN", "BUHCURRISN", "BUHDEPTISN", "BUHAMOUNT", "AMOUNT", "ISREVALUATION", "DOCSUMISN", "DOCISN", "DSSUBJISN", "DSCURRISN", "DSCLASSISN", "DSCLASSISN2", "DOCSUMPC", "SECTISN", "SECTTYPE", "SECTDATEBEG", "SECTDATEEND", "SECTCURRISN", "SECTPC", "REACCISN", "REACCDATEBEG", "REACCDATEEND", "AGRISN", "AGRCLASSISN", "DATEBASE", "AGRDATEBEG", "AGRDATEEND") AS 
-  WITH cl AS (SELECT d.isn, connect_by_root(isn) AS rootisn
-            FROM dicti d
-            START WITH d.isn IN (414, 427, 445)
-            CONNECT BY PRIOR d.isn=d.parentisn
-           ),
-     re AS (
-           SELECT --+ no_merge ( s )
-                  s.*,
-                  cl.rootisn AS classisn, ROWNUM rn
-           FROM (SELECT --+ index ( s X_REACCSUM_ACC )
-                        s.agrisn, s.amount, s.sectisn, s.reaccisn, s.subjisn, s.currisn,
-                        ais.recalc_utils.reclass2sumclass(s.classisn, s.classisn2) AS classisn2
-                 FROM reaccsum s
-                 WHERE s.reaccisn>pparam.GetParamN('MinIsn') AND s.reaccisn<=pparam.GetParamN('MaxIsn')
-                   AND s.subjisn IS NOT NULL
-                ) s, cl
-           WHERE cl.isn=s.classisn2
-          ),
-    x AS  (
-            SELECT --+ index ( ds X_DOCSUM_REACC )
-                   ds.*, ROWNUM rn
-            FROM docsum ds
-            WHERE ds.reaccisn>pparam.GetParamN('MinIsn') AND ds.reaccisn<=pparam.GetParamN('MaxIsn')
-              AND ds.classisn IN (414, 427, 445)
-              AND ds.discr='P'
-              AND ds.classisn2<>2265208403
-          ),
-     a AS (SELECT reaccisn, subjisn, currisn, classisn, classisn2
-           FROM (SELECT DISTINCT 1 AS ssource,ds.reaccisn, ds.subjisn, ds.currisn, ds.classisn, ds.classisn2
-                 FROM x ds
-                 UNION ALL
-                 SELECT DISTINCT 2, re.reaccisn, re.subjisn, re.currisn, re.classisn, re.classisn2
-                 FROM re
-                )
-           GROUP BY reaccisn, subjisn, currisn, classisn, classisn2
-           HAVING SUM(DECODE(ssource,1,1,0))<>SUM(DECODE(ssource,2,1,0))
-          ),
-    ds AS (
-            SELECT --+ use_hash ( ds a )
-                   DISTINCT ds.*, a.reaccisn AS diffreaccisn
-            FROM a,
-                 x ds
-            WHERE ds.classisn=a.classisn(+) AND ds.subjisn=a.subjisn(+) AND ds.currisn=a.currisn(+) AND ds.reaccisn=a.reaccisn(+)
-          )
+                        END
 
-SELECT --+ ordered use_nl ( re s acc agr ) no_merge ( re )
+  WHERE a.ruleisnagr IN (SELECT isn
+                         FROM dicti d
+                         START WITH d.isn=686160416 -- РїСЂРѕРґСѓРєС‚С‹ Р”РњРЎ
+                         CONNECT BY PRIOR d.isn = d.parentisn AND d.isn NOT IN (48654516, 1804413003, 2967557403, 2968741503, 2969117103, 2969118503)
+                        )
+/*KGS 29.13.2011 Р›Р‘ "РґРјСЃ (Р±СѓРґСЊ Р·РґРѕСЂРѕРІ)" РЅРµ С‚СЂРѕРіР°РµРј*/  and Nvl(a.motivgroupisn,0)<>2964494503 ;
+END; -- Procedure
 
-       -- проводка
-       re.bodyisn,
-       re.dateval,
-       re.statcode,
-       re.subaccisn,
-       re.buhcurrisn,
-       re.buhdeptisn,
-       re.buhamount,
-       re.amount,
-       re.isrevaluation,
 
-       -- доксумма
-       re.docsumisn,
-       re.docisn,
-       re.dssubjisn,
-       re.dscurrisn,
-       re.dsclassisn,
-       re.dsclassisn2,
-       re.docsumpc,
+  CREATE OR REPLACE PROCEDURE "STORAGES"."SET_REFUND_BUDGETROUPISN_NEW" (vMinIsn number,vMaxIsn Number)
+   IS
+BEGIN
 
-       -- секция
-       re.sectisn,
-       s.secttype,
-       trunc(s.datebeg) AS sectdatebeg,
-       trunc(s.dateend) AS sectdateend,
-       s.currisn AS sectcurrisn,
-       re.sectpc,
+   /*Update --+index(a x_reprefund)
+   RepRefund a
+    Set
+     BUDGETGROUPISN= --Nvl(
+     (Select Nvl(Max(Dx.classisn1),0)
 
-       -- 100% счет
-       re.reaccisn,
-       trunc(acc.datebeg) AS reaccdatebeg,
-       trunc(acc.dateend) AS reaccdateend,
+   from dicX dx
+   Where Classisn=1604770503
+   And  (classisn2=a.ruleisnagr
+      Or a.ruleisnagr in (Select Isn from dicti Start With Isn=classisn2 connect By Prior Isn=PArentIsn)))
+      --,
+--      Case
+--                     When  RptClassIsn in (Select Isn  from dicti Start With Isn=2051 connect by prior isn=ParentIsn) then 1343924403 --      РџСЂРѕС‡РµРµ РёРјСѓС‰РµСЃС‚РІРµРЅРЅРѕРµ СЃС‚СЂР°С…РѕРІР°РЅРёРµ    РќРµС‚ РїСЂРёР·РЅР°РєРѕРІ РІ РђРРЎ
+--                     When  RptClassIsn in (Select Isn  from dicti Start With Isn=2066 connect by prior isn=ParentIsn)  then 1343933603 -- 2,9 Р“СЂР°Р¶РґР°РЅСЃРєР°СЏ РѕС‚РІРµС‚СЃС‚РІРµРЅРЅРѕСЃС‚СЊ (РєСЂРѕРјРµ С‚РµС…. СЂРёСЃРєРѕРІ, РјРµР¶РґСѓРЅР°СЂРѕРґРЅС‹С… РїСЂРѕРіСЂР°РјРј Рё 2.10,2.11 )    42
+--                     end)
+Where  Isn > vMinIsn and Isn<=vMaxIsn
+ANd Rptgroupisn not in (747779200,755075000,755078500);
+--commit;
 
-       -- исходящий договор перестрахования
-       re.agrisn,
-       agr.classisn AS agrclassisn,
-       agr.datebase,
-       trunc(agr.datebeg) AS agrdatebeg,
-       trunc(agr.dateend) AS agrdateend
-FROM (
-      SELECT --+ no_merge ( ds ) no_merge ( re )
-             re.sectisn,
-             ds.reaccisn,
-             ds.subjisn AS dssubjisn,
-             ds.currisn AS dscurrisn,
-             ds.classisn AS dsclassisn,
-             ds.classisn2 AS dsclassisn2,
-             re.agrisn,
-             ds.bodyisn,
-             MAX(ds.subaccisn) AS subaccisn,
-             MAX(ds.dateval) AS dateval,
-             ds.docsumisn,
-             MAX(ds.docsumpc) AS docsumpc,
-             SUM(ds.amount) AS buhamount,
-             MAX(re.sectpc) AS sectpc,
-             SUM(ds.amount*re.sectpc*ds.docsumpc) AS amount,
-             MAX(ds.buhcurrisn) AS buhcurrisn,
-             MAX(ds.docisn) AS docisn,
-             MAX(ds.statcode) AS statcode,
-             MAX(ds.buhdeptisn)AS buhdeptisn,
-             MAX(ds.isrevaluation) AS isrevaluation
-      FROM  (
-             SELECT reaccisn, subjisn, currisn, classisn, classisn2,
-                    amount,
-                    CASE WHEN NVL(docsumAll,0)=0 THEN 1/docsumCnt ELSE AmountDoc/docsumAll END AS docsumpc,
-                    bodyisn,
-                    subaccisn,
-                    dateval,
-                    docsumisn,
-                    buhcurrisn,
-                    docisn,
-                    statcode,
-                    buhdeptisn,
-                    isrevaluation
-             FROM (
-                   SELECT --+ no_merge ( ds ) index ( bb X_REPBUHBODY_BODYISN ) ordered use_nl ( ds bb r )
-                          ds.isn AS docsumisn,
-                          ds.reaccisn,
-                          ds.subjisn,
-                          ds.currisn,
-                          ds.classisn,
-                          ds.classisn2,
-                          NVL(gcc2.gcc2(ds.amount,ds.currisn,bb.currisn,bb.dateval),0) AS AmountDoc,
-                          bb.bodyisn,
-                          bb.amount,
-                          bb.subaccisn,
-                          trunc(bb.dateval) AS dateval,
-                          NVL(SUM(gcc2.gcc2(ds.amount,ds.currisn,bb.currisn,bb.dateval)) over (PARTITION BY bb.isn),0) AS docsumAll,
-                          COUNT(1) OVER (PARTITION BY bb.isn) AS docsumCnt,
-                          bb.currisn AS buhcurrisn,
-                          nvl(ds.docisn,ds.docisn2) docisn,
-                          bb.statcode,
-                          bb.deptisnbuh AS buhdeptisn,
-                          --{ EGAO 05.06.2012
-                          /*
-                          CASE
-                            WHEN NVL(bb.agrisn,0)=0 THEN
-                              CASE
-                                WHEN NVL(bb.currisn,-1)=35 THEN 0
-                                ELSE 1
+
+-- РїРѕРїСЂР°РІРєРё РЅР° Р”РћРЎРђР“Рћ
+
+   Update --+ Use_Nl(a) index(a x_reprefund)
+   RepRefund a
+    Set
+     BUDGETGROUPISN=  1343940203
+      Where  Isn > vMinIsn and Isn<=vMaxIsn And BUDGETGROUPISN=1343935803
+      and exists (select 'a' from repbuh2cond b
+     where b.BUDGETGROUPISN=1343940203 and b.agrisn=a.agrisn and rownum<=1)
+
+\*      agrisn in (
+     select --+ Index_combine(b X_REPBUH2COND_BUDGETGROUP)
+     distinct agrisn
+     from repbuh2cond b
+     where BUDGETGROUPISN=1343940203
+     ) *\;*/
+
+  -- EGAO 17.11.2008 РїСЂРµРґС‹РґСѓС‰РёР№ РІР°СЂРёР°РЅС‚ РІ РєРѕРјРјРµРЅС‚Р°СЂРёСЏС… РІС‹С€Рµ
+
+  --1. РёР·РјРµРЅРёС‚СЊ Р»РёРЅРёСЋ Р±РёР·РЅРµСЃР° Сѓ С‚РµС… РґРѕРіРѕРІРѕСЂРѕРІ,
+  --   Сѓ РєРѕС‚РѕСЂС‹С… РґРµС‚Р°Р»РёР·Р°С†РёСЏ РїСЂРѕРґСѓРєС‚Р° СЃС‚СЂР°С…РѕРІР°РЅРёСЏ Р¤Р“РЈРџ "РљРћРЎРњРР§Р•РЎРљРђРЇ РЎР’РЇР—Р¬" (select Agrisn from agrext...)
+  UPDATE --+ use_hash ( a ) index ( a X_REPREFUND )
+         RepRefund a
+  SET a.BUDGETGROUPISN=2366821803, -- РљРћРЎРњ. РЎРўР РђРҐ-Р• Р¤Р“РЈРџ РљРћРЎРњ-РЇ РЎР’РЇР—Р¬
+      a.motivgroupisn =2366821803
+  WHERE
+       a.Isn > vMinIsn AND a.Isn<=vMaxIsn -- СѓСЃР»РѕРІРёРµ РіРёРґСЂС‹
+   AND     BUDGETGROUPISN IS NULL
+    AND a.ruleisnagr IN (SELECT d.isn
+                         FROM dicti d
+                         START WITH d.isn IN(683213616, 36626416)
+                         CONNECT BY PRIOR d.isn=d.parentisn
+                        )
+    AND a.AgrIsn IN (SELECT  Agrisn  FROM agrext WHERE x1 =2314945103 )
+    AND a.Rptgroupisn NOT IN (747779200,755075000,755078500); -- СѓСЃР»РѕРІРёРµ РёР· РІР°СЂРёР°РЅС‚Р° РІ РєРѕРјРјРµРЅС‚Р°СЂРёСЏС…;
+
+  --  РђРіСЂРѕРїСЂРѕРјС‹С€Р»РµРЅРЅРѕРµ СЃС‚СЂР°С…РѕРІР°РЅРёРµ
+  UPDATE --+ use_hash ( a ) index ( a X_REPREFUND )
+         RepRefund a
+  SET BUDGETGROUPISN=2366843303, -- РЎС‚СЂР°С…РѕРІР°РЅРёРµ СЃРµР»СЊСЃРєРѕС…РѕР·СЏР№СЃС‚РІРµРЅРЅС‹С… СЂРёСЃРєРѕРІ
+      motivgroupisn =2366843303
+  WHERE
+        a.Isn > vMinIsn AND a.Isn<=vMaxIsn -- oneiaea aea?u
+  AND   BUDGETGROUPISN IS NULL
+    AND a.ruleisnagr IN (SELECT d.isn
+                         FROM dicti d
+                         START WITH d.isn=1104369003 -- РРњРЈР©Р•РЎРўР’Рћ Р®Р . Р›РР¦
+                         CONNECT BY PRIOR d.isn=d.parentisn
+                        )
+    AND a.AgrIsn IN (SELECT  Agrisn  FROM agrext WHERE x1 =2933455203 )
+
+    AND a.Rptgroupisn NOT IN (747779200,755075000,755078500); -- СѓСЃР»РѕРІРёРµ РёР· РІР°СЂРёР°РЅС‚Р° РІ РєРѕРјРјРµРЅС‚Р°СЂРёСЏС…;
+
+
+
+   /*--2. РёР·РјРµРЅРёС‚СЊ Р»РёРЅРёСЋ Р±РёР·РЅРµСЃР° Сѓ С‚РµС… РґРѕРіРѕРІРѕСЂРѕРІ, Сѓ РєРѕС‚РѕСЂС‹С… РґРµС‚Р°Р»РёР·Р°С†РёСЏ РїСЂРѕРґСѓРєС‚Р° СЃС‚СЂР°С…РѕРІР°РЅРёСЏ Р¤РРљРЎРР РћР’РђРќРќРћР• РџРћРљР Р«РўРР• (select Agrisn from agrext...)
+   --   Рё СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓСЋС‰РёРµ РїСЂРґСѓРєС‚С‹ СЃС‚СЂР°С…РѕРІР°РЅРёСЏ
+   UPDATE --+ use_hash ( a ) index ( a X_REPREFUND )
+          RepRefund a
+   Set BUDGETGROUPISN=2366837603, -- Р¤РРљРЎРР РћР’РђРќРќР«Р™ Р РРЎРљ (Р”РњРЎ)
+       motivgroupisn =2366837603
+   WHERE BUDGETGROUPISN IS NULL
+     AND a.ruleisnagr IN (SELECT d.isn
+                          FROM dicti d
+                          START WITH d.isn IN(738374400)
+                          CONNECT BY PRIOR d.isn=d.parentisn)
+     AND AgrIsn IN (SELECT  Agrisn  FROM agrext Where x1 =1083092225 )
+     AND a.Isn > vMinIsn AND a.Isn<=vMaxIsn -- СѓСЃР»РѕРІРёРµ РіРёРґСЂС‹
+     AND a.Rptgroupisn NOT IN (747779200,755075000,755078500); -- СѓСЃР»РѕРІРёРµ РёР· РІР°СЂРёР°РЅС‚Р° РІ РєРѕРјРјРµРЅС‚Р°СЂРёСЏС…
+
+
+
+
+   --3. РёР·РјРµРЅРёС‚СЊ Р»РёРЅРёСЋ Р±РёР·РЅРµСЃР° Сѓ С‚РµС… РґРѕРіРѕРІРѕСЂРѕРІ, Сѓ РєРѕС‚РѕСЂС‹С… РґРµС‚Р°Р»РёР·Р°С†РёСЏ РїСЂРѕРґСѓРєС‚Р° СЃС‚СЂР°С…РѕРІР°РЅРёСЏ Р РРЎРљРћР’Р«Р™ (select Agrisn from agrext...)
+   --   Рё СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓСЋС‰РёРµ РїСЂРґСѓРєС‚С‹ СЃС‚СЂР°С…РѕРІР°РЅРёСЏ
+   UPDATE --+ use_hash ( a ) index ( a X_REPREFUND )
+          RepRefund a
+   SET BUDGETGROUPISN=2366837703, -- Р РРЎРљРћР’РћР• РЎРўР РђРҐРћР’РђРќРР• (Р”РњРЎ)
+       motivgroupisn =2366837703
+   WHERE BUDGETGROUPISN is NULL
+     AND a.ruleisnagr IN (SELECT d.isn
+                          FROM dicti d
+                          START WITH d.isn IN(738374400)
+                          CONNECT BY PRIOR d.isn=d.parentisn
+                         )
+     AND AgrIsn IN (SELECT  Agrisn  FROM agrext WHERE x1 =1083092025 )
+     AND a.Isn > vMinIsn AND a.Isn<=vMaxIsn -- СѓСЃР»РѕРІРёРµ РіРёРґСЂС‹
+     AND a.Rptgroupisn NOT IN (747779200,755075000,755078500); -- СѓСЃР»РѕРІРёРµ РёР· РІР°СЂРёР°РЅС‚Р° РІ РєРѕРјРјРµРЅС‚Р°СЂРёСЏС…*/
+
+   -- РїСЂРѕРґСѓРєС‚С‹ Р”РњРЎ EGAO 12.02.2009
+   UPDATE Reprefund a
+   SET a.budgetgroupisn= CASE
+                            WHEN a.agrdatebeg < TO_DATE('01.07.2006','DD.MM.YYYY') THEN
+                              CASE (SELECT b.bizflg FROM repagr b WHERE b.agrisn=a.agrisn)
+                                WHEN 'Р¤' THEN
+                                  CASE
+                                     WHEN (SELECT MAX(1)
+                                           FROM dicti d
+                                           WHERE d.isn IN (SELECT x.isn
+                                                           FROM dicti x
+                                                           START WITH x.isn=686160416
+                                                           CONNECT BY PRIOR x.isn = x.parentisn AND x.isn<>840792401
+                                                          )
+                                           START WITH d.isn=a.ruleisnagr
+                                           CONNECT BY PRIOR d.parentisn=d.isn
+                                          ) IS NOT NULL THEN  2366837603 -- СЃРїРµС†РёР°Р»СЊРЅРѕРµ РґРјСЃ
+                                     WHEN (SELECT MAX(1)
+                                           FROM dicti d
+                                           WHERE d.isn = 840792401
+                                           START WITH d.isn=a.ruleisnagr
+                                           CONNECT BY PRIOR d.parentisn=d.isn
+                                          ) IS NOT NULL THEN  2366837703 -- СЃС‚Р°РЅРґР°СЂС‚РЅРѕРµ РґРјСЃ
+                                  END
+                                ELSE
+                                  CASE
+                                    WHEN (SELECT MAX(1)
+                                          FROM dicti d
+                                          WHERE d.isn IN (2317815203,3358966203)--EGAO 30.08.2011 РІ СЂР°РјРєР°С… 24383164503 (1500758503, 2293897603, 2317815203)
+                                          START WITH d.isn = a.riskclassisn -- РґРµРїРѕР·РёС‚РЅС‹Рµ РїСЂРѕРіСЂР°РјРјР° Р”РњРЎ
+                                          CONNECT BY PRIOR d.parentisn=d.isn
+                                         ) IS NOT NULL THEN 2366837603 -- СЃРїРµС†РёР°Р»СЊРЅРѕРµ РґРјСЃ
+                                    ELSE 2366837703 -- СЃС‚Р°РЅРґР°СЂС‚РЅРѕРµ РґРјСЃ
+                                  END
                               END
                             ELSE
-                              CASE
-                                WHEN r.agrisn IS NULL THEN 0
-                                ELSE 1
+                              CASE NVL((SELECT --+ index ( ext X_AGREXT_AGR )
+                                        MAX(CASE ext.x1 WHEN 1083092225 THEN 1 WHEN 1083092025 THEN 2  WHEN 2513069503 THEN 2 END )
+                                        FROM agrext ext
+                                        WHERE ext.agrisn=a.agrisn
+                                          AND ext.classisn=1071774425
+                                       ),2)
+                                WHEN 1 THEN 2366837603 -- РѕРіСЂР°РЅРёС‡РµРЅРЅС‹Р№ -> СЃРїРµС†РёР°Р»СЊРЅРѕРµ РґРјСЃ
+                                WHEN 2 THEN
+                                  CASE
+                                    WHEN (SELECT MAX(1)
+                                          FROM dicti d
+                                          WHERE d.isn IN (2317815203,3358966203)--EGAO 30.08.2011 РІ СЂР°РјРєР°С… 24383164503 (1500758503, 2293897603, 2317815203)
+                                          START WITH d.isn=a.riskclassisn -- РґРµРїРѕР·РёС‚РЅС‹Рµ РїСЂРѕРіСЂР°РјРјР° Р”РњРЎ
+                                          CONNECT BY PRIOR d.parentisn=d.isn
+                                         ) IS NOT NULL THEN 2366837603 -- СЃРїРµС†РёР°Р»СЊРЅРѕРµ РґРјСЃ
+                                    ELSE 2366837703 -- СЃС‚Р°РЅРґР°СЂС‚РЅРѕРµ РґРјСЃ
+                                  END
+                              END
+                          END,
+        a.motivgroupisn = CASE
+                            WHEN a.agrdatebeg < TO_DATE('01.07.2006','DD.MM.YYYY') THEN
+                              CASE (SELECT b.bizflg FROM repagr b WHERE b.agrisn=a.agrisn)
+                                WHEN 'Р¤' THEN
+                                  CASE
+                                     WHEN (SELECT MAX(1)
+                                           FROM dicti d
+                                           WHERE d.isn IN (SELECT x.isn
+                                                           FROM dicti x
+                                                           START WITH x.isn=686160416
+                                                           CONNECT BY PRIOR x.isn = x.parentisn AND x.isn<>840792401
+                                                          )
+                                           START WITH d.isn=a.ruleisnagr
+                                           CONNECT BY PRIOR d.parentisn=d.isn
+                                          ) IS NOT NULL THEN  2366837603 -- СЃРїРµС†РёР°Р»СЊРЅРѕРµ РґРјСЃ
+                                     WHEN (SELECT MAX(1)
+                                           FROM dicti d
+                                           WHERE d.isn = 840792401
+                                           START WITH d.isn=a.ruleisnagr
+                                           CONNECT BY PRIOR d.parentisn=d.isn
+                                          ) IS NOT NULL THEN  2366837703 -- СЃС‚Р°РЅРґР°СЂС‚РЅРѕРµ РґРјСЃ
+                                  END
+                                ELSE
+                                  CASE
+                                    WHEN (SELECT MAX(1)
+                                          FROM dicti d
+                                          WHERE d.isn IN (2317815203,3358966203)--EGAO 30.08.2011 РІ СЂР°РјРєР°С… 24383164503 (1500758503, 2293897603, 2317815203)
+                                          START WITH d.isn = a.riskclassisn -- РїСЂРѕРіСЂР°РјРјР° Р”РњРЎ
+                                          CONNECT BY PRIOR d.parentisn=d.isn
+                                         ) IS NOT NULL THEN 2366837603 -- СЃРїРµС†РёР°Р»СЊРЅРѕРµ РґРјСЃ
+                                    ELSE 2366837703 -- СЃС‚Р°РЅРґР°СЂС‚РЅРѕРµ РґРјСЃ
+                                  END
+                              END
+                            ELSE
+                              CASE NVL((SELECT --+ index ( ext X_AGREXT_AGR )
+                                        MAX(CASE ext.x1 WHEN 1083092225 THEN 1 WHEN 1083092025 THEN 2  WHEN 2513069503 THEN 2 END )
+                                        FROM agrext ext
+                                        WHERE ext.agrisn=a.agrisn
+                                          AND ext.classisn=1071774425
+                                       ),2)
+                                WHEN 1 THEN 2366837603 -- РѕРіСЂР°РЅРёС‡РµРЅРЅС‹Р№ -> СЃРїРµС†РёР°Р»СЊРЅРѕРµ РґРјСЃ
+                                WHEN 2 THEN
+                                  CASE
+                                    WHEN (SELECT MAX(1)
+                                          FROM dicti d
+                                          WHERE d.isn IN (2317815203,3358966203)--EGAO 30.08.2011 РІ СЂР°РјРєР°С… 24383164503 (1500758503, 2293897603, 2317815203)
+                                          START WITH d.isn=a.riskclassisn
+                                          CONNECT BY PRIOR d.parentisn=d.isn
+                                         ) IS NOT NULL THEN 2366837603 -- СЃРїРµС†РёР°Р»СЊРЅРѕРµ РґРјСЃ
+                                    ELSE 2366837703 -- СЃС‚Р°РЅРґР°СЂС‚РЅРѕРµ РґРјСЃ
+                                  END
                               END
                           END
-                          */
-                          CASE WHEN NVL(bb.currisn,-1)=35 THEN 0 ELSE 1 END AS isrevaluation
-                          --}
-                   FROM ds, repbuhbody bb --EGAO 05.06.2012 , rep_isreval r
-                   WHERE ds.diffreaccisn IS NULL
-                     AND bb.bodyisn IN (ds.creditisn, ds.debetisn)
-                     AND NVL(bb.amount,0)<>0
-                     --EGAO 05.06.2012 AND r.agrisn(+)=bb.agrisn
-                  )
-             WHERE CASE WHEN docsumAll=0 THEN 1/docsumCnt ELSE AmountDoc/docsumAll END<>0
-            ) ds,
-            (
-             SELECT re.subjisn, re.currisn, re.reaccisn, re.sectisn, re.classisn, re.agrisn, classisn2,
-                    CASE WHEN re.allpremsum<>0 THEN re.sectpremsum/re.allpremsum ELSE 1/re.allcnt END AS sectpc
-             FROM (SELECT --+ ordered use_nl ( s ag )
-                          s.subjisn, s.currisn, s.reaccisn, s.sectisn, s.classisn, s.agrisn, classisn2,
-                          NVL(SUM(s.amount),0)  AS sectpremsum,
-                          NVL(SUM(SUM(s.amount)) OVER (PARTITION BY s.subjisn, s.currisn, s.reaccisn, s.classisn, s.agrisn, classisn2),0) AS allpremsum,
-                          COUNT(1) over (PARTITION BY s.subjisn, s.currisn, s.reaccisn, s.classisn, s.agrisn, classisn2) AS allcnt
-                   FROM re s
-                   GROUP BY s.subjisn, s.currisn, s.reaccisn, s.sectisn, s.classisn, s.agrisn, classisn2
-                  ) re
-             WHERE CASE WHEN re.allpremsum<>0 THEN re.sectpremsum/re.allpremsum ELSE 1/re.allcnt END <> 0
-            ) re
-      WHERE ds.reaccisn=re.reaccisn
-        AND ds.subjisn=re.subjisn
-        AND ds.currisn=re.currisn
-        AND ds.classisn=re.classisn
-        AND ds.classisn2=re.classisn2
-      GROUP BY re.sectisn, ds.reaccisn, ds.subjisn, ds.currisn, ds.classisn, ds.classisn2, re.agrisn, ds.docsumisn, ds.bodyisn
+   WHERE
 
-      UNION ALL
+        a.Isn > vMinIsn AND a.Isn<=vMaxIsn -- СѓСЃР»РѕРІРёРµ РіРёРґСЂС‹
+  AND a.ruleisnagr IN (SELECT isn
+                          FROM dicti d
+                          START WITH d.isn=686160416 -- РїСЂРѕРґСѓРєС‚С‹ Р”РњРЎ
+                          CONNECT BY PRIOR d.isn = d.parentisn AND d.isn NOT IN (48654516, 1804413003, 2967557403, 2968741503, 2969117103, 2969118503)
+                         )
+       AND a.Rptgroupisn NOT IN (747779200,755075000,755078500); -- СѓСЃР»РѕРІРёРµ РёР· РІР°СЂРёР°РЅС‚Р° РІ РєРѕРјРјРµРЅС‚Р°СЂРёСЏС…
 
-      SELECT --+ no_merge ( ds ) no_merge ( re ) no_merge ( a )
-             re.sectisn,
-             ds.reaccisn,
-             ds.subjisn AS dssubjisn,
-             ds.currisn AS dscurrisn,
-             ds.classisn AS dsclassisn,
-             NULL AS dsclassisn2,
-             re.agrisn,
-             ds.bodyisn,
-             MAX(ds.subaccisn) AS subaccisn,
-             MAX(ds.dateval) AS dateval,
-             ds.docsumisn,
-             MAX(ds.docsumpc) AS docsumpc,
-             SUM(ds.amount) AS buhamount,
-             MAX(re.sectpc) AS sectpc,
-             SUM(ds.amount*re.sectpc*ds.docsumpc) AS amount,
-             MAX(ds.buhcurrisn) AS buhcurrisn,
-             MAX(ds.docisn) AS docisn,
-             MAX(ds.statcode) AS statcode,
-             MAX(ds.buhdeptisn)AS buhdeptisn,
-             MAX(ds.isrevaluation) AS isrevaluation
-      FROM (
-            SELECT reaccisn, subjisn, currisn, classisn,
-                   CASE WHEN NVL(docsumAll,0)=0 THEN 1/docsumCnt ELSE AmountDoc/docsumAll END AS docsumpc,
-                   amount,
-                   bodyisn,
-                   subaccisn,
-                   dateval,
-                   docsumisn,
-                   buhcurrisn,
-                   docisn,
-                   statcode,
-                   buhdeptisn,
-                   isrevaluation
-             FROM (
-                   SELECT --+ no_merge ( ds ) index ( bb X_REPBUHBODY_BODYISN ) ordered use_nl ( ds bb r ) index ( r X_REP_ISREVAL )
-                          ds.isn AS docsumisn,
-                          ds.reaccisn,
-                          ds.subjisn,
-                          ds.currisn,
-                          ds.classisn,
-                          NVL(gcc2.gcc2(ds.amount,ds.currisn,bb.currisn,bb.dateval),0) AmountDoc,
-                          bb.bodyisn,
-                          bb.amount,
-                          bb.subaccisn,
-                          trunc(bb.dateval) AS dateval,
-                          NVL(SUM(gcc2.gcc2(ds.amount,ds.currisn,bb.currisn,bb.dateval)) over (PARTITION BY bb.isn),0) AS docsumAll,
-                          COUNT(1) OVER (PARTITION BY bb.isn) AS docsumCnt,
-                          bb.currisn AS buhcurrisn,
-                          nvl(ds.docisn,ds.docisn2) docisn,
-                          bb.statcode,
-                          bb.deptisnbuh AS buhdeptisn,
-                          --{EGAO 05.06.2012
-                          /*CASE
-                            WHEN NVL(bb.agrisn,0)=0 THEN
-                              CASE
-                                WHEN NVL(bb.currisn,-1)=35 THEN 0
-                                ELSE 1
-                              END
-                            ELSE
-                              CASE
-                                WHEN r.agrisn IS NULL THEN 0
-                                ELSE 1
-                              END
-                          END*/
-                          CASE WHEN NVL(bb.currisn,-1)=35 THEN 0 ELSE 1 END isrevaluation
-                          --}
-                   FROM ds, repbuhbody bb-- EGAO 05.06.2012 , rep_isreval r
-                   WHERE ds.diffreaccisn IS NOT NULL
-                     AND bb.bodyisn IN (ds.creditisn, ds.debetisn)
-                     AND NVL(bb.amount,0)<>0
-                     --AND r.agrisn(+)=bb.bodyisn
-                  )
-             WHERE CASE WHEN docsumAll=0 THEN 1/docsumCnt ELSE AmountDoc/docsumAll END<>0
-            ) ds,
-            (SELECT re.subjisn, re.currisn, re.reaccisn, re.sectisn, re.classisn, re.agrisn,
-                    CASE WHEN re.allpremsum<>0 THEN re.sectpremsum/re.allpremsum ELSE 1/allcnt END AS sectpc
-             FROM (
-                   SELECT --+ ordered use_nl ( s ag )
-                          s.subjisn, s.currisn, s.reaccisn, s.sectisn, s.classisn, s.agrisn,
-                          NVL(SUM(s.amount),0) AS sectpremsum,
-                          NVL(SUM(SUM(s.amount)) OVER (PARTITION BY s.subjisn, s.currisn, s.reaccisn, s.classisn, s.agrisn),0) AS allpremsum,
-                          COUNT(1) over (PARTITION BY s.subjisn, s.currisn, s.reaccisn, s.classisn, s.agrisn) AS allcnt
-                   FROM re s
-                   GROUP BY s.subjisn, s.currisn, s.reaccisn, s.sectisn, s.classisn, s.agrisn
-                  ) re
-             WHERE CASE WHEN re.allpremsum<>0 THEN re.sectpremsum/re.allpremsum ELSE 1/allcnt END <> 0
-            ) re
-      WHERE ds.reaccisn=re.reaccisn
-        AND ds.subjisn=re.subjisn
-        AND ds.currisn=re.currisn
-        AND ds.classisn=re.classisn
-      GROUP BY re.sectisn, ds.reaccisn, ds.subjisn, ds.currisn, ds.classisn, re.agrisn, ds.docsumisn, ds.bodyisn
-     ) re,
-     repagr agr,
-     resection s,
-     reacc100 acc
-WHERE agr.agrisn=re.agrisn
-  AND s.isn=re.sectisn
-  AND acc.isn=re.reaccisn
+   -- СѓСЃС‚Р°РЅР°РІР»РёРІР°РµРј Р·РЅР°С‡РµРЅРёРµ Р»РёРЅРёРё Р±РёР·РЅРµСЃР° РґР»СЏ РїСЂРѕРґСѓРєС‚РѕРІ РґРѕРіРѕРІРѕСЂРѕРІ
+   UPDATE --+ index ( a X_REPREFUND )
+          RepRefund a
+   SET BUDGETGROUPISN= (SELECT MAX(Dx.classisn2)
+                        FROM dicX dx
+                        WHERE Classisn=2366708603 -- РѕС‚РЅРѕС€РµРЅРёРµ "РџР РћР”РЈРљРў Р”РћР“РћР’РћР Рђ=>Р›РРќРРЇ Р‘РР—РќР•РЎРђ (NEW)" (classisn1 - РїСЂРѕРґСѓРєС‚, classisn2 - Р»РёРЅРёСЏ)
+                          AND (a.ruleisnagr in (Select Isn from dicti Start With Isn=classisn1 connect By Prior Isn=PArentIsn))),
+       motivgroupisn = (SELECT MAX(Dx.classisn2)
+                        FROM dicX dx
+                        WHERE Classisn=2366708603 -- РѕС‚РЅРѕС€РµРЅРёРµ "РџР РћР”РЈРљРў Р”РћР“РћР’РћР Рђ=>Р›РРќРРЇ Р‘РР—РќР•РЎРђ (NEW)" (classisn1 - РїСЂРѕРґСѓРєС‚, classisn2 - Р»РёРЅРёСЏ)
+                          AND (a.ruleisnagr in (Select Isn from dicti Start With Isn=classisn1 connect By Prior Isn=PArentIsn)))
+   WHERE BUDGETGROUPISN IS NULL
+     AND a.Isn > vMinIsn AND a.Isn<=vMaxIsn -- СѓСЃР»РѕРІРёРµ РіРёРґСЂС‹
+     AND a.Rptgroupisn NOT IN (747779200,755075000,755078500); -- СѓСЃР»РѕРІРёРµ РёР· РІР°СЂРёР°РЅС‚Р° РІ РєРѕРјРјРµРЅС‚Р°СЂРёСЏС…
+
+
+
+   -- РїРѕРїСЂР°РІРєРё РЅР° Р”РЎРђР“Рћ Рё РђР’РўРћ РќРЎ
+   UPDATE --+ index ( a X_REPREFUND )
+          RepRefund a
+   SET BUDGETGROUPISN =  CASE a.rptclassisn
+                           WHEN 2041 THEN 2366827803 -- РђР’РўРћ РќРЎ
+                           WHEN 2066 THEN 2366827703 -- Р”РЎРђР“Рћ
+                        END,
+       motivgroupisn  =  CASE a.rptclassisn
+                           WHEN 2041 THEN 2366827803 -- РђР’РўРћ РќРЎ
+                           WHEN 2066 THEN 2366827703 -- Р”РЎРђР“Рћ
+                        END
+   WHERE a.BUDGETGROUPISN=2366826703 -- РђР’РўРћРљРђРЎРљРћ
+     AND a.rptclassisn IN (2041, 2066)
+     AND a.Isn > vMinIsn AND a.Isn<=vMaxIsn -- СѓСЃР»РѕРІРёРµ РіРёРґСЂС‹
+     AND a.Rptgroupisn NOT IN (747779200,755075000,755078500); -- СѓСЃР»РѕРІРёРµ РёР· РІР°СЂРёР°РЅС‚Р° РІ РєРѕРјРјРµРЅС‚Р°СЂРёСЏС…
+
+
+
+END; -- Procedure
+
+  CREATE OR REPLACE PROCEDURE "STORAGES"."SET_RPTCLASS" 
+   IS
+
+BEGIN
+
+
+          Update --+ Index_Asc(a x_repbuh2cond)
+                tt_repBuh2Cond A
+              Set
+               (RptClassIsn,RptClass)=(Select
+                           (Case When rptgroupisn in (755075000,755078500)
+                            or AgrClassisn = 9058 /*kgs 19.07.12 РїРёСЃСЊРјРѕ Р”РјРёС‚СЂРµРІСЃРєРѕР№*/
+                            Then
+                           (select classisn2 from dicx where classisn = 49680116
+                            and classisn1 = ruleisnagr) Else RptClassIsn End) RptClassIsn,
+                            Nvl(
+                            Nvl(
+                            (Select
+                            decode (D.Isn, 818752900, 818752900, 1162286003,
+                            -- MSerp 30.06.2008  Р±С‹Р»Рѕ 1162286003, Р·Р°РјРµРЅРёР» РЅР° 57687916
+              57687916,
+
+
+                            decode (d.parentisn,747778500, decode (nvl (rptclassisn,0),0,2051), d.filterisn))
+                            From Dicti D Where Isn=RptGroupIsn),
+                            (select max (isn) from dicti where parentisn = 2004
+                             start with isn = Nvl(rptclassisn,
+                           Case When rptgroupisn in (755075000,755078500)
+                           or AgrClassisn = 9058 /*kgs 19.07.12 РїРёСЃСЊРјРѕ Р”РјРёС‚СЂРµРІСЃРєРѕР№*/
+                           Then
+                           (select classisn2 from dicx where classisn = 49680116
+                            and classisn1 = ruleisnagr) end
+                             )
+                             connect by prior parentisn = isn)),
+                       decode (deptisn,505,2051,519,2051,520,2066,11413819,2051,23735116,2041,
+                       691616516,2041,707480016,2041,742950000,2066)
+                       ) RptClass
+                              From Dual);
+
+
+
+
+
+END; -- Procedure
+
+  CREATE OR REPLACE PROCEDURE "STORAGES"."SET_RPTGROUPISN_BY_BUH" 
+IS
+
+ vParam Number;
+ vGroupIsn number;
+
+ vTurGr0 number;
+ vTurGr1 number;
+
+ vCnt     number:=0;
+ vCommitCount number:=300000;
+
+FinishRPMDate Date := to_date ('28-03-2003','dd-mm-yyyy');
+BEGIN
+
+-- РїСЂР°РІРёР»Рѕ 1 - РїРѕ СЃРїРёСЃРєСѓ РґРѕРіРѕРІРѕСЂРѕРІ
+--Р РРЎРљР РђР Рќ
+   Update 
+    Report_BuhBody_List a
+    Set
+     RPTGROUPISN=755075000
+    Where AGRISN IN (870705616, 870663416, 870783416, 870736216, 870657416, 870660716,
+          870655816, 870658316, 870730616, 870783216, 870787016, 870655716);
+
+-- РїСЂР°РІРёР»Рѕ 2 - РїРѕ Р·РЅР°С‡РµРЅРёСЋ   classisn
+
+
+
+--РћРЎРўРђР›Р¬РќРћР• Р’РҐРћР”РЇР©Р•Р• РћР‘Р›РР“РђРўРћР РќРћР• РџР•Р Р•РЎРўР .
+  Update
+     Report_BuhBody_List a
+    Set
+     RPTGROUPISN=755078500
+   Where Nvl(RPTGROUPISN,0)=0
+   AND (AGRCLASSISN =9020 --c.get ('agrInOblig')
+     Or DeptIsn = 504 and AGRDISCR = 'Р“');
+
+--EGAO 05.05.2013 РІ СЂР°РјРєР°С… Р”РРў-13-2-199598
+UPDATE report_buhbody_list a
+SET a.rptgroupisn=755078500
+WHERE nvl(a.rptgroupisn,0)=0
+  AND a.agrclassisn=8746 -- Р’РҐРћР”РЇР©РР™ Р¤РђРљРЈР›Р¬РўРђРўРР’
+  AND a.ruleisnagr IN (SELECT isn FROM dicti d start WITH d.isn=36628616 CONNECT BY PRIOR d.isn=d.parentisn)--РћР“РћРќР¬ Р РџР : РЎРўР РђРҐРћР’РђРќРР• РўРЈР РРЎРўРћР’
+  AND trunc(a.dateval)>=to_date('01.01.2013','dd.mm.yyyy');
+
+-- РїСЂР°РІРёР»Рѕ 3 - РїРѕ С„РёРєСЃРёСЂРѕРІР°РЅРЅС‹Рј СЃР°Р±СЃС‡РµС‚Р°Рј
+
+
+
+
+
+     Update
+        Report_BuhBody_List a
+       Set
+       RPTGROUPISN=Decode(sagroup,3,
+       Nvl(( Select --+ Index(sa)
+        rptgroupisn
+       from ais.subacc4dept sa
+       Where  rptgroupisn is not null AND SUBACCISN =(
+           Select /*+ index ( bb X_REPBUHBODY_AGR ) */ distinct First_Value(subaccisn) over (order by Abs(BuhamountUsd ) desc)
+           from repbuhbody bb
+            Where bb.agrisn=a.agrisn and bb.statcode=a.statcode and bb.sagroup<>3)),0),
+
+       Nvl((Select rptgroupisn from ais.subacc4dept Where rptgroupisn is not null AND SUBACCISN=A.SUBACCISN),0))
+
+       Where   Nvl(RPTGROUPISN,0)=0;
+
+
+
+
+
+
+-- Р“СЂСѓР·С‹
+
+-- Р’С‹СЃС‚Р°РІРѕС‡РЅС‹Рµ
+    Select max (groupisn)
+    into vGroupIsn
+    from rep_tt_rules2groups
+    where deptisn = 505--c.get ('CargoDept')
+      And Param=2;
+
+
+
+     Update
+      Report_BuhBody_List a
+       Set
+       RPTGROUPISN=vGroupIsn
+      Where
+          DEPTISN=505--c.get ('CargoDept')
+      AND RULEISNAGR=46260916 --c.get('agrCrgExhibition')
+      AND Nvl(RPTGROUPISN,0)=0 ;
+
+
+-- РњРѕСЂРµРј Рё Р±РѕР»СЊС€Рµ С‡РµРј 1
+    Select max (groupisn)
+    into vGroupIsn
+    from rep_tt_rules2groups
+    where deptisn =505 --c.get ('CargoDept')
+      And Param=1;
+
+     Update
+       Report_BuhBody_List a
+       Set
+       RPTGROUPISN=vGroupIsn
+        where  DEPTISN=505--c.get ('CargoDept')
+           AND Nvl(RPTGROUPISN,0)=0
+           And AgrIsn In (Select AgrIsn From Rep_AgrCargo Where  sea=1 or More1=1);
+
+
+-- Р’СЃРµ РѕСЃС‚Р°Р»СЊРЅС‹Рµ РіСЂСѓР·С‹
+    Select max (groupisn)
+    into vGroupIsn
+    from rep_tt_rules2groups
+    where deptisn = 505
+      And Param=0;
+
+     Update
+      Report_BuhBody_List a
+       Set
+       RPTGROUPISN=vGroupIsn
+      Where
+          DEPTISN=505  -- CargoDept
+      AND Nvl(RPTGROUPISN,0)=0;
+
+
+
+-- РџСЂР°РІРёР»Рѕ 4, РїРѕ РіСЂСѓРїРїРµ
+
+
+
+
+
+
+
+/* СЃРѕРіР»Р°СЃРЅРѕ Р·Р°РґР°С‡Рµ 4396689303
+-- РџРµСЂРµСЃС‚СЂР°С…РѕРІР°РЅРёРµ, РјРѕСЂРµРј
+
+     Update
+      Report_BuhBody_List a
+       Set
+       RPTGROUPISN=755040800
+      Where
+          DEPTISN=c.get ('ReInsDept')  -- CargoDept
+      AND Nvl(RPTGROUPISN,0)=0
+      And RULEISNAGR IN (  select ISN
+                           from dicti
+                           start with isn =36625016
+                           connect by prior  isn=parentisn);
+
+*/
+
+--EGAO 27.02.2012 РІ СЂР°РјРєР°С… Р”РРў-12-1-160925
+  UPDATE report_buhbody_list a
+  SET a.rptgroupisn=755064900
+  WHERE a.ruleisnagr IN (SELECT d.isn FROM dicti d start WITH d.isn=37504416 CONNECT BY PRIOR d.isn=d.parentisn) -- РљРћРњРџР›Р•РљРЎРќРћР• РРџРћРўР•Р§РќРћР• РЎРўР РђРҐРћР’РђРќРР•
+    AND a.dateval<to_date('01.01.2012','dd.mm.yyyy')
+    AND nvl(a.rptgroupisn,0)=0;
+
+END;
+
+
+
+  CREATE OR REPLACE PROCEDURE "STORAGES"."SET_RPTGROUPISN_BY_COND" 
+IS
+
+ vParam Number;
+ vGroupIsn number;
+
+ vTurGr0 number;
+ vTurGr1 number;
+
+ vCnt     number:=0;
+ vCommitCount number:=300000;
+
+FinishRPMDate Date := to_date ('28-03-2003','dd-mm-yyyy');
+BEGIN
+
+-- РџСЂР°РІРёР»Рѕ 4, РїРѕ РіСЂСѓРїРїРµ
+
+
+--cРЅР°С‡Р°Р»Р° РёСЃРєР»СЋС‡РµРЅРёСЏ РёР· РїСЂР°РІРёР»
+
+
+vParam:=0;
+
+  select Max(Nvl(groupisn,0))
+  into vTurGr0 --747777700
+  from
+   (select level lv, isn
+    from ais.rule
+    start with isn = 13310616
+    connect by prior parentisn = isn
+    order by lv) r, ais.tt_rules2groups t
+  where r.isn = t.ruleisn
+   and nvl (t.param,vParam) = vParam
+   And RowNum<=1;
+
+
+vParam:=1;
+  select Max(Nvl(groupisn,0))
+  into vTurGr1 --747777600
+  from
+   (select level lv, isn
+    from ais.rule
+    start with isn = 13310616
+    connect by prior parentisn = isn
+    order by lv) r, ais.tt_rules2groups t
+  where r.isn = t.ruleisn
+   and t.param = vParam
+   And RowNum<=1;
+
+
+-- С‚СѓСЂРёСЃС‚С‹, РїСЂРѕРіСЂР°РјРјР° Рђ
+
+
+--РЎС‚СЂР°С…РѕРІР°РЅРёРµ С‚СѓСЂРёСЃС‚РѕРІ. Р РѕСЃСЃРёСЏ
+       Update  --+  INDEX_COMBINE (a  X_tt_RepBuh2Cond_Dept X_tt_RepBuh2Cond_Rule ) Use_Hash(a)
+        REP_COND_LIST a
+       Set
+        RPTGROUPISN=vTurGr1
+       Where  -- DeptIsn = 707480016--c.get ('PrivDept')
+               --And
+               RuleIsn = 13310616
+               AND Nvl(RPTGROUPISN,0)=0
+               AND A.AGRISN In ( Select AgrIsn From REP_AGRTUR b Where isrussia=1);
+--РЎС‚СЂР°С…РѕРІР°РЅРёРµ С‚СѓСЂРёСЃС‚РѕРІ. РќРµ СЂРѕСЃСЃРёСЏ Р РѕСЃСЃРёСЏ (РІСЃРµ РѕСЃС‚Р°Р»СЊРЅС‹Рµ)
+
+Update --+ INDEX_COMBINE (a  X_tt_RepBuh2Cond_RPTGROUPISN X_tt_RepBuh2Cond_RULE X_tt_RepBuh2Cond_DEPT)
+  REP_COND_LIST a
+Set
+ RPTGROUPISN=vTurGr0
+Where   --DeptIsn = 707480016--c.get ('PrivDept')
+--And
+RuleIsn = 13310616
+AND Nvl(RPTGROUPISN,0)=0;
+
+
+-- РІСЃРµ РѕСЃС‚Р°Р»СЊРЅРѕРµ
+
+
+       Update
+       REP_COND_LIST a
+        Set
+         rptgroupisn=Nvl((Select groupisn  from TT_RULE_RPNGRP Where RuleIsn=A.RuleIsn and TYPERULE='COND'),0)
+       Where rptgroupisn=0;
+
+
+/* KGS 29.12.12. 41528597003 РЎРѕРіР»Р°СЃРЅРѕ РїРёСЃСЊРјСѓ Р”РђР  СѓР±РёСЂР°РµРј
+-- РїРѕРїСЂР°РІР»СЏРµРј
+       Update--+ Index (a  X_tt_RepBuh2Cond_RPTGROUPISN)
+       REP_COND_LIST a
+        Set
+         rptgroupisn=755103500
+       Where --DeptIsn=507 --c.get ('FireDept')
+       --And
+       rptgroupisn=747778900
+       AND ObjClassIsn not in (213816,213916,214016,214116,33757016);
+
+
+*/
+
+
+/*KGS 29.12.12. 41528597003 РЎРѕРіР»Р°СЃРЅРѕ РїРёСЃСЊРјСѓ Р”РђР  РґРѕР±Р°РІР»СЏРµРј*/
+
+       Update--+ Index (a  X_tt_RepBuh2Cond_RPTGROUPISN)
+       REP_COND_LIST a
+        Set
+         rptgroupisn=747778900
+       Where
+       RuleIsnAgr in (
+3443048403,--  РђРЈР”РРўРћР Р«
+3443049203,--  Р’Р РђР§Р
+3443048903,--  Р РР­Р›РўРћР Р«
+3442999203, --  РќРћРўРђР РРЈРЎ
+3442996603, --  РђР Р‘РРўР РђР–РќР«Р• РЈРџР РђР’Р›РЇР®Р©РР•
+3443050203,--  Р®Р РРЎРўР« Р РђР”Р’РћРљРђРўР«
+2904000603, --  РћРўР’Р•РўРЎРўР’Р•РќРќРћРЎРўР¬ РЎРўР РћРРўР•Р›Р•Р™ (РЎР Рћ)
+2904001203, --  РћРўР’Р•РўРЎРўР’Р•РќРќРћРЎРўР¬ РџР РћР•РљРўРР РћР’Р©РРљРћР’ (РЎР Рћ)
+2904001603) -- РћРўР’Р•РўРЎРўР’Р•РќРќРћРЎРўР¬ РР—Р«РЎРљРђРўР•Р›Р•Р™ (РЎР Рћ)
 ;
 
-  CREATE OR REPLACE FORCE VIEW "STORAGES"."V_RESUBJPERIOD" ("SECTISN", "CONDISN", "PARENTISN", "ISN", "SUBJISN", "SHAREPC", "DATEENTRY", "DATESWITCH", "DATEBEG", "DATEEND") AS 
-  SELECT --+ use_hash ( a s )
-      a.sectisn,
-      a.condisn,
-      a.parentisn,
-      a.isn,
-      a.subjisn,
-      nvl(a.sharepc,0) AS sharepc,
-      nvl(trunc(a.dateentry),trunc(s.datebeg)) AS dateentry,
-      nvl(trunc(a.dateswitch),to_date('01.01.3000','dd.mm.yyyy')) AS dateswitch,
-      nvl(trunc(a.datebeg),TRUNC(s.datebeg)) AS datebeg,
-      nvl(trunc(a.dateend),TRUNC(s.dateend)) AS dateend
-FROM resubjperiod a, resection s
-WHERE s.isn=a.sectisn
-;
-
-  CREATE OR REPLACE FORCE VIEW "STORAGES"."V_RNPREPCLASS" ("SAGROUP", "REPCLASSISN") AS 
-  SELECT 1 AS sagroup, 1 AS repclassisn FROM dual
-UNION ALL
-SELECT 2 AS sagroup, 2 AS repclassisn FROM dual
-UNION ALL
-SELECT 3 AS sagroup, 1 AS repclassisn FROM dual
-;
-
-  CREATE OR REPLACE FORCE VIEW "STORAGES"."V_RNP_RE_MSFO_VIRTUALCOND" ("AGRISN", "CONDISN", "DATEBEG", "DATEEND", "VIRTUALDATEBEG", "VIRTUALDATEEND", "SHAREPC") AS 
-  WITH sect AS (
-              SELECT --+ use_hash ( pr x ) no_merge ( pr ) index ( x  X_REP_AGRRE_AGRXISN )
-                      x.condisn,
-                      x.agrisn,
-                      trunc(x.sdatebeg) AS sdatebeg,
-                      trunc(x.sdateend) AS sdateend,
-                      pr.priority AS sectpriority,
-                      MAX(pr.priority) over (PARTITION BY x.agrisn, x.condisn) AS maxpriority
-              FROM rep_agrre x, v_resection_priority_msfo pr
-              WHERE x.agrisn>pparam.GetParamN('MinAgrIsn') AND x.agrisn<=pparam.GetParamN('MaxAgrIsn')
-                AND x.datebase='C'
-                AND pr.secttype=x.secttype
-                AND pr.agrclassisn=x.reclassisn
-             )
-SELECT a.agrisn,
-       a.condisn,
-       a.datebeg,
-       a.dateend,
-       a.dt AS virtualdatebeg,
-       a.dte AS virtualdateend,
-       CASE WHEN (a.dateend-a.datebeg+1)=0 THEN 0
-         ELSE (a.dte-a.dt+1)/(a.dateend-a.datebeg+1)
-       END AS sharepc
-FROM (
-      SELECT a.*, lead(dt) over (PARTITION BY agrisn, condisn order by dt)-1 AS dte
-            FROM (
-                  SELECT --+ ordered use_hash ( sect cd )
-                         DISTINCT cd.*,
-                         decode(n.n, 1, cd.datebeg,
-                                     2, cd.dateend+1,
-                                     3, sect.sdatebeg,
-                                     4, sect.sdateend+1
-                               ) dt
-                  FROM (SELECT --+ index ( rc X_REPCOND_AGR )
-                               rc.condisn,
-                               max(rc.agrisn) AS agrisn,
-                               trunc(max(rc.datebeg)) AS datebeg,
-                               trunc(max(rc.dateend)) AS dateend
-                        FROM repcond rc
-                        WHERE rc.agrisn>pparam.GetParamN('MinAgrIsn') AND rc.agrisn<=pparam.GetParamN('MaxAgrIsn')
-                        GROUP BY rc.condisn
-                       ) cd,
-                       sect,
-                       (SELECT ROWNUM n FROM dual CONNECT BY ROWNUM<=4) n
-                  WHERE EXISTS (SELECT 'x' FROM sect x
-                                WHERE x.sectpriority<x.maxpriority
-                                  AND x.agrisn=cd.agrisn
-                                  AND (x.condisn IS NULL OR x.condisn=cd.condisn)
-                                  AND (x.sdatebeg>cd.datebeg AND x.sdatebeg<cd.dateend OR x.sdateend>cd.datebeg AND x.sdateend<cd.dateend)
-                               )
-                    AND sect.agrisn=cd.agrisn
-                    AND (sect.condisn IS NULL OR sect.condisn=cd.condisn)
-                    AND (sect.sdatebeg>cd.datebeg AND sect.sdatebeg<cd.dateend OR sect.sdateend>cd.datebeg AND sect.sdateend<cd.dateend)
-                 ) a
-     ) a
-WHERE a.dt+ (a.dte-a.dt)/2 between a.datebeg and a.dateend
-;
-
-  CREATE OR REPLACE FORCE VIEW "STORAGES"."V_RNP_RE_SUBJECT_BY_AGRROLE" ("SSOURCE", "LOADISN", "DATEREP", "AGRISN", "REINSISN", "REINSISNNAME", "REINSISNPC", "SHORTNAME", "FULLNAME", "LATNAME", "COUNTRY", "INGO", "RECODE") AS 
-  WITH ag AS (
-             SELECT --+ materialize
-             a.*
-             FROM (
-                   SELECT --+ full ( a ) parallel (a 32)
-                           a.agrisn, a.loadisn, daterep
-                   FROM rnp_re_rsbu a
-                   WHERE a.loadisn=pparam.getParamN('LoadIsn')
-                     AND a.reclassisn=-1
-                   UNION
-                   SELECT --+ full ( a ) parallel (a 32)
-                           a.agrisn, a.loadisn, daterep
-                   FROM rnp_re_msfo_final a
-                   WHERE a.loadisn=pparam.getParamN('LoadIsn')
-                     AND a.reclassisn=-1
-                  ) a
-
-           ),
-    rl AS (
-            SELECT --+ index ( rl X_AGRROLE_CLASS )
-                   rl.agrisn,
-                   rl.subjisn,
-                   rl.sharepc  AS sharepc
-            FROM agrrole rl
-            WHERE 1=1
-              AND rl.classisn=435 -- перестраховщик
-              AND rl.sumclassisn=414 -- премия
-              AND rl.sumclassisn2 IN (414, 8133016)
-              AND rl.orderno>0
-              AND NVL(rl.sharepc,0)<>0
-              AND rl.calcflg='Y'
-          ),
-     a AS (SELECT --+ use_hash ( ag a )
-                   ag.agrisn,
-                   max(ag.loadisn) AS loadisn,
-                   max(ag.daterep) AS daterep,
-                   rl.subjisn,
-                   NVL(SUM(rl.sharepc),0)  AS sharepc,
-                   NVL(SUM(SUM(rl.sharepc)) over (PARTITION BY ag.agrisn),0) AS sharepcall
-            FROM ag, rl
-            WHERE rl.agrisn(+)=ag.agrisn
-            GROUP BY ag.agrisn, rl.subjisn
-          )
-SELECT --+ ordered use_nl ( a s ing c ) n_merge ( x )
-       1 AS ssource,
-       a.loadisn,
-       a.daterep,
-       a.agrisn,
-       a.subjisn AS reinsisn,
-       decode(s.code, NULL, '',s.code||' - ')||initcap(s.shortname) AS reinsisnname,
-       CASE WHEN sharepcall=0 THEN 0 ELSE sharepc/sharepcall END AS reinsisnpc,
-       s.shortname,
-       s.fullname,
-       s.namelat AS latname,
-       c.shortname AS country,
-       nvl2(ing.isn,1,0) AS ingo,
-       x.reform||x.retype||x.remethod AS recode
-FROM a, ais.subject_t s, Rep_IngoGrp ing, country c,
-     (SELECT x.* FROM v_rnp_re_subject_recode x WHERE x.agrclassisn=-1 AND x.secttype='QS') x
- WHERE a.sharepcall<>0
-   AND s.isn(+)=a.subjisn
-   AND ing.isn(+)=a.subjisn
-   AND c.isn(+)=s.countryisn
-UNION ALL
-SELECT --+ use_hash ( a )
-       2 AS ssource,
-       a.loadisn,
-       a.daterep,
-       a.agrisn,
-       0 AS reisnisn,
-       to_char(NULL) AS reisnisnname,
-       1 AS reisnisnpc,
-       to_char(NULL) AS shortname,
-       to_char(NULL) AS fullname,
-       to_char(NULL) AS latname,
-       to_char(NULL) AS country,
-       0 AS ingo,
-       to_char(NULL) AS recode
-FROM a
-WHERE a.sharepcall=0
-;
-
-  CREATE OR REPLACE FORCE VIEW "STORAGES"."V_RNP_RE_SUBJECT_BY_SECTION" ("SSOURCE", "LOADISN", "DATEREP", "SECTISN", "SECTTYPE", "SECTDATEBEG", "SECTDATEEND", "REISN", "REDATEBASE", "RECLASSISN", "REINSISN", "REINSISNPC", "REINSISNNAME", "LATNAME", "SHORTNAME", "FULLNAME", "COUNTRY", "INGO", "REINSDATEENTRY", "REINSDATESWITCH", "REINSDATEBEG", "REINSDATEEND", "RECODE") AS 
-  WITH x AS (
-           SELECT --+ materialize
-                  a.*
-           FROM (
-           SELECT --+ full ( a ) parallel (a 32)
-                   a.sectisn,
-                  trunc(a.sectdatebeg) AS sectdatebeg, TRUNC(a.sectdateend) AS sectdateend,
-                  a.secttype,
-                  a.reisn, a.reclassisn, a.redatebase,
-                  a.loadisn, a.daterep
-           FROM rnp_re_msfo_final a
-           WHERE a.loadisn=pparam.getParamN('LoadIsn')
-           AND a.reclassisn<>-1
-           UNION
-           SELECT --+ full ( a ) parallel (a 32)
-                  a.sectisn,
-                  trunc(a.sectdatebeg) AS sectdatebeg, TRUNC(a.sectdateend) AS sectdateend,
-                  a.secttype,
-                  a.reisn, a.reclassisn, a.redatebase,
-                  a.loadisn, a.daterep
-           FROM rnp_re_rsbu a
-           WHERE a.loadisn=pparam.getParamN('LoadIsn')
-             AND a.reclassisn<>-1) a
-          )
-          --SELECT * FROM s;
-          ,
-   sbj AS (
-           SELECT --+ materialize
-                  a.sectisn, a.condisn, a.subjisn, a.sharepc, condsharepc, a.parentisn, a.parentsharepc,
-                  CASE WHEN nvl(a.condsharepc,0)=0 THEN 0 ELSE a.sharepc*a.parentsharepc/a.condsharepc END AS subjsharepc,
-                  a.dateentry,
-                  a.dateswitch,
-                  a.datebeg,
-                  a.dateend
-           FROM (
-
-                 SELECT a.sectisn,
-                        a.condisn,
-                        a.subjisn,
-                        connect_by_root(nvl(a.sharepc,0)) AS parentsharepc,
-                        connect_by_root(a.isn) AS parentisn,
-                        nvl(a.sharepc,0) AS sharepc,
-                        trunc(a.dateentry) AS dateentry,
-                        trunc(a.dateswitch) AS dateswitch,
-                        trunc(a.datebeg) AS datebeg,
-                        trunc(a.dateend) AS dateend,
-                        SUM(a.sharepc) over (PARTITION BY a.condisn, connect_by_root(a.isn)) AS condsharepc
-                 FROM resubjperiod a
-                 WHERE CONNECT_BY_ISLEAF=1 AND nvl(a.sharepc,0)<>0
-                 CONNECT BY PRIOR a.isn=a.parentisn
-                 START WITH a.parentisn IS NULL
-                ) a
-          )
-          --SELECT * FROM sbj;
-          ,
-    cd AS (
-           SELECT --+ use_hash ( x cd ) materialize
-                  cd.isn AS layerisn,
-                  cd.sectisn,
-                  cd.name AS layername,
-                  nvl(cd.rate,0) AS rate,
-                  nvl(cd.depospremsum,0) AS depospremsum,
-                  COUNT(CASE WHEN nvl(cd.rate,0)<>0 THEN 1 END) over (PARTITION BY cd.sectisn) AS FullRateLayerCnt,
-                  COUNT(CASE WHEN nvl(cd.depospremsum,0)<>0 THEN 1 END) over (PARTITION BY cd.sectisn) AS FullDepospremLayerCnt,
-                  COUNT(1) over (PARTITION BY cd.sectisn) AS condcnt
-           FROM recond cd
-           WHERE cd.isn NOT IN (119901171303, 111824735603) -- EGAO 17.01.2012 Лейеры заведены некорректно, исправлению в АИС не подлежат. Исключаем их обработку в коде
-          )
-          --SELECT * FROM cd;
-          ,
-     a AS (
-           SELECT --+ materialize
-                  a.*,
-                  SUM(a.reshare) over (PARTITION BY a.sectisn) AS sectsharepc
-           FROM (
-                 SELECT x.loadisn, x.daterep, x.reisn, x.reclassisn, x.sectisn, x.secttype, x.sectdatebeg, x.sectdateend, x.redatebase,
-                        cd.layerisn, cd.layername, cd.rate,
-                        cd.depospremsum, sbj.subjisn, sbj.parentisn, sbj.parentsharepc,
-                        sbj.sharepc,
-                        sbj.subjsharepc,
-                        NVL(CASE
-                              WHEN x.secttype IN ('XL', 'RX', 'SL') THEN
-                                CASE
-                                  WHEN cd.condcnt=1 THEN sbj.subjsharepc
-                                  WHEN cd.FullRateLayerCnt>0 THEN sbj.subjsharepc*cd.rate
-                                  WHEN cd.FullDepospremLayerCnt>0 THEN sbj.subjsharepc*cd.depospremsum
-                                  ELSE 0
-                                END
-                              WHEN x.secttype IN ('QS', 'SP') THEN subjsharepc
-                            END,0) AS reshare, sbj.dateentry, sbj.dateswitch, sbj.datebeg, sbj.dateend
-                 FROM x, cd, sbj
-                 WHERE cd.sectisn(+)=x.sectisn
-                   AND sbj.sectisn(+)=cd.sectisn
-                   AND sbj.condisn(+)=cd.layerisn
-                ) a
-          )
-          --SELECT COUNT(1) FROM a; -- 39 409
-SELECT --+ ordered use_nl ( a s c ) no_merge ( a )
-       1 AS ssource,
-       a.loadisn,
-       a.daterep,
-       --Секция
-       a.sectisn,
-       a.secttype,
-       a.sectdatebeg,
-       a.sectdateend,
-       a.reisn,
-       a.redatebase,
-       a.reclassisn,
-       --Участник
-       a.reinsisn,
-       a.reinsisnpc,
-       decode(s.code, NULL, '',s.code||' - ')||InitCap(s.shortname) AS reinsisnname,
-       s.namelat AS latname,
-       s.shortname,
-       s.fullname,
-       c.shortname AS country,
-       nvl2(ing.isn,1,0) AS ingo,
-       a.reinsdateentry,
-       a.reinsdateswitch,
-       a.reinsdatebeg,
-       a.reinsdateend,
-       --
-       x.reform||x.retype||x.remethod AS recode
 
 
 
-FROM (
-      SELECT a.sectisn,
-             a.subjisn AS reinsisn,
-             MAX(a.reisn) AS reisn,
-             MAX(a.reclassisn) AS reclassisn,
-             MAX(a.redatebase) AS redatebase,
-             MAX(a.secttype) AS secttype,
-             MAX(a.sectdatebeg) AS sectdatebeg,
-             MAX(a.sectdateend) AS sectdateend,
-             SUM(CASE WHEN NVL(a.sectsharepc,0)=0 THEN 0 ELSE a.reshare/a.sectsharepc END) AS reinsisnpc,
-             max(a.dateentry) AS reinsdateentry,
-             max(a.dateswitch) AS reinsdateswitch,
-             max(a.datebeg) AS reinsdatebeg,
-             max(a.dateend) AS reinsdateend,
-             MAX(a.loadisn) AS loadisn,
-             MAX(a.daterep) AS daterep
-      FROM  a
-      GROUP BY a.sectisn, a.subjisn
-      HAVING SUM(CASE WHEN NVL(a.sectsharepc,0)=0 THEN 0 ELSE a.reshare/a.sectsharepc END)<>0
-     ) a,
-     ais.subject_t s,
-     country c,
-     Rep_IngoGrp ing,
-     v_rnp_re_subject_recode x
-WHERE s.isn(+)=a.reinsisn
-  AND c.isn(+)=s.countryisn
-  AND ing.isn(+)=s.isn
-  AND x.agrclassisn(+)=a.reclassisn
-  AND x.secttype(+)=a.secttype
 
-UNION ALL
-SELECT 2 AS ssource,
-       --
-       max(a.loadisn) AS loadisn,
-       max(a.daterep) AS daterep,
-       --секция
-       a.sectisn,
-       max(a.secttype) AS secttype,
-       MAX(a.sectdatebeg) AS sectdatebeg,
-       MAX(a.sectdateend) AS sectdateend,
-       MAX(a.reisn) AS reisn,
-       MAX(a.redatebase) AS redatebase,
-       MAX(a.reclassisn) AS reclassisn,
-       --участник
-       0 AS reinsisn,
-       1 AS reinsisnpc,
+/* KGS 27.12.2011 РЈР“ 757271000 РѕС‚РјРµРЅРёР»Рё. Р’РјРµСЃС‚Рѕ РЅРµРµ 3540195803. РќР°СЃС‚СЂРѕР№РєРё РІ DicX РїРѕРјРµРЅСЏР»
 
-       to_char(NULL) AS reinsisnname,
-       to_char(NULL) AS latname,
-       to_char(NULL) AS shortname,
-       to_char(NULL) AS fullname,
-       to_char(NULL) AS country,
-       0 AS ingo,
-       to_date(NULL) AS reinsdateentry,
-       to_date(NULL) AS reinsdateswitch,
-       to_date(NULL) AS reinsdatebeg,
-       to_date(NULL) AS reinsdateend,
-       --
-       to_char(NULL) AS recode
-FROM a
-GROUP BY a.sectisn
-HAVING SUM(CASE WHEN NVL(a.sectsharepc,0)=0 THEN 0 ELSE a.reshare/a.sectsharepc END)=0
-;
+       Update--+ INDEX (a X_tt_RepBuh2Cond_RPTGROUPISN)
+       REP_COND_LIST a
+        Set
+         rptgroupisn=747778800
+       Where  rptgroupisn=757271000
+       AND DateBeg >= FinishRPMDate;
+*/
 
-  CREATE OR REPLACE FORCE VIEW "STORAGES"."V_RPTGROUP2AGRRULE" ("RPTGROUPISN", "RPTGROUPCODE", "RPTGROUPNAME", "AGRRULEISN", "AGRRULENAME") AS 
-  SELECT /*+ ordered use_nl ( a d1 d2 ) */a.rptgroupisn, d2.code AS rptgroupcode, d2.shortname AS rptgroupname, a.agrruleisn, d1.shortname AS agrrulename
-FROM (
-      SELECT rootisn AS agrruleisn, MAX(groupisn) AS rptgroupisn
-      FROM (
-            SELECT r.lv, MIN(r.lv) over (PARTITION BY r.rootisn) AS minlv, t.ruleisn,t.groupisn, r.rootisn
-            FROM (SELECT LEVEL lv, isn, connect_by_root(isn) AS rootisn
-                  FROM (SELECT a.isn, a.parentisn
-                        FROM dicti a
-                        START WITH a.parentisn =24890816
-                        CONNECT BY PRIOR a.isn=a.parentisn
-                       )
-                  CONNECT BY PRIOR parentisn = isn
-                 ) r, (SELECT classisn1 groupisn,classisn2 ruleisn FROM dicx WHERE classisn=2031719303) t
-            WHERE r.isn = t.ruleisn
-           )
-      WHERE lv=minlv
-      GROUP BY rootisn
-     )a, dicti d1, dicti d2
-WHERE d1.isn(+)=a.agrruleisn
-  AND d2.isn(+)=a.rptgroupisn
-;
 
-  CREATE OR REPLACE FORCE VIEW "STORAGES"."V_RPTGROUP2RULE" ("RPTGROUPISN", "RPTGROUPCODE", "RPTGROUPNAME", "RULEISN", "RULENAME") AS 
-  SELECT /*+ ordered use_nl ( a d1 d2 ) */a.rptgroupisn, d2.code AS rptgroupcode, d2.shortname AS rptgroupname, a.ruleisn, d1.shortname AS rulename
-FROM (
-      SELECT rootisn AS ruleisn, MAX(groupisn) AS rptgroupisn
-      FROM (
-            SELECT r.lv, MIN(r.lv) over (PARTITION BY r.rootisn) AS minlv, t.ruleisn,t.groupisn, r.rootisn
-            FROM (SELECT LEVEL lv, isn, connect_by_root(isn) AS rootisn
-                  FROM ais.rule
-                  CONNECT BY PRIOR parentisn = isn
-                 ) r, (SELECT classisn1 groupisn,classisn2 ruleisn FROM dicx WHERE classisn=2031712503) t
-            WHERE r.isn = t.ruleisn
-           ) a
-      WHERE a.lv=a.minlv
-      GROUP BY rootisn
-     )a, dicti d1, dicti d2
-WHERE d1.isn(+)=a.ruleisn
-  AND d2.isn(+)=a.rptgroupisn
-;
+-- РЎРўР РђРҐРћР’Р«Р• РџР РћР”РЈРљРўР«
+       Update--+ Index (a X_tt_RepBuh2Cond_RPTGROUPISN )
+       REP_COND_LIST a
+        Set
+         rptgroupisn=Nvl((Select groupisn From TT_RULE_RPNGRP Where A.RuleIsnAgr=RuleIsn and TYPERULE='AGR'),0)
+       Where rptgroupisn=0 ;
+
+END;
