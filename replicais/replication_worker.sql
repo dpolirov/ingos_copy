@@ -52,11 +52,13 @@ begin
                     insert into hist.histlog (   isn, node, tablename,
                                                 recisn, agrisn, isn3,
                                                 sessionid, transid, status,
-                                                operation, updated, updatedby   )
+                                                operation, updated, updatedby,
+                                                unloadisn )
                         select  isn, node, tablename,
                                 recisn, agrisn, isn3,
                                 sessionid, transid, status,
-                                operation, updated, updatedby
+                                operation, updated, updatedby,
+                                unloadisn
                             from hist.temp_histlog
                             where tablename = '''||v_rep_tasks_incr.replication_table||'''
                                 and unloadisn between '||v_rep_tasks_incr.replication_start_isn||' and '||v_rep_tasks_incr.replication_end_isn||';
