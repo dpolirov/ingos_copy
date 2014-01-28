@@ -4,6 +4,10 @@ CREATE SEQUENCE storage_adm.repload_seq;
 
 CREATE SEQUENCE storage_adm.ss_seq;
 
+create sequence storage_adm.tt_seq;
+
+create sequence storage_adm.replog_seq;
+
 CREATE TABLE storage_adm.mx_histlog_etl(
    LOCKED smallint
 ) DISTRIBUTED BY (LOCKED);
@@ -33,7 +37,7 @@ CREATE TABLE storage_adm.repload (
     lastrundate                      TIMESTAMP,
     lastenddate                      TIMESTAMP,
     procisn                          NUMERIC,
-    daterep                          TIMESTAMP,
+    daterep                          TIMESTAMP
 )
 distributed by (isn);
 
@@ -50,15 +54,20 @@ COMMENT ON COLUMN storage_adm.repload.procisn IS 'FK SA_PROCESS.ISN Процес
 --created
 CREATE TABLE storage_adm.tt_histlog (
     isn                              NUMERIC,
-    table_name                       VARCHAR(150),
+    table_name                       VARCHAR(32),
     recisn                           NUMERIC
 )
 distributed by (recisn);
 
+CREATE TABLE storage_adm.tt_histlog_chunk (
+    like hist.histlog
+)
+distributed by (isn);
+
 --created
 CREATE TABLE storage_adm.tt_input (
     findisn                          NUMERIC,
-    table_name                       VARCHAR(150),
+    table_name                       VARCHAR(32),
     recisn                           NUMERIC
 )
 distributed by (table_name, findisn);
@@ -69,7 +78,7 @@ CREATE TABLE storage_adm.ss_histlog (
     findisn                          NUMERIC,
     procisn                          integer,
     indate                           TIMESTAMP DEFAULT current_timestamp,
-    table_name                       VARCHAR(150),
+    table_name                       VARCHAR(32),
     loadisn                          NUMERIC DEFAULT NULL,
     recisn                           NUMERIC
 )
@@ -91,13 +100,13 @@ CREATE TABLE storage_adm.ss_buf_log (
     recisn                           NUMERIC,
     procisn                          integer
 )
-distributed by (isn);
-COMMENT ON TABLE storage_adm.ss_buf_log IS $COMM$Буффер для отсадки записей из логов для схемы REPAGR. $COMM$;
+distributed by (recisn);
+COMMENT ON TABLE storage_adm.ss_buf_log IS 'Буффер для отсадки записей из логов для схемы REPAGR. ';
 
 
 CREATE TABLE storage_adm.ss_process_dest_tables (
     procisn                          integer,
-    table_name                       VARCHAR(150),
+    table_name                       VARCHAR(32),
     view_name                        VARCHAR(150),
     tt_table_name                    VARCHAR(150),
     keyfield                         VARCHAR(250),
@@ -112,20 +121,20 @@ CREATE TABLE storage_adm.ss_process_dest_tables (
 distributed by (procisn);
 --WARNING: No primary key defined for storage_adm.ss_process_dest_tables
 
-COMMENT ON TABLE storage_adm.ss_process_dest_tables IS $COMM$список таблиц, куда "заливает" процесс и вьюх источников. все вьюхи должны брать первоисточником tt_rowid, по Isn или Rowid - не важно. Список полей вьюхи должен точно соответсвовать списку полей таблицы (по именам тоже),
-кроме первых 2-х поле - Isn,Loadisn  -  их заполнит загрузчик.$COMM$;
-COMMENT ON COLUMN storage_adm.ss_process_dest_tables.procisn IS $COMM$ссылка на ISN из ss_process$COMM$;
-COMMENT ON COLUMN storage_adm.ss_process_dest_tables.table_name IS $COMM$таблица получатель$COMM$;
-COMMENT ON COLUMN storage_adm.ss_process_dest_tables.view_name IS $COMM$вьюха источник, должна содержать все поля получателя кроме Isn и Loadisn.$COMM$;
-COMMENT ON COLUMN storage_adm.ss_process_dest_tables.tt_table_name IS $COMM$tt для промежуточных операций, должен полностью совпадать по полям с view_name и быть темпоралкой .  по полям с совпадающими названиями будет проводится поиск записи в получателе на предмет изменения$COMM$;
-COMMENT ON COLUMN storage_adm.ss_process_dest_tables.keyfield IS $COMM$поле наката (связи) таблицы , в общем логический PK для таблицы получателя, список полей, ОБЯЗАТЕЛЬНО должны быть PK таблицы$COMM$;
-COMMENT ON COLUMN storage_adm.ss_process_dest_tables.hist_keyfield IS $COMM$поле, по которому значения в буффере хиста - для удаления удаленных в первоисточнике записей$COMM$;
-COMMENT ON COLUMN storage_adm.ss_process_dest_tables.priority IS $COMM$Очередность загрузки$COMM$;
-COMMENT ON COLUMN storage_adm.ss_process_dest_tables.dest_table_index IS $COMM$Индекс для обращения к таблице получателю$COMM$;
-COMMENT ON COLUMN storage_adm.ss_process_dest_tables.is_histtable IS $COMM$Признак, является ли таблица "исторической", с полями Datebg Dateend для записи, если да, то из нее не удаляем, а "останавливаем" записи датой загрузки$COMM$;
-COMMENT ON COLUMN storage_adm.ss_process_dest_tables.end_date_fld IS $COMM$Поле для Update в HISTTABLE$COMM$;
-COMMENT ON COLUMN storage_adm.ss_process_dest_tables.beg_date_fld IS $COMM$Поля даты начала действия записи$COMM$;
-COMMENT ON COLUMN storage_adm.ss_process_dest_tables.after_script IS $COMM$Скрипт, запускается после наполнения TT_TABLE$COMM$;
+COMMENT ON TABLE storage_adm.ss_process_dest_tables IS 'список таблиц, куда "заливает" процесс и вьюх источников. все вьюхи должны брать первоисточником tt_rowid, по Isn или Rowid - не важно. Список полей вьюхи должен точно соответсвовать списку полей таблицы (по именам тоже),
+кроме первых 2-х поле - Isn,Loadisn  -  их заполнит загрузчик.';
+COMMENT ON COLUMN storage_adm.ss_process_dest_tables.procisn IS 'ссылка на ISN из ss_process';
+COMMENT ON COLUMN storage_adm.ss_process_dest_tables.table_name IS 'таблица получатель';
+COMMENT ON COLUMN storage_adm.ss_process_dest_tables.view_name IS 'вьюха источник, должна содержать все поля получателя кроме Isn и Loadisn.';
+COMMENT ON COLUMN storage_adm.ss_process_dest_tables.tt_table_name IS 'tt для промежуточных операций, должен полностью совпадать по полям с view_name и быть темпоралкой .  по полям с совпадающими названиями будет проводится поиск записи в получателе на предмет изменения';
+COMMENT ON COLUMN storage_adm.ss_process_dest_tables.keyfield IS 'поле наката (связи) таблицы , в общем логический PK для таблицы получателя, список полей, ОБЯЗАТЕЛЬНО должны быть PK таблицы';
+COMMENT ON COLUMN storage_adm.ss_process_dest_tables.hist_keyfield IS 'поле, по которому значения в буффере хиста - для удаления удаленных в первоисточнике записей';
+COMMENT ON COLUMN storage_adm.ss_process_dest_tables.priority IS 'Очередность загрузки';
+COMMENT ON COLUMN storage_adm.ss_process_dest_tables.dest_table_index IS 'Индекс для обращения к таблице получателю';
+COMMENT ON COLUMN storage_adm.ss_process_dest_tables.is_histtable IS 'Признак, является ли таблица "исторической", с полями Datebg Dateend для записи, если да, то из нее не удаляем, а "останавливаем" записи датой загрузки';
+COMMENT ON COLUMN storage_adm.ss_process_dest_tables.end_date_fld IS 'Поле для Update в HISTTABLE';
+COMMENT ON COLUMN storage_adm.ss_process_dest_tables.beg_date_fld IS 'Поля даты начала действия записи';
+COMMENT ON COLUMN storage_adm.ss_process_dest_tables.after_script IS 'Скрипт, запускается после наполнения TT_TABLE';
 
 
 CREATE TABLE storage_adm.ss_process_source_tables (
@@ -157,22 +166,50 @@ CREATE TABLE storage_adm.ss_processes (
 distributed by (isn);
 --WARNING: No primary key defined for storage_adm.ss_proceses
 
-COMMENT ON TABLE storage_adm.ss_processes IS $COMM$список  процессов загрузки хранилища (запускаемых storage_adm.load_storage.LoadStorage($COMM$;
-COMMENT ON COLUMN storage_adm.ss_processes.isn IS $COMM$Isn процесаа$COMM$;
-COMMENT ON COLUMN storage_adm.ss_processes.name IS $COMM$Название$COMM$;
-COMMENT ON COLUMN storage_adm.ss_processes.description IS $COMM$Описание$COMM$;
-COMMENT ON COLUMN storage_adm.ss_processes.active IS $COMM$признак активности Y|N$COMM$;
-COMMENT ON COLUMN storage_adm.ss_processes.priority IS $COMM$Приоритет выполнения (чем меньше, тем раньше)$COMM$;
-COMMENT ON COLUMN storage_adm.ss_processes.blockcnt IS $COMM$Размер блока логов для обработки (по сколько измененных Isn берет за раз)$COMM$;
-COMMENT ON COLUMN storage_adm.ss_processes.wormactive IS $COMM$Признак обработки процесса "червяком"$COMM$;
+COMMENT ON TABLE storage_adm.ss_processes IS 'список  процессов загрузки хранилища (запускаемых storage_adm.load_storage.LoadStorage(';
+COMMENT ON COLUMN storage_adm.ss_processes.isn IS 'Isn процесаа';
+COMMENT ON COLUMN storage_adm.ss_processes.name IS 'Название';
+COMMENT ON COLUMN storage_adm.ss_processes.description IS 'Описание';
+COMMENT ON COLUMN storage_adm.ss_processes.active IS 'признак активности Y|N';
+COMMENT ON COLUMN storage_adm.ss_processes.priority IS 'Приоритет выполнения (чем меньше, тем раньше)';
+COMMENT ON COLUMN storage_adm.ss_processes.blockcnt IS 'Размер блока логов для обработки (по сколько измененных Isn берет за раз)';
+COMMENT ON COLUMN storage_adm.ss_processes.wormactive IS 'Признак обработки процесса "червяком"';
 
 
-create view storage_adm.v_active_process_source_tables as
+create view storage_adm.ac_process_source_tables as
 select st.*
     from storage_adm.ss_process_source_tables st
     inner join storage_adm.ss_processes p
         on p.isn=st.procisn
     where p.active = 'Y';
+
+
+    
+CREATE TABLE storage_adm.replog (
+    isn                              NUMERIC,
+    loadisn                          NUMERIC,
+    datebeg                          TIMESTAMP,
+    dateend                          TIMESTAMP,
+    operation                        VARCHAR(4000),
+    objcount                         NUMERIC,
+    errmsg                           VARCHAR(4000),
+    isn1                             NUMERIC,
+    isn2                             NUMERIC,
+    n1                               NUMERIC,
+    n2                               NUMERIC,
+    date1                            TIMESTAMP,
+    date2                            TIMESTAMP,
+    updated                          TIMESTAMP,
+    updatedby                        NUMERIC,
+    terminal                         VARCHAR(255),
+    previsn                          NUMERIC,
+    module                           VARCHAR(4000),
+    no                               NUMERIC,
+    action                           VARCHAR(4000),
+    sqltext                          TEXT,
+    blockisn                         NUMERIC
+)
+DISTRIBUTED BY (isn);
 
     
 ---------------------------------------------
@@ -544,10 +581,10 @@ CREATE TABLE storage_adm.tt_subject_attrib (
 ;
 --WARNING: No primary key defined for storage_adm.tt_subject_attrib
 
-COMMENT ON COLUMN storage_adm.tt_subject_attrib.monitoringisn IS $COMM$Значение мониторинга$COMM$;
-COMMENT ON COLUMN storage_adm.tt_subject_attrib.monitoringbeg IS $COMM$Дата начала мониторинга$COMM$;
-COMMENT ON COLUMN storage_adm.tt_subject_attrib.monitoringend IS $COMM$Дата окончания мониторинга$COMM$;
-COMMENT ON COLUMN storage_adm.tt_subject_attrib.monitoringupd IS $COMM$Автор изменения значения мониторинга$COMM$;
+COMMENT ON COLUMN storage_adm.tt_subject_attrib.monitoringisn IS 'Значение мониторинга';
+COMMENT ON COLUMN storage_adm.tt_subject_attrib.monitoringbeg IS 'Дата начала мониторинга';
+COMMENT ON COLUMN storage_adm.tt_subject_attrib.monitoringend IS 'Дата окончания мониторинга';
+COMMENT ON COLUMN storage_adm.tt_subject_attrib.monitoringupd IS 'Автор изменения значения мониторинга';
 
 
 CREATE TABLE storage_adm.tt_buhbody (
@@ -1113,10 +1150,10 @@ CREATE TABLE storage_adm.tt_repagrroleagr (
 ;
 --WARNING: No primary key defined for storage_adm.tt_repagrroleagr
 
-COMMENT ON COLUMN storage_adm.tt_repagrroleagr.agent_maxcomission_isn IS $COMM$Агент с максимальной комиссией$COMM$;
-COMMENT ON COLUMN storage_adm.tt_repagrroleagr.contrcount IS $COMM$Количетво подрядчиков$COMM$;
-COMMENT ON COLUMN storage_adm.tt_repagrroleagr.contractorisn IS $COMM$Подрядчик$COMM$;
-COMMENT ON COLUMN storage_adm.tt_repagrroleagr.contrcomission IS $COMM$% Подрядчика$COMM$;
+COMMENT ON COLUMN storage_adm.tt_repagrroleagr.agent_maxcomission_isn IS 'Агент с максимальной комиссией';
+COMMENT ON COLUMN storage_adm.tt_repagrroleagr.contrcount IS 'Количетво подрядчиков';
+COMMENT ON COLUMN storage_adm.tt_repagrroleagr.contractorisn IS 'Подрядчик';
+COMMENT ON COLUMN storage_adm.tt_repagrroleagr.contrcomission IS '% Подрядчика';
 
 
 CREATE TABLE storage_adm.tt_rep_agent_ranks (
