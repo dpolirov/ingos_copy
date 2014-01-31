@@ -4,18 +4,25 @@ declare
     v_min_dttm      timestamp;
     v_proc_tbl      varchar(32);
     v_proc_tbl_key  varchar(50);
+    v_skiphist      varchar(1);
     vRc             bigint;
+    vChunkRows      bigint;
     vSql            varchar;
     v_function_name CHARACTER VARYING = 'STORAGE_ADM.SS_HISTLOG_ADD_CHUNK';
     v_step          CHARACTER VARYING = 'NA';
 begin
 
     v_step = 'Determine max_dttm and min_dttm';
-    select coalesce(max(max_completed_dttm), timestamp '2014-01-28 00:00:00') into v_min_dttm 
+    select coalesce(max(max_completed_dttm), timestamp '2014-01-31 00:00:00') into v_min_dttm 
         from storage_adm.histlog_chunks;
     
     select coalesce(max(completed_dttm), v_min_dttm) into v_max_dttm
         from replicais.replication_tasks_incr;    
+
+    if v_max_dttm = v_min_dttm then
+        -- no new replicator loads since last run
+        return;
+    end if;
 
     --step 0
     --get chunk of data from histlog
@@ -29,8 +36,8 @@ begin
                 and h.unloadisn between r.replication_start_isn and r.replication_end_isn
         where v_min_dttm < r.completed_dttm and r.completed_dttm <= v_max_dttm;
 
-    get diagnostics vRc = ROW_COUNT;
-    RAISE NOTICE '%: % records were inserted to tt_histlog_chunk for interval v_min_dttm=% v_max_dttm =%', v_step, vRc, v_min_dttm, v_max_dttm;
+    get diagnostics vChunkRows = ROW_COUNT;
+    RAISE NOTICE '%: % records were inserted to tt_histlog_chunk for interval v_min_dttm=% v_max_dttm =%', v_step, vChunkRows, v_min_dttm, v_max_dttm;
 
     analyze storage_adm.tt_histlog_chunk;
     
@@ -53,17 +60,15 @@ begin
             on h.tablename = t.LOG_TABLE_NAME
         Group By h.tablename,h.recisn;
 
-    get diagnostics vRc = ROW_COUNT;
-    RAISE NOTICE '%: % records were inserted to tt_histlog for active processses', v_step, vRc;
+    --get diagnostics vRc = ROW_COUNT;
+    --RAISE NOTICE '%: % records were inserted to tt_histlog for tables of active processes', v_step, vRc;
 
-
-    --step 0
     --Remove processed records from ss_histlog table
     v_step = 'Clear ss_histlog';
     delete from storage_adm.ss_histlog
         where loadisn is not null;
-    get diagnostics vRc = ROW_COUNT;
-    RAISE NOTICE '%: %records were deleted from ss_histlog', v_step, vRc;
+    --get diagnostics vRc = ROW_COUNT;
+    --RAISE NOTICE '%: % records were deleted from ss_histlog', v_step, vRc;
    
 
     --step 2
@@ -84,21 +89,36 @@ begin
                 insert into storage_adm.tt_input(table_name, findisn, recisn)
                 select v_proc_tbl, recisn, recisn from storage_adm.tt_histlog h
                     where h.table_name = v_proc_tbl;
+                --get diagnostics vRc = ROW_COUNT;
+                --RAISE NOTICE '%: % records were inserted to tt_input for table %, key %', v_step,vRc, v_proc_tbl,v_proc_tbl_key;
                 
             else
                 --if key is not isn
                 --take specified field or expression from ais table
                 vsql = '
                 insert into storage_adm.tt_input(table_name, findisn, recisn)
-                    select '''||v_proc_tbl||''', t.findisn, t.isn
+                    select '''||v_proc_tbl||''', t.'||v_proc_tbl_key||' findisn, t.isn
                         from storage_adm.tt_histlog h inner join 
-                            (select isn, '||v_proc_tbl_key||' findisn from ais.'||v_proc_tbl||') t
+                            ais.'||v_proc_tbl||' t
                             on h.recisn = t.isn
                         where h.table_name='''||v_proc_tbl||'''';
                 execute vsql;
+                --get diagnostics vRc = ROW_COUNT;
+                --RAISE NOTICE '%: % records were inserted to tt_input for table %, key %', v_step,vRc, v_proc_tbl,v_proc_tbl_key;
+
+                --from hist table
+                select skiphist into v_skiphist from replicais.replication_tables where replication_table_name = v_proc_tbl;
+                if v_skiphist = 'N' then
+                    vsql = '
+                    insert into storage_adm.tt_input(table_name, findisn, recisn)
+                        select '''||v_proc_tbl||''', t.'||v_proc_tbl_key||' findisn, t.isn
+                            from storage_adm.tt_histlog h inner join 
+                                hist.'||v_proc_tbl||' t
+                                on h.recisn = t.isn and h.isn = t.histisn
+                            where h.table_name='''||v_proc_tbl||'''';
+                    execute vsql;
+                end if;
             end if;
-            get diagnostics vRc = ROW_COUNT;
-            RAISE NOTICE '%: % records were inserted to tt_input for table %, key %', v_step,vRc, v_proc_tbl,v_proc_tbl_key;
             --TODO:
             --also isns from hist. tables ?
         end loop;
@@ -115,13 +135,14 @@ begin
                 from storage_adm.v_active_process_source_tables
                 where log_table_name=v_proc_tbl) p;
                 
-        get diagnostics vRc = ROW_COUNT;
-        RAISE NOTICE '%: % records were inserted to ss_histlog for table %',v_step,vRc, v_proc_tbl;
+        --get diagnostics vRc = ROW_COUNT;
+        --RAISE NOTICE '%: % records were inserted to ss_histlog for table %',v_step,vRc, v_proc_tbl;
     end loop;
     
     analyze storage_adm.ss_histlog;
     
-    insert into storage_adm.histlog_chunks(max_completed_dttm) values (v_max_dttm);
+    insert into storage_adm.histlog_chunks(isn, max_completed_dttm, chunk_rows) values 
+        (nextval('storage_adm.histlog_chunks_seq'), v_max_dttm, vChunkRows);
     
 /*
     --Move records from histlog to histlog_arch
@@ -142,8 +163,6 @@ begin
 end;
 $BODY$
 language plpgsql;
-
-
 
 
 --------------------------------------------------------------------------------
@@ -310,7 +329,7 @@ language plpgsql;
 --  LOAD STORAGE
 -- 
 --------------------------------------------------------------------------------
-create or replace function STORAGE_ADM.LOADSTORAGE(pProcIsn int, pFull smallint, pFillBuffer smallint) returns void as $BODY$
+create or replace function STORAGE_ADM.LOADSTORAGE(pProcIsn int, pFull int) returns void as $BODY$
 declare
     vLoadIsn        numeric;
     vHistDb         timestamp; --was global
@@ -330,75 +349,75 @@ begin
     RAISE NOTICE 'STORAGE_ADM.LOADSTORAGE started for procisn=% pFull=%', pProcIsn, pFull;
     
     select * into vProc from storage_adm.ss_processes where isn = pProcIsn;
-
-    vLoadIsn = nextval('storage_adm.repload_seq');
     
     --REPLOG_I (vLoadIsn, 'LoadStorage','Get Log process '||vProc.Name, 'Begin', null, null);
     v_step = 'Create record in repload table';
+    vLoadIsn = nextval('storage_adm.repload_seq');
     insert into storage_adm.repload(isn, loadtype, procisn) values
         (vLoadIsn, pFull, pProcIsn);
     
-    if pFillBuffer=1 then
-        v_step = 'Clear SS_BUF_LOG';
-        if pFull = 0 then
-            delete from storage_adm.SS_BUF_LOG where procisn = pProcIsn and loadisn is not null;
-        else
-            delete from storage_adm.SS_BUF_LOG where procisn = pProcIsn;
-        end if;
-        get diagnostics vRc = ROW_COUNT;
-        RAISE NOTICE '%: % records were deleted from ss_buf_log',v_step,vRc;
-        
-        v_step = 'Fill SS_BUF_LOG';
-        if pFull=0 then
-            --incremental load
-            --Mark records in SS_HISTLOG for loading
-            update storage_adm.SS_HISTLOG
-                set Loadisn = vLoadisn
-                where procisn = pProcIsn and loadisn is null ;
-            get diagnostics vRc = ROW_COUNT;
-            RAISE NOTICE '%: % records were updated in ss_histlog with loadisn=%',v_step,vRc,vLoadIsn;
-
-            --Get records
-            --for non-fullload tables - get from ss_histlog
-            Insert Into storage_adm.SS_BUF_LOG (isn, loadisn, recisn, procisn)
-            select nextval('storage_adm.ss_seq'), 0, t.findisn, pProcIsn
-                from
-                (select h.findisn
-                    from storage_adm.ss_histlog h
-                        inner join storage_adm.ss_process_source_tables p
-                        on h.table_name=p.LOG_TABLE_NAME
-                    where coalesce(p.get_view, '') = '' and p.procisn = pProcIsn 
-                        and h.procisn = pProcIsn and h.loadisn = vLoadIsn and h.findisn is not null
-                    group by h.findisn) t;
-            get diagnostics vRc = ROW_COUNT;
-            RAISE NOTICE '%: % records were inserted in ss_buflog for non-fullload tables',v_step,vRc;
-            
-            --for fullload tables - get from get_view query
-            for v_view in (select get_view 
-                            from storage_adm.ss_process_source_tables
-                            where coalesce(get_view,'') <> '' and procisn = pProcIsn) loop
-                execute('insert into storage_adm.ss_buf_log(isn, loadisn, recisn, procisn)
-                    select nextval(''storage_adm.ss_seq''), 0, v.*, '||pProcIsn||'
-                        from '||v_view||' v where v.* is not null');
-                --v returns one variable that have type of isn and can have any name
-                get diagnostics vRc = ROW_COUNT;
-                RAISE NOTICE '%: % records were inserted in ss_buflog from get_view %',v_step,vRc,v_view;
-            end loop;
-        else
-            --if pFull=1
-            --for load type full get data from fullloadview query
-            for v_view in (select FullLoadView 
-                            from storage_adm.ss_process_source_tables
-                            where coalesce(FullLoadView,'') <> '' and procisn = pProcIsn) loop
-                execute('insert into storage_adm.ss_buf_log(isn, loadisn, recisn, procisn)
-                    select nextval(''storage_adm.ss_seq''), 0, v.*, '||pProcIsn||'
-                        from ('||v_view||') v');
-                --v returns one variable that have type of isn and can have any name
-                get diagnostics vRc = ROW_COUNT;
-                RAISE NOTICE '%: % records were inserted in ss_buflog from fullLoadView %',v_step,vRc,v_view;
-            end loop;
-        end if;
+    -- if pFillBuffer=1 then
+    -- actully buffer is always filled
+    v_step = 'Clear SS_BUF_LOG';
+    if pFull = 0 then
+        delete from storage_adm.SS_BUF_LOG where procisn = pProcIsn and loadisn is not null;
+    else
+        delete from storage_adm.SS_BUF_LOG where procisn = pProcIsn;
     end if;
+    get diagnostics vRc = ROW_COUNT;
+    RAISE NOTICE '%: % records were deleted from ss_buf_log',v_step,vRc;
+    
+    v_step = 'Fill SS_BUF_LOG';
+    if pFull=0 then
+        --incremental load
+        --Mark records in SS_HISTLOG for loading
+        update storage_adm.SS_HISTLOG
+            set Loadisn = vLoadisn
+            where procisn = pProcIsn and loadisn is null ;
+        get diagnostics vRc = ROW_COUNT;
+        RAISE NOTICE '%: % records were updated in ss_histlog with loadisn=%',v_step,vRc,vLoadIsn;
+
+        --Get records
+        --for non-fullload tables - get from ss_histlog
+        Insert Into storage_adm.SS_BUF_LOG (isn, loadisn, recisn, procisn)
+        select nextval('storage_adm.ss_seq'), 0, t.findisn, pProcIsn
+            from
+            (select h.findisn
+                from storage_adm.ss_histlog h
+                    inner join storage_adm.ss_process_source_tables p
+                    on h.table_name=p.LOG_TABLE_NAME
+                where coalesce(p.get_view, '') = '' and p.procisn = pProcIsn 
+                    and h.procisn = pProcIsn and h.loadisn = vLoadIsn and h.findisn is not null
+                group by h.findisn) t;
+        get diagnostics vRc = ROW_COUNT;
+        RAISE NOTICE '%: % records were inserted in ss_buflog for non-fullload tables',v_step,vRc;
+        
+        --for fullload tables - get from get_view query
+        for v_view in (select get_view 
+                        from storage_adm.ss_process_source_tables
+                        where coalesce(get_view,'') <> '' and procisn = pProcIsn) loop
+            execute('insert into storage_adm.ss_buf_log(isn, loadisn, recisn, procisn)
+                select nextval(''storage_adm.ss_seq''), 0, v.*, '||pProcIsn||'
+                    from '||v_view||' v where v.* is not null');
+            --v returns one variable that have type of isn and can have any name
+            get diagnostics vRc = ROW_COUNT;
+            RAISE NOTICE '%: % records were inserted in ss_buflog from get_view %',v_step,vRc,v_view;
+        end loop;
+    else
+        --pFull=1
+        --for load type full get data from fullloadview query
+        for v_view in (select FullLoadView 
+                        from storage_adm.ss_process_source_tables
+                        where coalesce(FullLoadView,'') <> '' and procisn = pProcIsn) loop
+            execute('insert into storage_adm.ss_buf_log(isn, loadisn, recisn, procisn)
+                select nextval(''storage_adm.ss_seq''), 0, v.*, '||pProcIsn||'
+                    from ('||v_view||') v');
+            --v returns one variable that have type of isn and can have any name
+            get diagnostics vRc = ROW_COUNT;
+            RAISE NOTICE '%: % records were inserted in ss_buflog from fullLoadView %',v_step,vRc,v_view;
+        end loop;
+    end if;
+    --end if; pFillBuffer
     --REPLOG_I (vLoadIsn, 'LoadStorage','Get Log process '||vProc.Name, 'End', null, null);
 
     --call Load_Proc_By_tt_RowId
@@ -409,7 +428,7 @@ language plpgsql;
 
 
     
-create or replace function STORAGE_ADM.Load_Proc_By_tt_RowId(pLoadIsn numeric, pProcIsn int, pProcName varchar, pFull smallint) returns void as $BODY$
+create or replace function STORAGE_ADM.Load_Proc_By_tt_RowId(pLoadIsn numeric, pProcIsn int, pFull int) returns void as $BODY$
 declare
     --vLoadIsn        numeric;
     vHistDb         timestamp; --was global
@@ -440,16 +459,16 @@ begin
     where ProcIsn=pProcIsn;
 
     --for each dest table of the process
-    for v_dest_tbl In (Select * from ss_process_dest_tables Where Procisn = pProcIsn order by PRIORITY Asc) loop
+    for v_dest_tbl In (Select * from storage_adm.ss_process_dest_tables Where Procisn = pProcIsn order by PRIORITY Asc) loop
         if pFull = 0 then
             --incremental load
             v_step = v_dest_tbl.TABLE_NAME||' Insert tt';
-            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcName||' By_tt_RowId', v_step,  'Begin');
+            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Begin');
             execute '  truncate table '||v_dest_tbl.TT_TABLE_NAME;       
             vSql =  '  Insert into '||v_dest_tbl.TT_TABLE_NAME||'
-                             select nextval(''storage_adm.tt_seq''), v.* from '||v_dest_tbl.VIEW_NAME||' v';
+                             select v.* from '||v_dest_tbl.VIEW_NAME||' v';
             execute vSql;
-            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcName||' By_tt_RowId', v_step,  'End', -1, vSql);
+            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'End', -1, vSql);
             
             v_step = 'Execute after_script';
             -- empty for all proceses as of now
@@ -458,7 +477,7 @@ begin
             end if;
             
             v_step = v_dest_tbl.TABLE_NAME||' Delete deleted';
-            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcName||' By_tt_RowId', v_step,  'Begin');
+            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Begin');
             vSql =
                 '   /* delete records that were deleted in source - set of records tt_rowid minus tt_table*/
                 Delete 
@@ -472,11 +491,11 @@ begin
                                 Select TT.'||v_dest_tbl.HIST_KEYFIELD||' from '||v_dest_tbl.TT_TABLE_NAME||' TT)';
             execute vSql;
             GET DIAGNOSTICS vRc = ROW_COUNT;
-            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcName||' By_tt_RowId', v_step,  'End', vRc, vSql);
+            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'End', vRc, vSql);
             
             /* remove missing keys in case of set of records by v_dest_tbl.HIST_KEYFIELD has changed  */
             v_step = v_dest_tbl.TABLE_NAME||' Delete by KeyField';
-            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcName||' By_tt_RowId', v_step,  'Begin');
+            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Begin');
             if coalesce(v_dest_tbl.IS_HISTTABLE,0) = 0 then
             
                 --non hist table
@@ -534,17 +553,17 @@ begin
             end if;
             execute vSql;
             
-            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcName||' By_tt_RowId', v_step,  'End', -1, vSql);
+            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'End', -1, vSql);
             
-            --here was inserting by blocks in loop. this is second part of load_tt_by_rowid procedure
+            /*--here was inserting by blocks in loop. this is second part of load_tt_by_rowid procedure
             v_step = v_dest_tbl.TABLE_NAME||' Populate tt_rowid_r';
             execute 'truncate table storage_adm.tt_rowid_r';
             execute 'Insert into storage_adm.tt_rowid_r(RId)
                         Select RowId from '||v_dest_tbl.TT_TABLE_NAME;
-                    
+            */
             --insert new records
             v_step = v_dest_tbl.TABLE_NAME||' DeleteInsert';
-            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcName||' By_tt_RowId', v_step,  'Begin');
+            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Begin');
             if coalesce(v_dest_tbl.IS_HISTTABLE,0) = 0 then
                 vdsql = 
                     'Delete 
@@ -556,9 +575,8 @@ begin
                                     v_dest_tbl.KeyField,
                                     'Where   ('||v_dest_tbl.KeyField||') in (
                                         Select '||v_dest_tbl.KeyField||' 
-                                            from storage_adm.tt_rowid_r tt, '||v_dest_tbl.TT_TABLE_NAME||' t 
-                                            Where t.rowid =tt.rId )',
-                                    'Where   rowid in (select rId from storage_adm.tt_rowid_r)'
+                                            from '||v_dest_tbl.TT_TABLE_NAME||' t)',
+                                    ''
                                   )||
                            ');';
 
@@ -583,9 +601,8 @@ begin
                                                 'Where '||v_dest_tbl.END_DATE_FLD||'>='''||vHistDB||''' 
                                                     And  ('||v_dest_tbl.KeyField||') in (
                                                         Select '||v_dest_tbl.KeyField||' 
-                                                            from  storage_adm.tt_rowid_r TT,'||v_dest_tbl.TT_TABLE_NAME||' T 
-                                                            Where t.rowid =tt.rId  )',
-                                                'Where   rowid in (select rId from storage_adm.tt_rowid_r)'
+                                                            from  '||v_dest_tbl.TT_TABLE_NAME||' T)',
+                                                ''
                                              )||
                                        ')
                                 ) S
@@ -603,9 +620,8 @@ begin
                                         'Where '||v_dest_tbl.END_DATE_FLD||'>='''||vHistDB ||''' 
                                             And  ('||v_dest_tbl.KeyField||') in 
                                             (Select '||v_dest_tbl.KeyField||' 
-                                                from storage_adm.tt_rowid_r tt,'||v_dest_tbl.TT_TABLE_NAME||' t 
-                                                Where t.rowid=tt.rId )',
-                                        'Where   rowid in (select rId from storage_adm.tt_rowid_r)'
+                                                from '||v_dest_tbl.TT_TABLE_NAME||' t)',
+                                        ''
                                      )||
                            ');';
 
@@ -618,31 +634,25 @@ begin
                 Insert  Into '||v_dest_tbl.TABLE_NAME||'
                 Select nextval(''storage_adm.ss_seq'') Isn, '||pLoadIsn||',S.*
                     FROM (
-                        With TT_DATA AS
-                        (
-                            Select T.*
-                                from storage_adm.tt_rowid_r r, '||v_dest_tbl.TT_TABLE_NAME||' T
-                                WHERE  T.RowID = r.RId
-                        ),
-                        Changed_Data AS
+                        WITH Changed_Data AS
                         (' ||storage_adm.Get_Minus_slq(
                                           v_dest_tbl.TT_TABLE_NAME,
                                           v_dest_tbl.TABLE_NAME,
                                           v_dest_tbl.KeyField,
-                                          'Where rowid  in (select rId from storage_adm.tt_rowid_r r ) ',
+                                          '',
                                           'Where   ('||v_dest_tbl.KeyField||') in (
-                                                Select '||v_dest_tbl.KeyField||' from TT_DATA ) '||vHistAdd
+                                                Select '||v_dest_tbl.KeyField||' from '||v_dest_tbl.TT_TABLE_NAME||' ) '||vHistAdd
                                           ) ||
                        ')
                         Select *
-                            from TT_DATA T
+                            from '||v_dest_tbl.TT_TABLE_NAME||' T
                             Where ('||v_dest_tbl.KeyField||') in 
                                 (Select  * from Changed_Data)
                     ) s;'; 
             
             --DEBUG_PUT_LINE(vSql);
             execute vSql;
-            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcName||' By_tt_RowId', v_step,  'End', -1, vSql);
+            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'End', -1, vSql);
 
             --seems not needed here as it is deleting block of data
             --execute 'delete from '||v_dest_tbl.TT_TABLE_NAME||' where  rowid in (select rId from tt_rowid_r)';
@@ -660,13 +670,13 @@ begin
                             AND '|| v_dest_tbl.END_DATE_FLD||' <' ||v_dest_tbl.BEG_DATE_FLD||';';
 
                 execute vSql;
-                perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcName||' By_tt_RowId', v_step,  '', -1, vSql);
+                perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  '', -1, vSql);
             end if;
                 
         else
             --full load
             v_step = v_dest_tbl.TABLE_NAME||' Insert';
-            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcName||' By_tt_RowId', v_step,  'Begin');
+            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Begin');
             
             vSql:='
                 Insert Into '||v_dest_tbl.TABLE_NAME||'
@@ -675,18 +685,17 @@ begin
             execute vSql;
             
             GET DIAGNOSTICS vRc = ROW_COUNT;
-            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcName||' By_tt_RowId', v_step, 'End', vRc, vSql);
+            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step, 'End', vRc, vSql);
 
         end if;
         
-        perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcName||' By_tt_RowId', v_dest_tbl.TABLE_NAME||' Insert tt', 'End');
     end loop;  --by dest tables
 
     
     If (pFull=0) then
         -- clear log
         v_step = v_dest_tbl.TABLE_NAME||' Clear Log';
-        perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcName||' By_tt_RowId', v_step, 'Begin');
+        perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step, 'Begin');
         
         Update storage_adm.SS_BUF_LOG
             Set Loadisn = pLoadIsn
@@ -696,7 +705,7 @@ begin
                 and procisn = pProcIsn;
                 
         GET DIAGNOSTICS vRc = ROW_COUNT;
-        perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcName||' By_tt_RowId', v_step, 'End', vRc, '');
+        perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step, 'End', vRc, '');
     end if;
 
 
