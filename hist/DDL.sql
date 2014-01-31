@@ -31,3 +31,7 @@ CREATE TABLE hist.temp_histlog (
     unloadisn numeric
 )
 DISTRIBUTED BY (isn);
+
+CREATE TABLE hist.histlog_arch (
+    LIKE hist.histlog
+) with (appendonly=true, orientation=column, compresstype=zlib, compresslevel=5);
