@@ -1,3 +1,6 @@
+------------------------------------------------------------
+-- Sequences
+------------------------------------------------------------
 CREATE SEQUENCE storage_adm.histlog_chunks_seq;
 
 --loadisn
@@ -12,6 +15,10 @@ create sequence storage_adm.tt_seq;
 --isn for log records
 create sequence storage_adm.replog_seq;
 
+create sequence storage_adm.SEQ_TASK_START;
+------------------------------------------------------------
+-- Log-based ETL
+------------------------------------------------------------
 CREATE TABLE storage_adm.mx_histlog_etl(
    LOCKED smallint
 ) DISTRIBUTED BY (LOCKED);
@@ -120,6 +127,7 @@ CREATE TABLE storage_adm.ss_process_dest_tables (
     procisn                          integer,
     table_name                       VARCHAR(150),
     view_name                        VARCHAR(150),
+    tt_function_name                 VARCHAR(150),
     tt_table_name                    VARCHAR(150),
     keyfield                         VARCHAR(250),
     hist_keyfield                    VARCHAR(150),
@@ -223,4 +231,115 @@ CREATE TABLE storage_adm.replog (
 )
 DISTRIBUTED BY (isn);
 
-    
+
+
+
+
+
+
+
+------------------------------------------------------------
+-- PL/SQL based ETL 
+------------------------------------------------------------
+CREATE TABLE storage_adm.sa_processes (
+    isn                              NUMERIC,
+    shortname                        VARCHAR(100),
+    usefreq                          NUMERIC DEFAULT 0,
+    lastrun                          TIMESTAMP,
+    nextrun                          TIMESTAMP,
+    errrepcnt                        NUMERIC(38),
+    errtime                          NUMERIC(38),
+    errcnt                           NUMERIC(38),
+    isruning                         NUMERIC(38) DEFAULT 0,
+    sqltext                          TEXT,
+    stoprep                          NUMERIC,
+    shemaname                        VARCHAR(16),
+    shemapass                        VARCHAR(255),
+    rerunsqltext                     VARCHAR(4000),
+    lastrunisn                       NUMERIC,
+    askbeforerun                     VARCHAR(1),
+    nextrun1                         TIMESTAMP,
+    runisn                           NUMERIC,
+    runjobisn                        NUMERIC,
+    isdispecher                      NUMERIC,
+    topbanner                        VARCHAR(4000),
+    bottombanner                     VARCHAR(4000),
+    procname                         VARCHAR(3200),
+    typetasks                        VARCHAR(1),
+    sqlproc                          TEXT,
+    typetask                         VARCHAR(4),
+    flagiscomplex                    NUMERIC
+)
+;
+--WARNING: No primary key defined for storage_adm.sa_processes
+
+COMMENT ON COLUMN storage_adm.sa_processes.isn IS 'Машинный номер задачи';
+COMMENT ON COLUMN storage_adm.sa_processes.shortname IS 'Название задачи';
+COMMENT ON COLUMN storage_adm.sa_processes.usefreq IS 'Ссылка на режим запуска(Sa_freq)';
+COMMENT ON COLUMN storage_adm.sa_processes.lastrun IS 'дата последнего запуска';
+COMMENT ON COLUMN storage_adm.sa_processes.nextrun IS 'дата следующего запуска';
+COMMENT ON COLUMN storage_adm.sa_processes.errrepcnt IS 'кол-во повторений при ошибке';
+COMMENT ON COLUMN storage_adm.sa_processes.errtime IS 'повторять через минут';
+COMMENT ON COLUMN storage_adm.sa_processes.errcnt IS 'кол-во ошибок подряд';
+COMMENT ON COLUMN storage_adm.sa_processes.isruning IS '0 - не запущен';
+COMMENT ON COLUMN storage_adm.sa_processes.sqltext IS 'Текст запроса (чего выполняем)';
+COMMENT ON COLUMN storage_adm.sa_processes.stoprep IS 'признак остановки задачи 1 - остановили (ананлог broken)';
+COMMENT ON COLUMN storage_adm.sa_processes.shemaname IS 'запускать под пользователем (из менеджера)';
+COMMENT ON COLUMN storage_adm.sa_processes.rerunsqltext IS 'Чего выполняем для "доделать"';
+COMMENT ON COLUMN storage_adm.sa_processes.lastrunisn IS '"внутренний" Идентификатор последнего запуска Loadisn задачи, в общем, метка из выполняемиго кода';
+COMMENT ON COLUMN storage_adm.sa_processes.askbeforerun IS '"задавать вопрос перед запуском" для запуска из утилиты';
+COMMENT ON COLUMN storage_adm.sa_processes.nextrun1 IS 'дата следующего запуска 1';
+COMMENT ON COLUMN storage_adm.sa_processes.runisn IS 'технический идентификатор запуска для логов в SA_TASKLOG';
+COMMENT ON COLUMN storage_adm.sa_processes.runjobisn IS 'JobId для задач - диспечеров';
+COMMENT ON COLUMN storage_adm.sa_processes.isdispecher IS 'признак диспечер или нет';
+COMMENT ON COLUMN storage_adm.sa_processes.topbanner IS 'вверхняя шапка обёртки кода';
+COMMENT ON COLUMN storage_adm.sa_processes.bottombanner IS 'нижняя  шапка обёртки кода';
+COMMENT ON COLUMN storage_adm.sa_processes.procname IS 'имя процедуры в которой код задачи';
+COMMENT ON COLUMN storage_adm.sa_processes.typetasks IS 'С - состовная задача, S - односложная';
+COMMENT ON COLUMN storage_adm.sa_processes.sqlproc IS 'Текс процедуры';
+
+
+CREATE TABLE storage_adm.sa_freq (
+    freq                             NUMERIC,
+    dateadd                          VARCHAR(1000),
+    shortname                        VARCHAR(100),
+    rconst                           VARCHAR(100)
+)
+;
+--WARNING: No primary key defined for storage_adm.sa_freq
+
+COMMENT ON TABLE storage_adm.sa_freq IS 'Справочник интервалов для расписаний выполнения отчетов';
+
+
+CREATE TABLE storage_adm.sa_sole_ref (
+    taskisn                          NUMERIC,
+    atomrownum                       NUMERIC,
+    atomsource                       VARCHAR(3200),
+    atomname                         VARCHAR(100)
+)
+DISTRIBUTED BY (taskisn,atomrownum);
+COMMENT ON TABLE storage_adm.sa_freq IS 'Список шагов для каждого из процессов';
+
+
+CREATE TABLE storage_adm.sa_tasklog (
+    isn                              NUMERIC,
+    repisn                           NUMERIC,
+    repname                          VARCHAR(100),
+    event                            VARCHAR(1000),
+    pdate                            TIMESTAMP,
+    pdate2                           TIMESTAMP,
+    p1                               NUMERIC,
+    p2                               NUMERIC,
+    premark                          VARCHAR(4000),
+    updated                          TIMESTAMP,
+    updatedby                        NUMERIC,
+    terminal                         VARCHAR(255),
+    errsql                           TEXT
+)
+;
+--WARNING: No primary key defined for storage_adm.sa_tasklog
+
+--data migration for pl/sql etl configuration tables
+--select shared_system.load_from_ora('storage_adm.sa_processes', 'ext_temp_sa_processes', 1, 'select * from storage_adm.sa_processes');
+--select shared_system.load_from_ora('storage_adm.sa_freq', 'ext_temp_sa_freq', 1, 'select * from storage_adm.sa_freq');
+--select shared_system.load_from_ora('storage_adm.sa_sole_ref', 'ext_temp_sa_freq', 1, 'select * from storage_adm.sa_sole_ref');

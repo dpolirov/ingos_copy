@@ -295,33 +295,39 @@ end;
 $BODY$
 language plpgsql;
 
---GET DIAGNOSTICS vRc = ROW_COUNT;
 
---TODO: Autonomous transaction 
 create or replace function STORAGE_ADM.replog_i(pLoadIsn numeric, pModule varchar, pOperation varchar,
                                                    pAction varchar, pObjCount bigint, pSqlText text) returns void as $BODY$
+    declare vResult varchar;
 begin
-    insert into storage_adm.replog(isn, loadisn, module, operation, action, objcount, sqltext) values
-    (nextval('storage_adm.replog_seq'), pLoadIsn, pModule, pOperation, pAction, pObjCount, pSqlText);
-    RAISE NOTICE '% : ploadisn=%, % %, % records affected. Query:\n %', pOperation, pLoadIsn, pModule, pAction, pObjCount, pSqlText;
+    vResult = shared_system.autonomous_transaction(
+        'insert into storage_adm.replog(isn, loadisn, module, operation, action, objcount, sqltext) values ('||
+        nextval('storage_adm.replog_seq')||','||
+        coalesce(cast(pLoadIsn as varchar), 'null')||',$TXT$'||
+        coalesce(pModule, 'null')||'$TXT$,$TXT$'||
+        coalesce(pOperation, 'null')||'$TXT$,$TXT$'||
+        coalesce(pAction, 'null')||'$TXT$,'||
+        coalesce(cast(pObjCount as varchar), 'null')||',$TXT$'||
+        coalesce(pSqlText,'null')||'$TXT$)'
+    );
+    if vResult <> '' then 
+        RAISE EXCEPTION 'STORAGE_ADM.replog_i : %', vResult;
+    end if;
+    RAISE NOTICE '% : ploadisn=%, % %, % records affected. Query:
+%', pOperation, pLoadIsn, pModule, pAction, pObjCount, pSqlText;
 end;
 $BODY$
 language plpgsql;
 
 
---TODO: Autonomous transaction 
 create or replace function STORAGE_ADM.replog_i(pLoadIsn numeric, pModule varchar, pOperation varchar,
                                                    pAction varchar) returns void as $BODY$
 begin
-    insert into storage_adm.replog(isn, loadisn, module, operation, action) values
-    (nextval('storage_adm.replog_seq'), pLoadIsn, pModule, pOperation, pAction);
-    RAISE NOTICE '% : ploadisn=%, % %', pOperation, pLoadIsn, pModule, pAction;
+    perform STORAGE_ADM.replog_i(pLoadIsn, pModule, pOperation, pAction, null, null);
 end;
 $BODY$
 language plpgsql;
 
-
---RepLog_i ('||pLoadIsn||', ''Load '||pProcName||' By_tt_RowId'', '''||Cur.TABLE_NAME||' DeleteInsert'',  pAction => ''End'',pobjCount => vrc
 
 
 --------------------------------------------------------------------------------
@@ -458,17 +464,23 @@ begin
             from storage_adm.SS_BUF_LOG
     where ProcIsn=pProcIsn;
 
+    perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', '',  'Begin');
     --for each dest table of the process
     for v_dest_tbl In (Select * from storage_adm.ss_process_dest_tables Where Procisn = pProcIsn order by PRIORITY Asc) loop
         if pFull = 0 then
             --incremental load
-            v_step = v_dest_tbl.TABLE_NAME||' Insert tt';
-            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Begin');
-            execute '  truncate table '||v_dest_tbl.TT_TABLE_NAME;       
-            vSql =  '  Insert into '||v_dest_tbl.TT_TABLE_NAME||'
-                             select v.* from '||v_dest_tbl.VIEW_NAME||' v';
+            v_step = v_dest_tbl.TABLE_NAME||' Fill tt table from view';
+            --perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Begin');
+            execute '  truncate table '||v_dest_tbl.TT_TABLE_NAME;
+            if v_dest_tbl.TT_FUNCTION_NAME is not null then
+                vSql = 'perform '||v_dest_tbl.TT_FUNCTION_NAME;
+            else
+                vSql = 'Insert into '||v_dest_tbl.TT_TABLE_NAME||'
+                            select v.* from '||v_dest_tbl.VIEW_NAME||' v';
+            end if;
             execute vSql;
-            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'End', -1, vSql);
+            GET DIAGNOSTICS vRc = ROW_COUNT;
+            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Ins', vRc, vSql);
             
             v_step = 'Execute after_script';
             -- empty for all proceses as of now
@@ -477,7 +489,7 @@ begin
             end if;
             
             v_step = v_dest_tbl.TABLE_NAME||' Delete deleted';
-            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Begin');
+            --perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Begin');
             vSql =
                 '   /* delete records that were deleted in source - set of records tt_rowid minus tt_table*/
                 Delete 
@@ -491,11 +503,11 @@ begin
                                 Select TT.'||v_dest_tbl.HIST_KEYFIELD||' from '||v_dest_tbl.TT_TABLE_NAME||' TT)';
             execute vSql;
             GET DIAGNOSTICS vRc = ROW_COUNT;
-            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'End', vRc, vSql);
+            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Del', vRc, vSql);
             
             /* remove missing keys in case of set of records by v_dest_tbl.HIST_KEYFIELD has changed  */
             v_step = v_dest_tbl.TABLE_NAME||' Delete by KeyField';
-            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Begin');
+            --perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Begin');
             if coalesce(v_dest_tbl.IS_HISTTABLE,0) = 0 then
             
                 --non hist table
@@ -508,11 +520,15 @@ begin
                                 (Select t.Isn from storage_adm.tt_rowid t )
                                 except
                                 Select  '||v_dest_tbl.KeyField||' from '||v_dest_tbl.TT_TABLE_NAME||' TT)';
+                execute vSql;
+                GET DIAGNOSTICS vRc = ROW_COUNT;
+                perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Del', vRc, vSql);
             else
                 --table with history
                 vSql = storage_adm.GetHistTableFldList(v_dest_tbl.TABLE_NAME,v_dest_tbl.END_DATE_FLD);
 
-                vSql = 'Insert Into '||v_dest_tbl.TABLE_NAME||'
+                vSql = '
+                        Insert Into '||v_dest_tbl.TABLE_NAME||'
                             SELECT NEXTVAL(''storage_adm.ss_seq'') ISN,S.*
                                 from
                                     (Select '||vSql ||'
@@ -529,8 +545,12 @@ begin
                                                 from '||v_dest_tbl.TT_TABLE_NAME||'
                                             )
                                     ) S
-                                WHERE '|| v_dest_tbl.END_DATE_FLD||'>='||v_dest_tbl.BEG_DATE_FLD|| ';
-
+                                WHERE '|| v_dest_tbl.END_DATE_FLD||'>='||v_dest_tbl.BEG_DATE_FLD|| ';';
+                execute vSql;
+                GET DIAGNOSTICS vRc = ROW_COUNT;
+                perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Ins-hist', vRc, vSql);
+                
+                vSql='
                         Delete
                             from '||v_dest_tbl.TABLE_NAME||' a
                             Where  '||v_dest_tbl.END_DATE_FLD||'>='''||vHistDB ||''' 
@@ -541,19 +561,23 @@ begin
                                             (Select Isn from storage_adm.tt_rowid )
                                     except
                                     Select  '||v_dest_tbl.KeyField||' 
-                                        from '||v_dest_tbl.TT_TABLE_NAME||');
-
-                        /* remove records that begin after hist date */
+                                        from '||v_dest_tbl.TT_TABLE_NAME||');';
+                execute vSql;
+                GET DIAGNOSTICS vRc = ROW_COUNT;
+                perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Del1-hist', vRc, vSql);
+                
+                /* remove records that begin after hist date */
+                vSql='
                         Delete 
                             from '||v_dest_tbl.TABLE_NAME||' a
                                 Where  '||v_dest_tbl.BEG_DATE_FLD||'>='''||vHistDB ||''' 
                                     AND ('||v_dest_tbl.KeyField||')  In
                                         (Select  '||v_dest_tbl.KeyField||' 
                                             from '||v_dest_tbl.TT_TABLE_NAME||');';
+                execute vSql;
+                GET DIAGNOSTICS vRc = ROW_COUNT;
+                perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Del2-hist', vRc, vSql);
             end if;
-            execute vSql;
-            
-            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'End', -1, vSql);
             
             /*--here was inserting by blocks in loop. this is second part of load_tt_by_rowid procedure
             v_step = v_dest_tbl.TABLE_NAME||' Populate tt_rowid_r';
@@ -563,9 +587,8 @@ begin
             */
             --insert new records
             v_step = v_dest_tbl.TABLE_NAME||' DeleteInsert';
-            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Begin');
             if coalesce(v_dest_tbl.IS_HISTTABLE,0) = 0 then
-                vdsql = 
+                vSql = 
                     'Delete 
                         from '||v_dest_tbl.TABLE_NAME||' a 
                         Where ('||v_dest_tbl.KeyField||')  In
@@ -581,15 +604,18 @@ begin
                            ');';
 
                 vHistAdd = ' ';
+                execute vSql;
+                GET DIAGNOSTICS vRc = ROW_COUNT;
+                perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Del', vRc, vSql);
             else
 
-                vdsql = storage_adm.GetHistTableFldList(v_dest_tbl.TABLE_NAME, v_dest_tbl.END_DATE_FLD);
+                vsql = storage_adm.GetHistTableFldList(v_dest_tbl.TABLE_NAME, v_dest_tbl.END_DATE_FLD);
 
-                vdsql = '
+                vsql = '
                     Insert Into '||v_dest_tbl.TABLE_NAME||'
                         SELECT Seq_SS.NEXTVAL ISN,S.*
                             FROM(
-                                Select '||vdsql||' 
+                                Select '||vsql||' 
                                     from  '||v_dest_tbl.TABLE_NAME||'
                                     Where
                                         '||v_dest_tbl.END_DATE_FLD||'>='''||vHistDB||''' 
@@ -606,9 +632,12 @@ begin
                                              )||
                                        ')
                                 ) S
-                            WHERE   '|| v_dest_tbl.END_DATE_FLD||'>='||v_dest_tbl.BEG_DATE_FLD||';
+                            WHERE   '|| v_dest_tbl.END_DATE_FLD||'>='||v_dest_tbl.BEG_DATE_FLD||';';
+                execute vSql;
+                GET DIAGNOSTICS vRc = ROW_COUNT;
+                perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Ins-hist', vRc, vSql);
 
-
+                vSql = '
                     Delete
                         from '||v_dest_tbl.TABLE_NAME||'
                         Where '||v_dest_tbl.END_DATE_FLD||'>='''||vHistDB ||'''
@@ -624,13 +653,15 @@ begin
                                         ''
                                      )||
                            ');';
+                execute vSql;
+                GET DIAGNOSTICS vRc = ROW_COUNT;
+                perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Del-hist', vRc, vSql);
 
                 vHistAdd:=' AND '||v_dest_tbl.END_DATE_FLD||'>='''||vHistDB ||'''';
 
             end if;
 
-            vsql = vdsql||
-                '
+            vsql = '
                 Insert  Into '||v_dest_tbl.TABLE_NAME||'
                 Select nextval(''storage_adm.ss_seq'') Isn, '||pLoadIsn||',S.*
                     FROM (
@@ -649,14 +680,10 @@ begin
                             Where ('||v_dest_tbl.KeyField||') in 
                                 (Select  * from Changed_Data)
                     ) s;'; 
-            
-            --DEBUG_PUT_LINE(vSql);
             execute vSql;
-            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'End', -1, vSql);
-
-            --seems not needed here as it is deleting block of data
-            --execute 'delete from '||v_dest_tbl.TT_TABLE_NAME||' where  rowid in (select rId from tt_rowid_r)';
-
+            GET DIAGNOSTICS vRc = ROW_COUNT;
+            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Ins', vRc, vSql);
+            
 
             /* грязно. для таблиц с датой начала-окнчания зачищаем неликвидные записи  */
 
@@ -670,23 +697,21 @@ begin
                             AND '|| v_dest_tbl.END_DATE_FLD||' <' ||v_dest_tbl.BEG_DATE_FLD||';';
 
                 execute vSql;
-                perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  '', -1, vSql);
+                GET DIAGNOSTICS vRc = ROW_COUNT;
+                perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Del-hist', vRc, vSql);
             end if;
                 
         else
             --full load
-            v_step = v_dest_tbl.TABLE_NAME||' Insert';
-            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Begin');
+            v_step = v_dest_tbl.TABLE_NAME||' Full load from view';
             
             vSql:='
                 Insert Into '||v_dest_tbl.TABLE_NAME||'
                 Select nextval(''storage_adm.ss_seq''), '||pLoadIsn||', S.*
                     From (select * from '||v_dest_tbl.VIEW_NAME||') s;';
             execute vSql;
-            
             GET DIAGNOSTICS vRc = ROW_COUNT;
-            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step, 'End', vRc, vSql);
-
+            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Ins', vRc, vSql);
         end if;
         
     end loop;  --by dest tables
@@ -695,7 +720,7 @@ begin
     If (pFull=0) then
         -- clear log
         v_step = v_dest_tbl.TABLE_NAME||' Clear Log';
-        perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step, 'Begin');
+        --perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step, 'Begin');
         
         Update storage_adm.SS_BUF_LOG
             Set Loadisn = pLoadIsn
@@ -705,8 +730,9 @@ begin
                 and procisn = pProcIsn;
                 
         GET DIAGNOSTICS vRc = ROW_COUNT;
-        perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step, 'End', vRc, '');
+        perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step, 'Del', vRc, '');
     end if;
+    perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', '',  'End');
 
 
     EXCEPTION
