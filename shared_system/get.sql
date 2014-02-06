@@ -10,4 +10,4 @@ begin
     end if;
 end;
 $BODY$
-language plpgsql
+language plpgsql;

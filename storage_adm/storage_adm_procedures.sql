@@ -168,6 +168,35 @@ language plpgsql;
 --------------------------------------------------------------------------------
 -- Utility functions for LOAD_STORAGE
 --------------------------------------------------------------------------------
+create or replace function storage_adm.GetHistDB() returns timestamp as $BODY$
+begin
+    return shared_system.getparamt('histdb');
+end;
+$BODY$
+language plpgsql;
+
+create or replace function storage_adm.SetHistDB(vHistDB timestamp) returns void as $BODY$
+begin
+    perform shared_system.setparamt('histdb', vHistDB);
+end;
+$BODY$
+language plpgsql;
+
+create or replace function storage_adm.GetLoadIsn() returns numeric as $BODY$
+begin
+    return shared_system.getparamn('loadisn');
+end;
+$BODY$
+language plpgsql;
+
+create or replace function storage_adm.SetLoadIsn(vLoadIsn numeric) returns void as $BODY$
+begin
+    perform shared_system.setparamn('loadisn', vHistDB);
+end;
+$BODY$
+language plpgsql;
+
+
 create or replace function STORAGE_ADM.CalcHistDB() returns timestamp as $BODY$
 declare
     pHistDB         timestamp;
@@ -198,7 +227,7 @@ $BODY$
 language plpgsql;
 
 --fields list  for closing hist records: all except isn, loadisn,  pEND_DATE_FIELD replaced with value of vHistDB
-create or replace function STORAGE_ADM.GetHistTableFldList (pTABLE_NAME Varchar, pEND_DATE_FLD Varchar) Returns VARCHAR as $BODY$
+create or replace function STORAGE_ADM.GetHistTableFldList (pTABLE_NAME Varchar, pEND_DATE_FLD Varchar, vHistDB timestamp) Returns VARCHAR as $BODY$
 declare
     vSql    Varchar(4000);
     Cur_Col record;
@@ -220,7 +249,7 @@ Begin
         if (Cur_Col.attname <> lower(pEND_DATE_FLD)) Then
             vSql = vSql||','||Cur_Col.attname;
         else
-            vSql = vSql||',To_DAte('''||To_Char(vHistDB-1,'DD.MM.YYYY')||''',''DD.MM.YYYY'') AS '||pEND_DATE_FLD;
+            vSql = vSql||',timestamp '''||To_Char(vHistDB - interval '1 day', 'yyyy-mm-dd HH:MI:SS')||''' AS '||pEND_DATE_FLD;
         end if;
     end loop;
 
@@ -294,40 +323,6 @@ begin
 end;
 $BODY$
 language plpgsql;
-
-
-create or replace function STORAGE_ADM.replog_i(pLoadIsn numeric, pModule varchar, pOperation varchar,
-                                                   pAction varchar, pObjCount bigint, pSqlText text) returns void as $BODY$
-    declare vResult varchar;
-begin
-    vResult = shared_system.autonomous_transaction(
-        'insert into storage_adm.replog(isn, loadisn, module, operation, action, objcount, sqltext) values ('||
-        nextval('storage_adm.replog_seq')||','||
-        coalesce(cast(pLoadIsn as varchar), 'null')||',$TXT$'||
-        coalesce(pModule, 'null')||'$TXT$,$TXT$'||
-        coalesce(pOperation, 'null')||'$TXT$,$TXT$'||
-        coalesce(pAction, 'null')||'$TXT$,'||
-        coalesce(cast(pObjCount as varchar), 'null')||',$TXT$'||
-        coalesce(pSqlText,'null')||'$TXT$)'
-    );
-    if vResult <> '' then 
-        RAISE EXCEPTION 'STORAGE_ADM.replog_i : %', vResult;
-    end if;
-    RAISE NOTICE '% : ploadisn=%, % %, % records affected. Query:
-%', pOperation, pLoadIsn, pModule, pAction, pObjCount, pSqlText;
-end;
-$BODY$
-language plpgsql;
-
-
-create or replace function STORAGE_ADM.replog_i(pLoadIsn numeric, pModule varchar, pOperation varchar,
-                                                   pAction varchar) returns void as $BODY$
-begin
-    perform STORAGE_ADM.replog_i(pLoadIsn, pModule, pOperation, pAction, null, null);
-end;
-$BODY$
-language plpgsql;
-
 
 
 --------------------------------------------------------------------------------
@@ -427,6 +422,10 @@ begin
     --REPLOG_I (vLoadIsn, 'LoadStorage','Get Log process '||vProc.Name, 'End', null, null);
 
     --call Load_Proc_By_tt_RowId
+    vSql = 'select STORAGE_ADM.Load_Proc_By_tt_RowId('||vLoadIsn||','||pProcIsn||','||pFull||')';
+    dbms_jobs.job_submit(vSql, 1);
+    RAISE NOTICE '%: Job submitted
+%',v_step,vSql;
 end;
 $BODY$
 language plpgsql;
@@ -453,6 +452,9 @@ begin
     else
         vHistDB = to_date('01-01-1900','dd-mm-yyyy');
     end if;
+    perform storage_adm.SetHistDB(vHistDB);
+    perform storage_adm.SetLoadIsn(pLoadIsn);
+    
     RAISE NOTICE 'vHistDB=%', vHistDB;
 
     v_step = 'Populate tt_rowid';
@@ -525,7 +527,7 @@ begin
                 perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Del', vRc, vSql);
             else
                 --table with history
-                vSql = storage_adm.GetHistTableFldList(v_dest_tbl.TABLE_NAME,v_dest_tbl.END_DATE_FLD);
+                vSql = storage_adm.GetHistTableFldList(v_dest_tbl.TABLE_NAME, v_dest_tbl.END_DATE_FLD, vHistDB);
 
                 vSql = '
                         Insert Into '||v_dest_tbl.TABLE_NAME||'
@@ -609,7 +611,7 @@ begin
                 perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Del', vRc, vSql);
             else
 
-                vsql = storage_adm.GetHistTableFldList(v_dest_tbl.TABLE_NAME, v_dest_tbl.END_DATE_FLD);
+                vsql = storage_adm.GetHistTableFldList(v_dest_tbl.TABLE_NAME, v_dest_tbl.END_DATE_FLD, vHistDB);
 
                 vsql = '
                     Insert Into '||v_dest_tbl.TABLE_NAME||'
@@ -744,4 +746,42 @@ end;
 $BODY$
 language plpgsql;
 
+
+
+--------------------------------------------------------------------------------
+--
+--  LOGGING
+-- 
+--------------------------------------------------------------------------------
+create or replace function STORAGE_ADM.replog_i(pLoadIsn numeric, pModule varchar, pOperation varchar,
+                                                   pAction varchar, pObjCount bigint, pSqlText text) returns void as $BODY$
+    declare vResult varchar;
+begin
+    vResult = shared_system.autonomous_transaction(
+        'insert into storage_adm.replog(isn, loadisn, module, operation, action, objcount, sqltext) values ('||
+        nextval('storage_adm.replog_seq')||','||
+        coalesce(cast(pLoadIsn as varchar), 'null')||',$TXT$'||
+        coalesce(pModule, 'null')||'$TXT$,$TXT$'||
+        coalesce(pOperation, 'null')||'$TXT$,$TXT$'||
+        coalesce(pAction, 'null')||'$TXT$,'||
+        coalesce(cast(pObjCount as varchar), 'null')||',$TXT$'||
+        coalesce(pSqlText,'null')||'$TXT$)'
+    );
+    if vResult <> '' then 
+        RAISE EXCEPTION 'STORAGE_ADM.replog_i : %', vResult;
+    end if;
+    RAISE NOTICE '% : ploadisn=%, % %, % records affected. Query:
+%', pOperation, pLoadIsn, pModule, pAction, pObjCount, pSqlText;
+end;
+$BODY$
+language plpgsql;
+
+
+create or replace function STORAGE_ADM.replog_i(pLoadIsn numeric, pModule varchar, pOperation varchar,
+                                                   pAction varchar) returns void as $BODY$
+begin
+    perform STORAGE_ADM.replog_i(pLoadIsn, pModule, pOperation, pAction, null, null);
+end;
+$BODY$
+language plpgsql;
 

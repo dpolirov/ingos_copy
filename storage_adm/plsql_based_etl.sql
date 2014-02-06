@@ -13,7 +13,7 @@ begin
         else
             if (v_process.NextRun1 is null) and ((v_process.NextRun <= v_now) or (v_process.NextRun is null)) then
                 RAISE NOTICE 'run %', v_process.isn;
-                perform execute_loged_report(v_process.isn, 1, 0);
+                --perform execute_loged_report(v_process.isn, 1, 0);
             end if;
         end if;
     end loop;
@@ -73,7 +73,7 @@ end;
 $BODY$
 language plpgsql;
 
-
+--Log task status in autonomous transaction
 create or replace function storage_adm.LOGREP
   (pREPISN numeric,
    pREPNAME VARCHAR,
@@ -88,44 +88,81 @@ create or replace function storage_adm.LOGREP
    --pTERMINAL VARCHAR2:=NULL,
    pRUNJOBISN numeric
    )returns void as $BODY$
+declare
+    vSql varchar ;
+    vResult varchar;
+    spP1 varchar = coalesce(cast(pP1 as varchar), 'null');
+    spP2 varchar = coalesce(cast(pP2 as varchar), 'null');
+    spRemark varchar = coalesce(pREMARK, 'null');
+    spRUNJOBISN varchar = coalesce(cast(pRUNJOBISN as varchar),'null');
 begin
-    insert into storage_adm.SA_TASKLOG (REPISN,REPNAME,EVENT,PDATE,PDATE2,P1,P2,pREMARK,UPDATED,UPDATEDBY,TERMINAL)
-        values (pREPISN,pREPNAME,pEVENT,null,null,pP1,pP2,pREMARK,current_timestamp,null,null);
+    vSql = '
+    insert into storage_adm.SA_TASKLOG (
+        REPISN,
+        REPNAME,
+        EVENT,
+        PDATE,PDATE2,
+        P1,
+        P2,
+        pREMARK,
+        UPDATED,
+        UPDATEDBY,TERMINAL,
+        job_isn)
+    values ('||
+        pREPISN||','''||
+        pREPNAME||''','''||
+        pEVENT||
+        ''',null,null,'||
+        spP1||','||
+        spP2||',$remark$'||
+        spREMARK||'$remark$,'||
+        'current_timestamp,'||
+        'null,null,'||
+        spRUNJOBISN||');';
 
     If pP2 = 0 Then
+        vSql = vSql||'
         Update storage_adm.Sa_Processes 
         Set 
             IsRuning  = 1,
-            LastRun   = date_Trunc('minute', current_timestamp),
-            RunIsn    = pP1,
-            RUNJOBISN = pRUNJOBISN 
-        Where Isn = pRepIsn; /*пишем запущен*/
+            LastRun   = date_trunc(''minute'', current_timestamp),
+            RunIsn    = '||spP1||',
+            RUNJOBISN = '||spRUNJOBISN||'
+        Where Isn = '||pRepIsn||'; /*пишем запущен*/';
     elsif pP2 = -1 then
+        vSql = vSql||'
         Update storage_adm.Sa_Processes
         Set
             IsRuning = 0,
             ErrCnt   = coalesce(ErrCnt,0) + 1,
-            NextRun1 = null,--EGAO 04.09.2009 NextRun1=Decode(Sign(errrepcnt-ErrCnt),1,(Trunc(SysDate,'MI')+errtime/1440)),
-            NextRun  = null --EGAO 04.09.2009 NextRun=Decode(Sign(errrepcnt-ErrCnt),1,NextRun)
-        Where Isn = pRepIsn;  /*пишем остановлен + пишем ошибка (на счетчик)+след. запуск*/
+            NextRun1 = null,
+            NextRun  = null 
+        Where Isn = '||pRepIsn||';  /*пишем остановлен + пишем ошибка (на счетчик)+след. запуск*/';
     else
+        vSql = vSql||'
         Update storage_adm.Sa_Processes 
         Set 
             IsRuning = 0,
             ErrCnt   = 0
-        Where Isn = pRepIsn; /*пишем остановлен + сброс счетчика ошибок*/
+        Where Isn = '||pRepIsn||'; /*пишем остановлен + сброс счетчика ошибок*/';
     end if;
-  
+
+    raise notice '%', vSql;
+    vResult = shared_system.autonomous_transaction(vSql);
+    if vResult <> '' then 
+        RAISE EXCEPTION 'STORAGE_ADM.LOGREP : %', vResult;
+    end if;
 END; -- Procedure
 $BODY$
 language plpgsql;
 
 
 
+
 --PROCEDURE EXECUTE_LOGED_REPORT
 create or replace function STORAGE_ADM.EXECUTE_LOGED_REPORT(pTaskIsn numeric, pMoveTime integer, pReRun integer) returns void as $BODY$
 declare
-    /*parameters that never specified in function call */
+    /*parameters always constant */
     pBlockMode Integer:=0, /* блокирующий или не блокирующий режим запуска */
     pIsRaise Integer:=0,  /* признак генерации ошибки запуска*/
     pLogEnd Integer:=1, /* признак автологировани завершения выполнения*/
@@ -154,41 +191,38 @@ begin
     vStartId = NEXTVAL('storage_adm.seq_task_start'); /*ИДЕНТИФИКАТОР ЗАПУСКА*/
     
     SELECT * into v_process FROM storage_adm.Sa_Processes WHERE Isn = pTaskIsn;
-
+    -- there was a cycle but actually there is only one process per pTaskIsn
+    
     /*В КОНЕЦ БЛОКА ПИШЕМ ОБРАБОЧИК "ЗАКОНЧИЛИ" И ОШИБКИ ВЫПОЛНЕНИЯ*/
     IF (pRerun=1) and (v_process.RERUNSQLTEXT is not Null) Then
         -- RERUNSQLTEXT is always null
-        vBaseSql = v_process.SHEMANAME||'.'||v_process.RERUNSQLTEXT;
+        vSql = v_process.SHEMANAME||'.'||v_process.RERUNSQLTEXT;
     ELSE
-        vBaseSql = v_process.SHEMANAME||'.'||v_process.sqltext;
+        vSql = v_process.SHEMANAME||'.'||v_process.sqltext;
     END IF;
 
-    if v_process.TYPETASK = 'C' then
-        -- составная задача
-        vSql = '
-            declare
-                i number;
-            begin
-                i = '||vBaseSql||'
-            if i = 0 then return; end if;';            
-    else
-        vSql = 'begin '||vBaseSql;           
+    
+    vSql = vSql||'select storage_adm.LOGREP('||pTaskIsn||','''||v_process.shortname||''','''||'END TASK'||''','||vStartId||',1);'; --task finished
+    if pMoveTime = 1 then
+        --pMoveTime is always 1
+        vSql = vSql||'select storage_adm.Set_Rep_NextRun('||pTaskIsn||');';
     end if;
-
-    if pLogEnd = 1 then
-        vSql = vSql||'storage_adm.LOGREP('||pTaskIsn||','''||v_process.shortname||''','''||'END TASK'||''',null,null,'||vStartId||',1);';
-        if pMoveTime = 1 then
-            vSql = vSql||'perform storage_adm.Set_Rep_NextRun('||pTaskIsn||');';
-        end if;
-    end if; -- logEnd
-    vSql = vSql||'Exception When Others Then ';
-    vSql = vSql||'   storage_adm.LOGREP('||pTaskIsn||','''||v_process.shortname||''',SQLCODE ||'''||':'||'''||SQLERRM,null,null,'||vStartId||',-1);';
-    vSql = vSql||'End;';
+    --Move exception handler to executed procedures
+    /*
+    EXCEPTION
+        WHEN OTHERS THEN
+        BEGIN
+            perform storage_adm.LOGREP(shared_system.getparamn('taskisn'), shared_system.getparamn('processshortname'), sqlerrm, shared_system.getparamn('startid'), -1);
+        END;    
+    */
+    --vSql = vSql||'Exception When Others Then ';
+    --vSql = vSql||'   perform storage_adm.LOGREP('||pTaskIsn||','''||v_process.shortname||''',SQLCODE ||'''||':'||'''||SQLERRM,null,null,'||vStartId||',-1);';
+    --vSql = vSql||'End;';
 
     Raise notice '%', vSql;
     --DBMS_OUTPUT.Put_Line( Upper(Nvl(v_process.SHEMANAME,User )));
     --DBMS_OUTPUT.Put_Line( vNextRun );
-    --migrated code ends here
+    
     /*ЗАПУСТИЛИ ОБРАБОТЧИК ДЖОБОМ*/
     if v_process.ISDISPECHER = 1 and vNextRun = 'Null' and pRerun = 0 then
         vNextRun = current_timestamp + interval '1 minute';
@@ -198,7 +232,7 @@ begin
     end if;
     --jobid = runjob(vSql, Upper(v_process.SHEMANAME), vNextRun);
     --DBMS_JOB.SUBMIT(jobid,vSql,SYSDATE,null);
-    LOGREP(pTaskIsn,v_process.shortname,'START TASK',null,null,StartId,0,pRemark=>vSql||' ' ||User||' '||Nvl(v_process.SHEMANAME,User),
+    perform LOGREP(pTaskIsn,v_process.shortname,'START TASK',null,null,StartId,0,pRemark=>vSql||' ' ||User||' '||Nvl(v_process.SHEMANAME,User),
       pRUNJOBISN=>jobid);
     
     /* pBlockMode is never specified
@@ -228,7 +262,7 @@ begin
     exception
       when Others then
         /*ПИШЕМ ОШИБКУ*/
-        LOGREP(pTaskIsn,v_process.shortname,SQLCODE||' ' ||SQLERRM,null,null,StartId,-1,pRemark=>vSql);
+        perform LOGREP(pTaskIsn,v_process.shortname,SQLERRM,StartId,-1,vSql,null);
         Raise;
      /* pIsRaise is never specified
        If pIsRaise=1 Then Raise; end if;

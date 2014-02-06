@@ -208,10 +208,13 @@ select st.*
 CREATE TABLE storage_adm.replog (
     isn                              NUMERIC,
     loadisn                          NUMERIC,
+    module                           VARCHAR(4000),
+    operation                        VARCHAR(4000),
+    action                           VARCHAR(4000),
+    objcount                         NUMERIC,
+    sqltext                          TEXT,
     datebeg                          TIMESTAMP,
     dateend                          TIMESTAMP,
-    operation                        VARCHAR(4000),
-    objcount                         NUMERIC,
     errmsg                           VARCHAR(4000),
     isn1                             NUMERIC,
     isn2                             NUMERIC,
@@ -223,10 +226,8 @@ CREATE TABLE storage_adm.replog (
     updatedby                        NUMERIC,
     terminal                         VARCHAR(255),
     previsn                          NUMERIC,
-    module                           VARCHAR(4000),
     no                               NUMERIC,
     action                           VARCHAR(4000),
-    sqltext                          TEXT,
     blockisn                         NUMERIC
 )
 DISTRIBUTED BY (isn);
@@ -334,7 +335,8 @@ CREATE TABLE storage_adm.sa_tasklog (
     updated                          TIMESTAMP,
     updatedby                        NUMERIC,
     terminal                         VARCHAR(255),
-    errsql                           TEXT
+    errsql                           TEXT,
+    job_isn                          NUMERIC
 )
 ;
 --WARNING: No primary key defined for storage_adm.sa_tasklog
