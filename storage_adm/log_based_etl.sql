@@ -337,6 +337,9 @@ declare
     vSql            varchar(1000);
     vProc           record;
     vRc             bigint;
+    vTaskIsn        numeric;
+    vProcessShortname varchar;
+    vStartId        numeric;
     v_view          varchar;    
     v_dest_tbl      record;
     v_function_name CHARACTER VARYING = 'STORAGE_ADM.LOADSTORAGE(pProcIsn int, pFull smallint)';
@@ -423,9 +426,19 @@ begin
 
     --call Load_Proc_By_tt_RowId
     vSql = 'select STORAGE_ADM.Load_Proc_By_tt_RowId('||vLoadIsn||','||pProcIsn||','||pFull||')';
-    dbms_jobs.job_submit(vSql, 1);
-    RAISE NOTICE '%: Job submitted
-%',v_step,vSql;
+    execute vSql;
+    /*dbms_jobs.job_submit(vSql, 1);
+    RAISE NOTICE '%: Job submitted%',v_step,vSql;*/
+
+    EXCEPTION
+        WHEN OTHERS THEN
+        BEGIN
+            /*vTaskIsn = shared_system.getparamn('taskisn');
+            vProcessShortname = shared_system.getparamv('processshortname');
+            vStartId = shared_system.getparamv('startid');            
+            perform storage_adm.LOGREP(vTaskIsn,vProcessShortname,'('||v_function_name||' : '||v_step||' : '||sqlerrm,vStartId,-1,null,null);*/
+            RAISE EXCEPTION '(%:%:%)', v_function_name, v_step, sqlerrm;
+        END;
 end;
 $BODY$
 language plpgsql;
