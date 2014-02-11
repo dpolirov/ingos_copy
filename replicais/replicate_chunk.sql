@@ -100,6 +100,7 @@ begin
                         select distinct ' || v_hist_key || '
                             from gp_user.histunloaded
                             where unloadisn between ' || v_start_isn::varchar || ' and ' || v_end_isn::varchar || '
+                                  and tablename = ''' || p_table_name || '''
                     ) h on ('||v_join_condition||')'
                 );
 
@@ -110,14 +111,16 @@ begin
                 select ' || v_field_list_csv_p || ', p.histisn 
                     from hist.' || p_table_name || ' p
                         inner join gp_user.histunloaded h on ('||v_join_condition||' and p.histisn = h.histisn)
-                    where h.unloadisn between ' || v_start_isn::varchar || ' and ' || v_end_isn::varchar);
+                    where h.unloadisn between ' || v_start_isn::varchar || ' and ' || v_end_isn::varchar ||
+                        ' and h.tablename = ''' || p_table_name || '''');
     end if;
       
     --Load into main table 
     execute 'delete from ' || v_schema || '.' || p_table_name || ' as p
                 using hist.temp_histlog as h
                 where h.tablename = ''' || p_table_name || '''
-                    and h.unloadisn between ' || v_start_isn::varchar || ' and ' || v_end_isn::varchar || ' and '||
+                    and h.unloadisn between ' || v_start_isn::varchar || ' and ' || v_end_isn::varchar || '
+                    and h.tablename = ''' || p_table_name || ''' and ' ||
                     v_join_condition;
     execute 'insert into ' || v_schema || '.' || p_table_name || ' (' || v_field_list_csv_gp || ')          
                 select ' || v_field_list_csv_gp || '
@@ -135,7 +138,9 @@ begin
                             from hist.temp_histlog as h
                                  inner join replicais_incr.hist_' || p_table_name || ' as p
                                  on ' || v_join_condition || ' and p.histisn = h.isn
-                            where h.unloadisn between ' || v_start_isn::varchar || ' and ' || v_end_isn::varchar || ') as h
+                            where h.unloadisn between ' || v_start_isn::varchar || ' and ' || v_end_isn::varchar || '
+                                  and h.tablename = ''' || p_table_name || '''
+                            ) as h
                     where ' || v_join_condition || ' and p.histisn = h.isn';              
         
         execute 'insert into hist.' || p_table_name || ' (' || v_field_list_csv_gp || ', histisn)
