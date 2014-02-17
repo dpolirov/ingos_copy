@@ -184,14 +184,14 @@ language plpgsql;
 
 create or replace function storage_adm.GetLoadIsn() returns numeric as $BODY$
 begin
-    return shared_system.getparamn('loadisn');
+    return coalesce(shared_system.getparamn('loadisn'), 0);
 end;
 $BODY$
 language plpgsql;
 
 create or replace function storage_adm.SetLoadIsn(vLoadIsn numeric) returns void as $BODY$
 begin
-    perform shared_system.setparamn('loadisn', vHistDB);
+    perform shared_system.setparamn('loadisn', vLoadIsn);
 end;
 $BODY$
 language plpgsql;
@@ -355,10 +355,13 @@ begin
     select * into vProc from storage_adm.ss_processes where isn = pProcIsn;
     
     --REPLOG_I (vLoadIsn, 'LoadStorage','Get Log process '||vProc.Name, 'Begin', null, null);
-    v_step = 'Create record in repload table';
-    vLoadIsn = nextval('storage_adm.repload_seq');
-    insert into storage_adm.repload(isn, loadtype, procisn) values
-        (vLoadIsn, pFull, pProcIsn);
+    
+    vLoadIsn = storage_adm.GetLoadIsn();
+    if vLoadIsn = 0 then
+        --process was started not from prcLoadStorage_*** therefore we dont know task isn
+        perform storage_adm.CreateLoad(0);
+    end if;
+    perform storage_adm.SetLoadParams(vLoadIsn, pProcIsn, pFull);
     
     -- if pFillBuffer=1 then
     -- actully buffer is always filled
@@ -471,8 +474,7 @@ begin
     RAISE NOTICE 'vHistDB=%', vHistDB;
 
     v_step = 'Populate tt_rowid';
-    -- clear and fill tt_rowid
-    truncate table storage_adm.tt_rowid;
+    -- fill tt_rowid
     
     insert into storage_adm.tt_rowid(Isn)
         select distinct RECISN
@@ -747,12 +749,15 @@ begin
         GET DIAGNOSTICS vRc = ROW_COUNT;
         perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step, 'Del', vRc, '');
     end if;
+    
+    perform shared_system.session_data_table_cleanup('storage_adm', 'tt_rowid');
     perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', '',  'End');
 
 
     EXCEPTION
         WHEN OTHERS THEN
         BEGIN
+            perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'ERROR', null, vSql, sqlerrm);
             RAISE EXCEPTION '(%:%:%)', v_function_name, v_step, sqlerrm;
         END;
 end;
@@ -767,7 +772,7 @@ language plpgsql;
 -- 
 --------------------------------------------------------------------------------
 create or replace function STORAGE_ADM.replog_i(pLoadIsn numeric, pModule varchar, pOperation varchar,
-                                                   pAction varchar, pObjCount bigint, pSqlText text) returns void as $BODY$
+                                                   pAction varchar, pObjCount bigint, pSqlText text, pErrMsg varchar) returns void as $BODY$
     declare vResult varchar;
 begin
     vResult = shared_system.autonomous_transaction(
@@ -778,7 +783,8 @@ begin
         coalesce(pOperation, 'null')||'$TXT$,$TXT$'||
         coalesce(pAction, 'null')||'$TXT$,'||
         coalesce(cast(pObjCount as varchar), 'null')||',$TXT$'||
-        coalesce(pSqlText,'null')||'$TXT$)'
+        coalesce(pSqlText,'null')||'$TXT$,$TXT$'||
+        coalesce(pErrMsg,'null')||'$TXT$)'
     );
     if vResult <> '' then 
         RAISE EXCEPTION 'STORAGE_ADM.replog_i : %', vResult;
@@ -789,11 +795,18 @@ end;
 $BODY$
 language plpgsql;
 
+create or replace function STORAGE_ADM.replog_i(pLoadIsn numeric, pModule varchar, pOperation varchar,
+                                                   pAction varchar, pObjCount bigint, pSqlText text) returns void as $BODY$
+begin
+    perform STORAGE_ADM.replog_i(pLoadIsn, pModule, pOperation, pAction, pObjCount, pSqlText, null);
+end;
+$BODY$
+language plpgsql;
 
 create or replace function STORAGE_ADM.replog_i(pLoadIsn numeric, pModule varchar, pOperation varchar,
                                                    pAction varchar) returns void as $BODY$
 begin
-    perform STORAGE_ADM.replog_i(pLoadIsn, pModule, pOperation, pAction, null, null);
+    perform STORAGE_ADM.replog_i(pLoadIsn, pModule, pOperation, pAction, null, null, null);
 end;
 $BODY$
 language plpgsql;

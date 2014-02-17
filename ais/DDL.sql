@@ -7962,3 +7962,28 @@ COMMENT ON COLUMN ais.wrktime.updatedby IS $COMM$Автор изменения$C
 COMMENT ON COLUMN ais.wrktime.discr IS $COMM$Тип W-запись учёта рабочего времени (Yunin V.A. 15.01.04)$COMM$;
 COMMENT ON COLUMN ais.wrktime.dateworkend IS $COMM$Дата окончания Yunin V.A. 13/07/04$COMM$;
 COMMENT ON COLUMN ais.wrktime.durationmax IS $COMM$Максимальная продолжительность. Yunin V.A. 13/07/04$COMM$;
+
+
+CREATE TABLE ais.subacc4dept (
+    code                             VARCHAR(10),
+    deptisn                          NUMERIC,
+    subaccisn                        NUMERIC,
+    sheettype                        NUMERIC DEFAULT 1,
+    statcode                         NUMERIC,
+    updated                          TIMESTAMP,
+    updatedby                        NUMERIC,
+    isn                              NUMERIC,
+    rptgroupisn                      NUMERIC,
+    dept0isn                         NUMERIC,
+    sagroup                          NUMERIC
+)
+DISTRIBUTED BY (isn);
+
+COMMENT ON TABLE ais.subacc4dept IS 'Таблица для привязки бухгалтерских счетов к подразделениям, используется для создания отчета "Результаты оперативных подразделений"';
+COMMENT ON COLUMN ais.subacc4dept.dept0isn IS 'Головное подразделение';
+COMMENT ON COLUMN ais.subacc4dept.code IS 'Код субсчета плана бухгалтерских счетов';
+COMMENT ON COLUMN ais.subacc4dept.deptisn IS 'Формальная ссылка на подразделение (AIS.SUBDEPT)';
+COMMENT ON COLUMN ais.subacc4dept.subaccisn IS 'Формальнеая ссылка на план счетов';
+COMMENT ON COLUMN ais.subacc4dept.sheettype IS 'Вид отчета, используемого для данного подразделения (1 -прямые, 2 - перестрахование)';
+COMMENT ON COLUMN ais.subacc4dept.statcode IS 'Код статотчетности (38 - премия по прямому страхованию, etc.)';
+COMMENT ON COLUMN ais.subacc4dept.isn IS 'PK. SEQ_DICX.NextVal';

@@ -41,7 +41,7 @@ CREATE TABLE storage_adm.repload (
     buhdate                          TIMESTAMP,
     tablename                        VARCHAR(40),
     updatedby                        NUMERIC,
-    updated                          TIMESTAMP,
+    updated                          TIMESTAMP default current_timestamp,
     classisn                         NUMERIC,
     description                      VARCHAR(4000),
     loadtype                         NUMERIC,
@@ -242,6 +242,10 @@ DISTRIBUTED BY (isn);
 ------------------------------------------------------------
 -- PL/SQL based ETL 
 ------------------------------------------------------------
+
+create TABLE STORAGE_ADM.MX_TASKMANAGER (locked smallint) ;
+
+
 CREATE TABLE storage_adm.sa_processes (
     isn                              NUMERIC,
     shortname                        VARCHAR(100),
@@ -320,6 +324,21 @@ CREATE TABLE storage_adm.sa_sole_ref (
 )
 DISTRIBUTED BY (taskisn,atomrownum);
 COMMENT ON TABLE storage_adm.sa_freq IS 'Список шагов для каждого из процессов';
+
+CREATE TABLE storage_adm.sa_params (
+    isn                              NUMERIC,
+    name                             VARCHAR(1000),
+    cvalue                           VARCHAR(3200)
+)
+;
+--WARNING: No primary key defined for storage_adm.sa_params
+
+CREATE TABLE storage_adm.sa_complex_ref (
+    parentisn                        NUMERIC,
+    childisn                         NUMERIC,
+    childrownum                      NUMERIC DEFAULT 1
+)
+DISTRIBUTED BY (parentisn,childisn);
 
 
 CREATE TABLE storage_adm.sa_tasklog (

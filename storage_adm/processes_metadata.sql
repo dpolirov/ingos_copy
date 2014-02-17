@@ -1,5 +1,401 @@
 --------------------------------------------------------------------------------------------------
 --
+--   storage_adm.sa_params
+--
+--------------------------------------------------------------------------------------------------
+INSERT INTO sa_params (isn, name, cvalue) VALUES (1, 'comlex:auto:bottom_banner', '
+    perform storage_adm.Set_Rep_NextRun(vTaskIsn ,null);
+    perform storage_adm.SetLoadToTask(vTaskIsn, 0);
+    perform shared_system.setparamn(''processfinished'', 1);
+
+    EXCEPTION
+        WHEN OTHERS THEN
+        BEGIN
+            raise exception ''% : % : %'', v_function_name, v_step, sqlerrm;
+        END;
+end;
+');
+INSERT INTO sa_params (isn, name, cvalue) VALUES (2, 'comlex:auto:top_banner', 'declare
+    vTaskIsn        numeric;
+    vChildTaskIsn   numeric;
+    vProcessShortname varchar;
+    vStartId        numeric;
+    vLoadIsn        numeric;
+    vStepNumber     numeric;
+    vStatus         numeric;
+    v_function_name CHARACTER VARYING = ''STORAGE_ADM.prcLoadStorageTest_663'';
+    v_step          CHARACTER VARYING = ''NA'';
+begin
+    v_step = ''Get Params'';
+    vTaskIsn = coalesce(shared_system.getparamn(''taskisn''), -999);
+    vProcessShortname = coalesce(shared_system.getparamv(''processshortname''), ''unknown'');
+    vStartId = coalesce(shared_system.getparamn(''startid''), -999);
+
+    vLoadIsn = storage_adm.GetLoadFromTask(vTaskIsn);
+    If vLoadisn  = 0 then
+        vLoadIsn = storage_adm.createload(vTaskIsn);
+        perform storage_adm.SetLoadToTask(vTaskIsn,vLoadIsn);
+    end if;
+
+    v_step = ''Do the job'';
+    vStepNumber = storage_adm.GetLoadStep(vLoadIsn);
+');
+INSERT INTO sa_params (isn, name, cvalue) VALUES (3, 'comlex:core:failed:continue', '
+    If vStepNumber <= {ITASKSTEP1} then
+        vChildTaskIsn = {TASKNUMBER};
+        If vStepNumber = {ITASKSTEP0} then
+            perform storage_adm.EXECUTE_LOGED_REPORT(vChildTaskIsn,0,0); 
+            perform storage_adm.SetLoadStep(vLoadIsn,{ITASKSTEP1}); 
+        else
+            vStatus = storage_adm.GetTaskStatus(vChildTaskIsn);
+            If vStatus = 0  then --не запущенна или первый запуск
+                perform storage_adm.SetLoadStep(vLoadisn,{ITASKSTEP2}); 
+            elsif vStatus = 1 then  -- идет, ждем
+                null;
+            elsIf vStatus < 0 then -- Ошибка
+                perform storage_adm.Set_Rep_NextRun(vTaskIsn ,null);
+                perform storage_adm.LOGREP(true, vTaskIsn, vProcessShortname,''ERROR in ''||v_function_name||'' : ''||v_step||'' : ''||sqlerrm,vStartId,-1,null,null);
+                RAISE Exception ''%'', storage_adm.GETTASKERRCODE(vChildTaskIsn);
+            end if;
+        end if;  
+        perform shared_system.setparamn(''processfinished'', 0);
+        return;
+    end if;
+');
+INSERT INTO sa_params (isn, name, cvalue) VALUES (4, 'comlex:core:failed:stop', '
+    If vStepNumber <= {ITASKSTEP1} then
+        vChildTaskIsn = {TASKNUMBER};
+        If vStepNumber = {ITASKSTEP0} then
+            perform storage_adm.EXECUTE_LOGED_REPORT(vChildTaskIsn,0,0); 
+            perform storage_adm.SetLoadStep(vLoadIsn,{ITASKSTEP1}); 
+        else
+            vStatus = storage_adm.GetTaskStatus(vChildTaskIsn);
+            If vStatus = 0  then --не запущенна или первый запуск
+                perform storage_adm.SetLoadStep(vLoadisn,{ITASKSTEP2}); 
+            elsif vStatus = 1 then  -- идет, ждем
+                null;
+            elsIf vStatus < 0 then -- Ошибка
+                perform storage_adm.Set_Rep_NextRun(vTaskIsn ,null);
+                perform storage_adm.LOGREP(true, vTaskIsn, vProcessShortname,''ERROR in ''||v_function_name||'' : ''||v_step||'' : ''||sqlerrm,vStartId,-1,null,null);
+                RAISE Exception ''%'', storage_adm.GETTASKERRCODE(vChildTaskIsn);
+            end if;
+        end if;  
+        perform shared_system.setparamn(''processfinished'', 0);
+        return;
+    end if;
+');
+INSERT INTO sa_params (isn, name, cvalue) VALUES (5, 'comlex:user:bottom_banner', NULL);
+INSERT INTO sa_params (isn, name, cvalue) VALUES (6, 'comlex:user:top_banner', NULL);
+INSERT INTO sa_params (isn, name, cvalue) VALUES (7, 'sole:auto:bottom_banner', 'end;');
+INSERT INTO sa_params (isn, name, cvalue) VALUES (8, 'sole:auto:top_banner', 'declare
+    vTaskIsn        numeric;
+    vProcessShortname varchar;
+    vStartId        numeric;
+    vLoadIsn        numeric;
+    vStepNumber     numeric;
+    vStatus         numeric;
+    v_function_name CHARACTER VARYING = ''STORAGE_ADM.prcLoadStorageTest_{PARENTISN}'';
+    v_step          CHARACTER VARYING = ''NA'';
+begin
+    v_step = ''Get Params'';
+    vTaskIsn = coalesce(shared_system.getparamn(''taskisn''), -999);
+    vProcessShortname = coalesce(shared_system.getparamv(''processshortname''), ''unknown'');
+    vStartId = coalesce(shared_system.getparamn(''startid''), -999);
+
+    select storage_adm.createload(vTaskIsn) into vLoadIsn;
+    perform storage_adm.SetLoadToTask(vTaskIsn,vLoadIsn);
+
+    v_step = ''Do the job'';
+');
+INSERT INTO sa_params (isn, name, cvalue) VALUES (9, 'sole:core:bottom_banner', NULL);
+INSERT INTO sa_params (isn, name, cvalue) VALUES (10, 'sole:core:top_banner', NULL);
+INSERT INTO sa_params (isn, name, cvalue) VALUES (11, 'sole:user:bottom_banner', NULL);
+INSERT INTO sa_params (isn, name, cvalue) VALUES (12, 'sole:user:top_banner', NULL);
+INSERT INTO sa_params (isn, name, cvalue) VALUES (13, 'sole:core:failed:stop', '
+    EXCEPTION
+        WHEN OTHERS THEN
+        BEGIN            
+            raise exception ''% : % : %'', v_function_name, v_step, sqlerrm;
+        END;
+');
+INSERT INTO sa_params (isn, name, cvalue) VALUES (14, 'sole:core:failed:continue', '
+    EXCEPTION
+        WHEN OTHERS THEN
+        BEGIN
+            raise exception ''% : % : %'', v_function_name, v_step, sqlerrm;
+        END;
+');
+
+
+--------------------------------------------------------------------------------------------------
+--
+--   storage_adm.sa_complex_ref
+--   ! STAGE 2 only !
+--
+--------------------------------------------------------------------------------------------------
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (663,1026,0);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (663,667,1);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (663,678,2);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (663,1205,3);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (667,1430,5);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (667,727,10);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (667,719,20);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (667,721,40);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (667,723,50);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (667,1452,51);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (667,704,52);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (667,1407,55);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (667,726,60);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (667,1408,80);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (667,1409,90);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (678,839,1);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (965,1026,0);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (965,667,1);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (965,968,2);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (965,971,4);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (965,678,5);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (965,970,6);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (965,1205,7);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1265,965,1);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1265,1225,2);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1265,710,4);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1265,1326,5);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1292,1026,0);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1292,667,1);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1292,678,2);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1292,1288,3);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1292,1289,4);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1292,1291,5);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1292,1205,6);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1471,719,1);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1471,721,2);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1471,723,3);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1471,1452,4);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1471,1470,5);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1471,726,6);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1471,968,7);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1471,971,8);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1471,1407,9);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1471,1408,10);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1471,1409,11);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1471,678,12);
+insert into sa_complex_ref(parentisn, childisn, childrownum) values (1471,970,13);
+
+--------------------------------------------------------------------------------------------------
+--
+--   storage_adm.sa_sole_ref
+--   ! STAGE 2 only !
+-- get inserts
+-- psql -c "select 'insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values ('||taskisn||','||atomrownum||','''||replace(atomsource,'''','''''')||''','''||atomname||''');' from storage_adm.sa_sole_ref order by taskisn,atomrownum;"|sed 's/ *$//g'|sed 's/^ //g'>sa_sole_ref_stage2.sql
+--
+--------------------------------------------------------------------------------------------------
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (704,12,'REPORT_BUH_STORAGE_NEW.LoadBuh2Cond(LoadIsn); ','LoadBuh2Cond');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (719,5, 'perform STORAGE_ADM.LoadStorage(27, 0);','RepAgrRoleAgr');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (719,10,'perform storage_adm.LoadStorage(13, 0);','RepAgr');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (721,1,' perform storage_adm.LoadStorage(12, 0);','RepRefund');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (723,1,' perform storage_adm.LoadStorage(15, 0);','RepBuhBody');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (726,1,'/* перенесено в "Операции после догрузки по логам"
+LOAD_STORAGE_ADDS.AgrGrpAdds(loadisn);  
+*/
+null;
+','LoadAgrAdds');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (726,2,'/* перенесено в "Операции после догрузки по логам"
+ LOAD_STORAGE_ADDS.BuhBodyGrpAdds(Loadisn);
+*/
+null;','LoadBuhAdds');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (726,3,'/* перенесено в "Операции после догрузки по логам"
+доля перестрах в убытках
+LOAD_STORAGE_ADDS.refundgrpadds(loadisn);
+*/
+null;','LoadRefundAdds');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (726,6,'/* перенесено в "Операции после догрузки по логам" 
+LOAD_STORAGE_ADDS.LoadAgrRuleExt(loadisn);
+*/
+null;','LoadAgrRuleExt');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (726,7,'
+    perform storages.make_repbuhre2resection_new();
+    perform storages.make_repbuh2resection();
+    perform storages.make_repbuhre2directanalytics();
+    perform storages.MAKE_AGRXINSUREDSUM4REFUND();
+','Перестрахование');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (727,10,'perform LOAD_STORAGE_ADDS.insertdict();','LoadStruncBefore');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (727,20,'perform LOAD_STORAGE_ADDS.LoadAgrDetails();','LoadAgrDetails');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (727,30,'perform COGNOS.MAKE_DIC_TABLES();','Справочники для Cognos');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (839,2,' perform  REPORT_BUH_STORAGE_NEW.Create_Agr_Analitiks();','Agr_analytics');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (839,3,' perform  report_budget.load_budget_body_agrs();','Budget_body_agr');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (968,1,'Declare 
+LoadIsn Number;
+vDaterep Date:=Trunc(sysdate,''MM'')-1;
+Begin 
+null;
+SYSTEM.INVALIDOBJECTPKG.CompileSchema(''STORAGES''); -- EGAO 04.09.2010
+
+LoadIsn:=REPORT_STORAGE.createload(pProcType=>12,pDaterep=>vDaterep,pclassisn=>1);
+Update
+   Sa_Processes
+Set
+  LASTRUNISN=LoadIsn
+ Where Isn=12;
+Commit;
+-- To_Date(''31052005'',''DDMMYYYY'')
+
+-- сделали загрузку актуальной
+Update Repload Set
+classisn = null
+where PROCISN=12  and Daterep=vDaterep and isn<>LoadIsn;
+Commit;
+
+
+
+REPORT_RZU.LoadReserve(LoadIsn,vDaterep );  
+
+--ofsa_owner.STG_LCR_FILL.main@owb(vDaterep);
+ 
+ 
+Update
+   Sa_Processes
+Set
+  LASTRUNISN=0
+ Where Isn=12;
+Commit;
+
+end;','rsu');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (970,1,'
+SYSTEM.INVALIDOBJECTPKG.CompileSchema(''STORAGES''); -- EGAO 04.09.2010
+
+LoadIsn:=REPORT_STORAGE.createload(ptype=>REPORT_STORAGE.cLoadFull,pProcType=>21);
+
+ Update 
+    Sa_Processes
+ Set
+   LASTRUNISN=LoadIsn
+    Where Isn=21;
+Commit;
+
+rep_stat.full_repbuhsummary(loadisn);
+
+
+','prem,ubytki, com');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (971,1,'Declare 
+  vDaterep Date:=Trunc(sysdate,''MM'')-1;
+Begin 
+  SYSTEM.INVALIDOBJECTPKG.CompileSchema(''STORAGES'');
+  REPORT_RNP_NEW.make_rnp_all;  
+end;','rnp 2 in 1');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1015,1,'perform storage_adm.LoadStorage(1, 0);','ST_BuhBody');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1015,2,'perform storage_adm.LoadStorage(2, 0);','BuhBaseBody');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1015,3,'perform storage_adm.LoadStorage(3, 0);','DocSumBody');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1015,4,'perform storage_adm.LoadStorage(4, 0);','BuhTurn');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1015,5,'perform storage_adm.LoadStorage(5, 0);','BuhBody_Reins');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1015,6,'perform storage_adm.LoadStorage(6, 0);','rep_subject');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1015,7,'perform storage_adm.LoadStorage(7, 0);','BuhTurnCor');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1015,8,'perform storage_adm.LoadStorage(8, 0);','BuhTurnContr');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1015,9,'/* storage_adm.load_storage.LoadStorage(10,0,0);     */
+null;','JuorAgrOSAGO');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1015,10,'perform storage_adm.LoadStorage(14, 0);','Nfs');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1015,11,'/* sts 23.04.2013 - убрал, т.к. сделана новая витрина MOTOR.REP_DOCS_DOCSUM_CLMINV_LINE
+  и грузится она в моторе
+Пока оставил до перевода отчета на новую витрину
+ storage_adm.load_storage.LoadStorage(22,0,0);     
+ */
+','REP_DOCS_DOCSUM_CLMINV');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1026,1,'--STORAGES.P_STORAGELOAD_SENDMAIL(''BE'');','Почта. Начало');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1205,0,'--STORAGES.P_STORAGELOAD_SENDMAIL(''EN'');','Stop');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1288,1,'Declare 
+LoadIsn Number;
+vDaterep Date:=add_months(trunc(SYSDATE,''mm'')-1,1);
+Begin 
+null;
+SYSTEM.INVALIDOBJECTPKG.CompileSchema(''STORAGES''); -- EGAO 04.09.2010
+
+LoadIsn:=REPORT_STORAGE.createload(pProcType=>12,pDaterep=>vDaterep,pclassisn=>1);
+Update
+   Sa_Processes
+Set
+  LASTRUNISN=LoadIsn
+ Where Isn=12;
+Commit;
+-- To_Date(''31052005'',''DDMMYYYY'')
+
+-- сделали загрузку актуальной
+Update Repload Set
+classisn = null
+where PROCISN=12  and Daterep=vDaterep and isn<>LoadIsn;
+Commit;
+
+
+
+REPORT_RZU.LoadReserve(LoadIsn,vDaterep );  
+
+--ofsa_owner.STG_LCR_FILL.main@owb(vDaterep);
+ 
+ 
+Update
+   Sa_Processes
+Set
+  LASTRUNISN=0
+ Where Isn=12;
+Commit;
+
+end;','rzu');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1289,1,'Declare 
+  vDaterep Date:=add_months(trunc(SYSDATE,''mm'')-1,1); 
+Begin 
+  SYSTEM.INVALIDOBJECTPKG.CompileSchema(''STORAGES'');
+  REPORT_RNP_NEW.make_rnp_all(vDaterep);  
+end;','rnp 2 in 1');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1291,1,'Declare 
+  vDaterep Date:=add_months(SYSDATE,1); 
+Begin
+  SYSTEM.INVALIDOBJECTPKG.CompileSchema(''STORAGES''); -- EGAO 04.09.2010
+LoadIsn:=REPORT_STORAGE.createload(ptype=>REPORT_STORAGE.cLoadFull,pProcType=>21);
+
+ Update 
+    Sa_Processes
+ Set
+   LASTRUNISN=LoadIsn
+    Where Isn=21;
+Commit;
+
+rep_stat.full_repbuhsummary(loadisn, vDaterep);
+end;
+
+
+','prem, ubytok, commission');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1306,1,'DECLARE 
+  vloadisn NUMBER := report_rnp_new.GetActiveLoad(add_months(trunc(sysdate,''mm'')-1,1));
+BEGIN
+  INSERT_AGRRE(0);
+  report_rnp_new.make_rnp_re_rsbu(vloadisn);
+  report_rnp_new.make_rnp_re_msfo(vloadisn);
+  report_rnp_new.make_rnp_re_subject(vloadisn);
+END;','re');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1346,0,'-- грузим repbuh2obj с начала года по текущий месяц включительно
+storages.rep_motivation.load_repbuh2obj(trunc(ADD_MONTHS(sysdate,-12),''MM''), add_months(trunc(sysdate, ''mm''), 1));','repbuh2obj');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1366,0,'storages.INSERT_AGRRE(0);
+storages.make_repbuhre2resection;
+make_repbuh2resection;
+make_repbuhre2directanalytics;
+MAKE_AGRXINSUREDSUM4REFUND;','Вызов');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1406,0,'shared_system.GET_STORAGE_STAT ;','Stat');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1407,10,'storage_adm.load_storage.LoadStorage(pProcIsn => 19, pGetLog => 0, pFull => 0);','rep_agr_salers');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1408,10,'-- грузим repbuh2obj с начала года по текущий месяц включительно
+storages.rep_motivation.load_repbuh2obj(trunc(ADD_MONTHS(sysdate,-12),''MM''), add_months(trunc(sysdate, ''mm''), 1));
+
+','RepBuh2Obj');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1409,10,'storage_adm.load_storage.LoadStorage(pProcIsn => 20, pGetLog => 0, pFull => 0);','Rep_Agent_Ranks');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1410,10,'COGNOS.MAKE_DIC_TABLES(''Y'');','Обновление справочников Cognos');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1430,10,'PKG_MAKE_DICTI_TABLES.MAKE_MOTOR_DICTI_TABLES;','Формирование справочников');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1452,10,'LOAD_STORAGE_ADDS.AgrGrpAdds(loadisn);  ','LoadAgrAdds');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1452,11,'LOAD_STORAGE_ADDS.BuhBodyGrpAdds(Loadisn);','LoadBuhAdds');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1452,12,'/* доля перестрах в убытках*/
+LOAD_STORAGE_ADDS.refundgrpadds(loadisn);','LoadRefundAdds');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1452,13,'LOAD_STORAGE_ADDS.LoadAgrRuleExt(loadisn);','LoadAgrRuleExt');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1470,0,'REPORT_BUH_STORAGE_NEW.LoadBuh2Cond_BY_DATE(LoadIsn,''01-sep-2013'');','repbuh2cond');
+
+
+--------------------------------------------------------------------------------------------------
+--
 --   storage_adm.sa_freq
 --
 --------------------------------------------------------------------------------------------------
@@ -15,150 +411,156 @@ insert into storage_adm.sa_freq (freq, dateadd, shortname, rconst) values (365,'
 --------------------------------------------------------------------------------------------------
 --
 --   storage_adm.ss_processes
+--   For stage 2 used 1,2,3,4,5,6,7,8,12,13,14,15,19,20,27,52
 --
 --------------------------------------------------------------------------------------------------
+--stage 2
+insert into storage_adm.ss_processes values(1,'ST_BuhBody','ST_BUHBODY','Y',10,30000,'N','');
+insert into storage_adm.ss_processes values(2,'BuhBaseBody','ST_BODYDEBCRE,St_bodydebt_corr','Y',20,10000,'N','');    
+insert into storage_adm.ss_processes values(3,'DocSumBody','st_docsumbody','Y',30,10000,'N','');
+insert into storage_adm.ss_processes values(4,'BuhTurn','Обороты по всем счетам','Y',40,300,'N','');
+insert into storage_adm.ss_processes values(5,'BuhBody_Reins','Проводки по перестрахованию','Y',50,10000,'N','');
+insert into storage_adm.ss_processes values(6,'rep_subject','Витрина контрагентов для отчетности','Y',60,500,'Y',''); 
+insert into storage_adm.ss_processes values(7,'BuhTurnCor','Обороты по счетам c корреспонденцией','Y',40,1000,'N','');
+insert into storage_adm.ss_processes values(8,'BuhTurnContr','Обороты по счетам с аналитикой контрагента','Y',70,100,'N','');   
+insert into storage_adm.ss_processes values(12,'REPREFUND','Загрузка Витрины REPREFUND','Y',140,5000,'N','');    
+insert into storage_adm.ss_processes values(13,'AGRGROUP','Загрузка таблиц группы "договор"','Y',120,10000,'N','');   
+insert into storage_adm.ss_processes values(14,'BODY_ISN_GROUP','Загрузка таблиц проводок (разные), Логируется Body.Isn','Y',130,30000,'N','');
+insert into storage_adm.ss_processes values(15,'REPBUHBODYGROUP','Загрузка REPBUHBODY - проводки проходят серьезную очистку и результат - HEADISN','Y',110,5000,'N','');
+insert into storage_adm.ss_processes values(19,'AgrSalers','Загрузка продавцов','Y',180,5000,'N','storage_adm.prc_rep_agr_salers_afterscript();');
+insert into storage_adm.ss_processes values(20,'AgrAgents','Загрузка агентов','Y',190,5000,'N','');
+insert into storage_adm.ss_processes values(27,'RepAgrRoleAgr','Загрузка витрины по ролям договора','Y',10,10000,'N','');  
+insert into storage_adm.ss_processes values(52,'SUBJECT_ATTRIB','Загрузка витрины STORAGE_SOURCE.SUBJECT_ATTRIB','Y',10,100000,'N','');   
+-- later stages
+insert into storage_adm.ss_processes values(9,'RepAgr','договоры страхования','N',80,100000,'N','');
+insert into storage_adm.ss_processes values(10,'JuorAgrOSAGO','ST_JuorAgrOSAGO','N',90,10000,'N','');
 insert into storage_adm.ss_processes values(11,'JuorClaimOSAGO','ST_JuorClaimOSAGO','N',100,10000,'N','');
+insert into storage_adm.ss_processes values(16,'MedAgrGroup','Загрузка Медицины','Y',150,1000,'N','');
 insert into storage_adm.ss_processes values(17,'MedRefundGroup','Загрузка Медицины: Убытки','Y',160,1000,'N','');
 insert into storage_adm.ss_processes values(18,'MedBuhGroup','Загрузка Медицины: Бухгалтерия','Y',170,1000,'N','');   
-insert into storage_adm.ss_processes values(20,'AgrAgents','Загрузка агентов','Y',190,5000,'N','');
+insert into storage_adm.ss_processes values(21,'CarRepAgr','Загрузка витрины CarRepAgr','Y',200,5000,'N','');    
 insert into storage_adm.ss_processes values(22,'REP_DOCS_DOCSUM_CLMINV','Загрузка витрины REP_DOCS_DOCSUM_CLMINV - sts: отключил в загрузчике № 1015. Вместо него - включил 24 процесс в загрузчик 1330','N',220,10000,'N','');
+insert into storage_adm.ss_processes values(23,'BEST_ADDR','Загрузка витрины с Крыловским адресом','Y',10,10000,'N','');   
 insert into storage_adm.ss_processes values(24,'REP_DOCS_DOCSUM_CLMINV_LINE','Загрузка витрины по счетам, строкам калькуляции и их документам','N',10,10000,'N','');
-insert into storage_adm.ss_processes values(38,'MTPL_SUMMARIZED ','Загрузка моторного ХД: MTPL_SUMMARIZED','Y',10,50000,'N','');
-insert into storage_adm.ss_processes values(39,'PVUFIXSUM','Загрузка моторного ХД: PVUFIXSUM','N',10,50000,'N','');   
-insert into storage_adm.ss_processes values(48,'CAR_DEALERS','Загрузка моторного ХД: CAR_DEALERS','N',10,10000,'N','');    
-insert into storage_adm.ss_processes values(42,'CARDOCSUMINVOICELINE','Загрузка моторного ХД: CARDOCSUMINVOICELINE','N',10,10000,'N',''); 
-insert into storage_adm.ss_processes values(44,'CARDRIVER','Загрузка моторного ХД: CARDRIVER','N',10,20000,'N','');   
-insert into storage_adm.ss_processes values(49,'AGR_DRIVERS','Загрузка моторного ХД: AGR_DRIVERS','N',10,50000,'N','');    
-insert into storage_adm.ss_processes values(50,'REP_QUEUE_MAIL','Загрузка моторного ХД: REP_QUEUE_MAIL','N',10,10000,'N','');   
-insert into storage_adm.ss_processes values(14,'BODY_ISN_GROUP','Загрузка таблиц проводок (разные), Логируется Body.Isn','Y',130,30000,'N','');
-insert into storage_adm.ss_processes values(19,'AgrSalers','Загрузка продавцов','Y',180,5000,'N','begin  
-  storage_adm.prc_rep_agr_salers_afterscript(); 
-end;');
-insert into storage_adm.ss_processes values(35,'CAR_CUBE','Загрузка моторного ХД: CAR_CUBE','Y',10,50000,'N','');
-insert into storage_adm.ss_processes values(47,'REPAGR_AGENT','Загрузка моторного ХД: REPAGR_AGENT','N',10,10000,'N','');  
-insert into storage_adm.ss_processes values(45,'DOPUSLUGI_SUMS','Загрузка моторного ХД: DOPUSLUGI_SUMS','N',10,250000,'N','');  
-insert into storage_adm.ss_processes values(51,'Med_AgrCondBuh','Загрузка Медицины: MED_AGRCONDNUH','Y',230,100000,'N','');
-insert into storage_adm.ss_processes values(52,'SUBJECT_ATTRIB','Загрузка витрины STORAGE_SOURCE.SUBJECT_ATTRIB','Y',10,100000,'N','');   
-insert into storage_adm.ss_processes values(2,'BuhBaseBody','ST_BODYDEBCRE,St_bodydebt_corr','Y',20,10000,'N','');    
-insert into storage_adm.ss_processes values(1,'ST_BuhBody','ST_BUHBODY','Y',10,30000,'N','');
-insert into storage_adm.ss_processes values(4,'BuhTurn','Обороты по всем счетам','Y',40,300,'N','');
-insert into storage_adm.ss_processes values(6,'rep_subject','Витрина контрагентов для отчетности','Y',60,500,'Y',''); 
-insert into storage_adm.ss_processes values(8,'BuhTurnContr','Обороты по счетам с аналитикой контрагента','Y',70,100,'N','');   
-insert into storage_adm.ss_processes values(9,'RepAgr','договоры страхования','N',80,100000,'N','');
-insert into storage_adm.ss_processes values(3,'DocSumBody','st_docsumbody','Y',30,10000,'N','');
-insert into storage_adm.ss_processes values(5,'BuhBody_Reins','Проводки по перестрахованию','Y',50,10000,'N','');
-insert into storage_adm.ss_processes values(7,'BuhTurnCor','Обороты по счетам c корреспонденцией','Y',40,1000,'N','');
 insert into storage_adm.ss_processes values(25,'REP_DOCS_DOCSUM','Загрузка витрины по моторным документам и доксуммам','Y',10,5000,'N','');    
 insert into storage_adm.ss_processes values(26,'REP_CLMINV_LINE','Загрузка витрины по моторным счетам, строкам калькуляции','Y',10,5000,'N','');    
-insert into storage_adm.ss_processes values(29,'TariffKoeff','Загрузка моторного ХД: Тарифы и скидки','Y',10,10000,'Y','');
-insert into storage_adm.ss_processes values(33,'CARCOND_OBJ_SUM','Загрузка моторного ХД: CARCOND_OBJ_SUM','Y',20,25000,'N',''); 
-insert into storage_adm.ss_processes values(53,'ClientDirectivity','Загрузка витрины storages.clientdirectivity','Y',10,5000,'N','');
-insert into storage_adm.ss_processes values(12,'REPREFUND','Загрузка Витрины REPREFUND','Y',140,5000,'N','');    
-insert into storage_adm.ss_processes values(21,'CarRepAgr','Загрузка витрины CarRepAgr','Y',200,5000,'N','');    
-insert into storage_adm.ss_processes values(23,'BEST_ADDR','Загрузка витрины с Крыловским адресом','Y',10,10000,'N','');   
-insert into storage_adm.ss_processes values(27,'RepAgrRoleAgr','Загрузка витрины по ролям договора','Y',10,10000,'N','');  
-insert into storage_adm.ss_processes values(32,'repagrobjectext','Загрузка моторного ХД: Факторы риска объекта','Y',10,50000,'N','');
-insert into storage_adm.ss_processes values(40,'RISK2RPTCLASS','Загрузка моторного ХД: RISK2RPTCLASS','N',10,10000,'N','');
-insert into storage_adm.ss_processes values(41,'CARREFUND','Загрузка моторного ХД: CARREFUND','N',10,50000,'N','');   
-insert into storage_adm.ss_processes values(43,'CAR_ATTRIB','Загрузка моторного ХД: CAR_ATTRIB','N',10,25000,'N',''); 
-insert into storage_adm.ss_processes values(10,'JuorAgrOSAGO','ST_JuorAgrOSAGO','N',90,10000,'N','');
-insert into storage_adm.ss_processes values(13,'AGRGROUP','Загрузка таблиц группы "договор"','Y',120,10000,'N','');   
-insert into storage_adm.ss_processes values(15,'REPBUHBODYGROUP','Загрузка REPBUHBODY - проводки проходят серьезную очистку и результат - HEADISN','Y',110,5000,'N','');
-insert into storage_adm.ss_processes values(16,'MedAgrGroup','Загрузка Медицины','Y',150,1000,'N','');
 insert into storage_adm.ss_processes values(28,'REP_CLIENT_QUEUE_CALLS','Загрузка витрины по контактам и звонкам','Y',10,10000,'N','');   
-insert into storage_adm.ss_processes values(31,'Car_Attrib','Загрузка моторного ХД: Атрибуты авто','N',10,10000,'N','');   
+insert into storage_adm.ss_processes values(29,'TariffKoeff','Загрузка моторного ХД: Тарифы и скидки','Y',10,10000,'Y','');
 insert into storage_adm.ss_processes values(30,'Carcond','Загрузка моторного ХД: Carcond','Y',10,1000,'N','');   
+insert into storage_adm.ss_processes values(31,'Car_Attrib','Загрузка моторного ХД: Атрибуты авто','N',10,10000,'N','');   
+insert into storage_adm.ss_processes values(32,'repagrobjectext','Загрузка моторного ХД: Факторы риска объекта','Y',10,50000,'N','');
+insert into storage_adm.ss_processes values(33,'CARCOND_OBJ_SUM','Загрузка моторного ХД: CARCOND_OBJ_SUM','Y',20,25000,'N',''); 
+insert into storage_adm.ss_processes values(35,'CAR_CUBE','Загрузка моторного ХД: CAR_CUBE','Y',10,50000,'N','');
 insert into storage_adm.ss_processes values(36,'CAR_SUM','Загрузка моторного ХД: CAR_SUM','Y',10,50000,'N','');  
 insert into storage_adm.ss_processes values(37,'MTPL_POLICIES','Загрузка моторного ХД: MTPL_POLICIES','Y',10,50000,'N','');
+insert into storage_adm.ss_processes values(38,'MTPL_SUMMARIZED ','Загрузка моторного ХД: MTPL_SUMMARIZED','Y',10,50000,'N','');
+insert into storage_adm.ss_processes values(39,'PVUFIXSUM','Загрузка моторного ХД: PVUFIXSUM','N',10,50000,'N','');   
+insert into storage_adm.ss_processes values(40,'RISK2RPTCLASS','Загрузка моторного ХД: RISK2RPTCLASS','N',10,10000,'N','');
+insert into storage_adm.ss_processes values(41,'CARREFUND','Загрузка моторного ХД: CARREFUND','N',10,50000,'N','');   
+insert into storage_adm.ss_processes values(42,'CARDOCSUMINVOICELINE','Загрузка моторного ХД: CARDOCSUMINVOICELINE','N',10,10000,'N',''); 
+insert into storage_adm.ss_processes values(43,'CAR_ATTRIB','Загрузка моторного ХД: CAR_ATTRIB','N',10,25000,'N',''); 
+insert into storage_adm.ss_processes values(44,'CARDRIVER','Загрузка моторного ХД: CARDRIVER','N',10,20000,'N','');   
+insert into storage_adm.ss_processes values(45,'DOPUSLUGI_SUMS','Загрузка моторного ХД: DOPUSLUGI_SUMS','N',10,250000,'N','');  
 insert into storage_adm.ss_processes values(46,'REP_PRESALE','Загрузка моторного ХД: REP_PRESALE','N',10,10000,'N','');    
+insert into storage_adm.ss_processes values(47,'REPAGR_AGENT','Загрузка моторного ХД: REPAGR_AGENT','N',10,10000,'N','');  
+insert into storage_adm.ss_processes values(48,'CAR_DEALERS','Загрузка моторного ХД: CAR_DEALERS','N',10,10000,'N','');    
+insert into storage_adm.ss_processes values(49,'AGR_DRIVERS','Загрузка моторного ХД: AGR_DRIVERS','N',10,50000,'N','');    
+insert into storage_adm.ss_processes values(50,'REP_QUEUE_MAIL','Загрузка моторного ХД: REP_QUEUE_MAIL','N',10,10000,'N','');   
+insert into storage_adm.ss_processes values(51,'Med_AgrCondBuh','Загрузка Медицины: MED_AGRCONDNUH','Y',230,100000,'N','');
+insert into storage_adm.ss_processes values(53,'ClientDirectivity','Загрузка витрины storages.clientdirectivity','Y',10,5000,'N','');
 
 
 --------------------------------------------------------------------------------------------------
 --
 --   storage_adm.ss_process_dest_tables
+--   For stage 2 used 1,2,3,4,5,6,7,8,12,13,14,15,19,20,27,52
 --
 --------------------------------------------------------------------------------------------------
-insert into storage_adm.ss_process_dest_tables values(-4,'STORAGES.ST_BUH_TURN_NFS','storage_adm.V_TT_BUHTURN_NFS','TT_BUHTURN_NFS','PRM_KEY,coalesce(OPRISN,-1),coalesce(OSCLASS,-1),coalesce(OSKIND,-1),coalesce(OSSTATUS,-1) ,coalesce(OKOFCODE,''-''),coalesce(ISBULDING,-1),CODE','PRM_KEY',null,'X_ST_BUH_TURN_NFS_UNIC',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.repagr_economic','storage_adm.V_repagr_economic','STORAGE_ADM.tt_repagr_economic','AgrIsn','AgrIsn',null,'',0,'','','');
+-- stage 2
+insert into storage_adm.ss_process_dest_tables values(1,'STORAGES.st_buhbody','storage_adm.v_tt_buhbody','STORAGE_ADM.tt_buhbody','bodyisn','bodyisn',10,'x_st_buhbody_body',0,'','','');    
+insert into storage_adm.ss_process_dest_tables values(2,'STORAGES.st_bodydebcre','storage_adm.v_tt_bodydebcre','STORAGE_ADM.tt_bodydebcre','baseisn,db','baseisn',20,'x_st_bodydebcre_base',0,'','',''); 
+insert into storage_adm.ss_process_dest_tables values(3,'STORAGES.st_docsumbody','storage_adm.v_tt_docsumbody','STORAGE_ADM.tt_docsumbody','BODYISN,DSISN','BODYISN',null,'X_ST_DOCSUMBODY_DS',1,'DATEEND','DATEBEG','');
+insert into storage_adm.ss_process_dest_tables values(4,'STORAGES.ST_BUH_TURN','storage_adm.v_tt_BUH_TURN','STORAGE_ADM.tt_BUH_TURN','PRM_KEY,coalesce(SUBKINDISN,-1),coalesce(OPRISN,-1),coalesce(CURRISN,-1),CODE,coalesce(DEB,timestamp ''1900-01-01 00:00:00'')','PRM_KEY',null,'X_ST_BUH_TURN_UNIC',0,'','','');
+insert into storage_adm.ss_process_dest_tables values(5,'STORAGES.st_buhbody_reins','storage_adm.v_tt_buhbody_reins','STORAGE_ADM.tt_buhbody_reins','bodyisn','bodyisn',null,'x_st_buhbody_reins_body',0,'','','');
+insert into storage_adm.ss_process_dest_tables values(6,'STORAGES.ST_REP_SUBJECT','storage_adm.V_REP_SUBJECT','STORAGE_ADM.tt_REP_SUBJECT','SubjIsn','SubjIsn',null,'x_REP_SUBJECT_subj',0,'','',''); 
+insert into storage_adm.ss_process_dest_tables values(7,'STORAGES.st_buh_turn_corr','storage_adm.v_tt_buh_turn_corr','STORAGE_ADM.tt_buh_turn_corr','PRM_KEY,coalesce(SubKindISn,-1),coalesce(OPRISN,-1),CorCode','PRM_KEY',null,'x_st_buh_turn_Corr_unic',0,'','','');
+insert into storage_adm.ss_process_dest_tables values(8,'STORAGES.ST_BUH_TURN_CONTR','storage_adm.V_TT_BUH_TURN_CONTR','STORAGE_ADM.TT_BUH_TURN_CONTR','PRM_KEY,coalesce(OPRISN,-1),coalesce(Resident,''A''),coalesce(branchisn,0),coalesce(CURRISN,-1),coalesce(JURIDICAL,''A'')','PRM_KEY',null,'x_st_buh_turn_Contr_unic',0,'','','');   
+insert into storage_adm.ss_process_dest_tables values(12,'STORAGE_SOURCE.REPREFUND','storage_adm.V_REPREFUND','STORAGE_ADM.tt_reprefund','REFUNDISN,coalesce(AGREXTISN,0)','CLAIMISN',null,'X_REPREFUND_REF_EXT',0,'','','');
 insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.REP_AGRCARGO','storage_adm.V_REPAGRCARGO','STORAGE_ADM.tt_REP_AGRCARGO','AgrIsn','AgrIsn',null,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.REP_AGRTUR','storage_adm.V_REPAGRTUR','STORAGE_ADM.tt_REP_AGRTUR','Agrisn','AgrIsn',null,'',0,'','',''); 
-insert into storage_adm.ss_process_dest_tables values(-1,'STORAGE_SOURCE.REP_AGRCLAUSE','storage_adm.v_REP_AGRCLAUSE','tt_REP_AGRCLAUSE','AgrIsn,Classisn','AgrIsn',null,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.rep_objclass_domestic','storage_adm.v_rep_objclass_domestic','STORAGE_ADM.tt_rep_objclass_domestic','AgrIsn,ObjClassIsn,Parentobjclassisn','AgrIsn',null,'',0,'','','');  
 insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.rep_agrext','storage_adm.v_rep_agrext','STORAGE_ADM.tt_rep_agrext','AgrIsn','AgrIsn',null,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.REPCRGDOC','storage_adm.v_repcrgdoc','STORAGE_ADM.tt_repcrgdoc','Agrisn,classisn','Agrisn',null,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.REPAGR','storage_adm.V_REPAGR','STORAGE_ADM.tt_repagr','AgrIsn','AgrIsn',10,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.REPCOND','storage_adm.V_REPCOND','STORAGE_ADM.tt_repcond','CondIsn','AgrIsn',null,'X_REPCOND_COND',0,'','','');    
+insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.REP_AGRTUR','storage_adm.V_REPAGRTUR','STORAGE_ADM.tt_REP_AGRTUR','Agrisn','AgrIsn',null,'',0,'','',''); 
 insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.rep_longagraddendum','storage_adm.v_longagraddendum','STORAGE_ADM.tt_longagraddendum','ADDISN','AgrIsn',null,'',0,'','',''); 
-insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDAGRROLEAGR','storage_adm.V_MEDAGRROLEAGR','STORAGE_ADM.TT_MEDAGRROLEAGR','AGRISN','AGRISN',30,'',0,'','','');
+insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.rep_objclass_domestic','storage_adm.v_rep_objclass_domestic','STORAGE_ADM.tt_rep_objclass_domestic','AgrIsn,ObjClassIsn,Parentobjclassisn','AgrIsn',null,'',0,'','','');  
+insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.REPAGR','storage_adm.V_REPAGR','STORAGE_ADM.tt_repagr','AgrIsn','AgrIsn',10,'',0,'','','');
+insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.repagr_economic','storage_adm.V_repagr_economic','STORAGE_ADM.tt_repagr_economic','AgrIsn','AgrIsn',null,'',0,'','','');
+insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.REPCOND','storage_adm.V_REPCOND','STORAGE_ADM.tt_repcond','CondIsn','AgrIsn',null,'X_REPCOND_COND',0,'','','');    
+insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.REPCRGDOC','storage_adm.v_repcrgdoc','STORAGE_ADM.tt_repcrgdoc','Agrisn,classisn','Agrisn',null,'',0,'','','');    
+insert into storage_adm.ss_process_dest_tables values(14,'storages.st_buhbody_nms','storage_adm.v_tt_buhbody_nms','STORAGE_ADM.tt_buhbody_nms','BODYISN','BODYISN',null,'X_buhbody_nms_BODY',0,'','','');  
+insert into storage_adm.ss_process_dest_tables values(15,'STORAGE_SOURCE.REPBUHBODY','storage_adm.V_REPBUHBODY','storage_adm.tt_repbuhbody','BODYISN,coalesce(DOCSUMISN,0),coalesce(factisn,0),coalesce(buhquitisn,0),coalesce(buhquitbodyisn,0),Dateval','HEADISN',10,'X_PREBUHBODY_ASPK',0,'','','');
+insert into storage_adm.ss_process_dest_tables values(15,'STORAGE_SOURCE.REPBUHQUIT','storage_adm.v_repbuhquit','storage_adm.tt_repbuhquit','BodyIsn,buhquitbodyisn,buhquitisn,coalesce(quitbodyisn,0),Dateval','HeadIsn',20,'X_REPBUHQUIT_BODY',0,'','',''); 
+insert into storage_adm.ss_process_dest_tables values(19,'STORAGES.REP_AGR_SALERS','storage_adm.V_REP_AGR_SALERS','STORAGE_ADM.TT_REP_AGR_SALERS','AGRISN, SALERISN, coalesce(SALERCLASSISN, 0), AGRSALERCLASSISN, DATEBEG, DATEEND, DEPTISN','AGRISN',10,'',0,'','','');    
+insert into storage_adm.ss_process_dest_tables values(19,'STORAGES.REP_AGR_SALERS_LINE','storage_adm.V_REP_AGR_SALERS_LINE','STORAGE_ADM.TT_REP_AGR_SALERS_LINE','AGRISN, DATEBEG, DATEEND','AGRISN',20,'',0,'','','');    
 insert into storage_adm.ss_process_dest_tables values(20,'MOTOR.AGRAGENT_RANKS','storage_adm.V_AGRAGENT_RANKS','STORAGE_ADM.TT_AGRAGENT_RANKS','AGRISN, AGENTISN, CLASSISN, AGENT_RANK, SHAREPC, AGRRANK_RANK, ARCLASSISN','AGRISN',20,'',0,'','','');   
+insert into storage_adm.ss_process_dest_tables values(20,'STORAGES.REP_AGENT_RANKS','storage_adm.V_REP_AGENT_RANKS','STORAGE_ADM.TT_REP_AGENT_RANKS','AGRISN, ADDISN, AGENTISN, ORDERNO','AGRISN',10,'',0,'','','');
+insert into storage_adm.ss_process_dest_tables values(27,'STORAGE_SOURCE.REPAGRROLEAGR','storage_adm.V_REPAGRROLEAGR','STORAGE_ADM.TT_REPAGRROLEAGR','AGRISN','AGRISN',10,'',0,'','','');    
+insert into storage_adm.ss_process_dest_tables values(52,'STORAGE_SOURCE.SUBJECT_ATTRIB','storage_adm.V_SUBJECT_ATTRIB','STORAGE_ADM.TT_SUBJECT_ATTRIB','SUBJISN','SUBJISN',null,'',0,'','',''); 
+-- later stages
+insert into storage_adm.ss_process_dest_tables values(9,'STORAGES.ST_REPAGR','STORAGES.V_TT_REPAGR','STORAGES.TT_REPAGR','AGRISN','AGRISN',null,'X_REPAGR',0,'','','');    
+insert into storage_adm.ss_process_dest_tables values(10,'STORAGES.ST_JuorAgrOSAGO','STORAGES.v_tt_JuorAgrOSAGO','STORAGES.tt_JuorAgrOSAGO','AGRISN','AGRISN',null,'X_ST_JOURAGROSAGO_AGR',1,'DTEND','DTBEG','');  
+insert into storage_adm.ss_process_dest_tables values(11,'STORAGES.ST_JuorClaimOSAGO','storage_adm.v_tt_JuorClaimOSAGO','STORAGE_ADM.tt_JuorClaimOSAGO','AGRISN, DISCR','AGRISN',null,'X_ST_JuorClaimOSAGO_AGR',1,'DTEND','DTBEG','');   
+insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDAGENTAGR','storage_adm.V_MEDAGENTAGR','STORAGE_ADM.TT_MEDAGENTAGR','AGRISN','AGRISN',40,'',0,'','',''); 
+insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDAGREEMENT','storage_adm.V_MEDAGREEMENT','STORAGE_ADM.TT_MEDAGREEMENT','AGRISN','AGRISN',50,'',0,'','','');   
+insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDAGRROLE','storage_adm.V_MEDAGRROLE','STORAGE_ADM.TT_MEDAGRROLE','ROLEISN','AGRISN',20,'X_MEDAGRROLE_ROLEISN',0,'','','');   
+insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDAGRROLEAGR','storage_adm.V_MEDAGRROLEAGR','STORAGE_ADM.TT_MEDAGRROLEAGR','AGRISN','AGRISN',30,'',0,'','','');
+insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDCOND','storage_adm.V_MEDCOND','STORAGE_ADM.TT_MEDCOND','CONDISN','AGRISN',70,'X_MEDCOND',0,'','','');   
+insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDCONDAGRDE','storage_adm.V_MEDCOND','STORAGE_ADM.TT_MEDCOND','CONDISN','AGRISN',80,'X_ST_MEDCONDAGRDE',0,'','','');
+insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDOBJECT','storage_adm.V_MEDOBJECT','STORAGE_ADM.TT_MEDOBJECT','OBJISN','AGRISN',60,'',0,'','','');  
+insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDREPAGR','storage_adm.V_MEDREPAGR','STORAGE_ADM.TT_MEDREPAGR','AGRISN','AGRISN',10,'',0,'','','');  
+insert into storage_adm.ss_process_dest_tables values(17,'MEDIC.ST_MEDREFUND','storage_adm.V_MEDREFUND','STORAGE_ADM.TT_MEDREFUND','REFUNDISN,coalesce(EXTISN,0)','CLAIMISN',null,'X_MEDREFUND_PK',0,'','',''); 
+insert into storage_adm.ss_process_dest_tables values(18,'MEDIC.ST_MEDSUM','storage_adm.V_MEDSUM','STORAGE_ADM.TT_MEDSUM','DOCSUMISN','DOCSUMISN',null,'',0,'','','');  
+insert into storage_adm.ss_process_dest_tables values(21,'MOTOR.CARREPAGR','storage_adm.V_CARREPAGR','STORAGE_ADM.TT_CARREPAGR','AGRISN','AGRISN',10,'',0,'','','');
 insert into storage_adm.ss_process_dest_tables values(22,'MOTOR.REP_DOCS_DOCSUM_CLMINV','storage_adm.V_REP_DOCS_DOCSUM_CLMINV','STORAGE_ADM.TT_REP_DOCS_DOCSUM_CLMINV','DOC_SIGNED, DOCSUM_ISN','CLMINV_ISN',10,'X_DOCSUMCLMINV_DOCSUM',0,'','','');
+insert into storage_adm.ss_process_dest_tables values(23,'STORAGE_SOURCE.SUBJ_BEST_ADDR','storage_adm.V_SUBJ_BEST_ADDR','STORAGE_ADM.TT_SUBJ_BEST_ADDR','SUBJISN','SUBJISN',10,'X_SUBADDR_SUBJ',0,'','','');
 insert into storage_adm.ss_process_dest_tables values(24,'MOTOR.REP_DOCS_DOCSUM_CLMINV_LINE','storage_adm.V_REP_DOCS_DOCSUM_CLMINV_LINE','STORAGE_ADM.TT_REP_DOCS_DOCSUM_CLMINV_LINE','CLMINVL_ISN, CLMINV_ISN, REFUNDISN, DOCSUM_ISN, DOC_ISN','CLMINV_ISN',10,'',0,'','','');
 insert into storage_adm.ss_process_dest_tables values(25,'MOTOR.REP_DOCS_DOCSUM','storage_adm.V_REP_DOCS_DOCSUM','STORAGE_ADM.TT_REP_DOCS_DOCSUM','DOCSUM_ISN','AGRISN',10,'',0,'','','');   
 insert into storage_adm.ss_process_dest_tables values(26,'MOTOR.REP_CLMINV_LINE','storage_adm.V_REP_CLMINV_LINE','STORAGE_ADM.TT_REP_CLMINV_LINE','CLMINVL_ISN, CLMINV_ISN, REFUNDISN','CLMINV_ISN',10,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(37,'MOTOR.MTPL_POLICIES','storage_adm.V_MTPL_POLICIES','STORAGE_ADM.TT_MTPL_POLICIES','AGRISN','AGRISN',null,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(38,'MOTOR.MTPL_SUMMARIZED','storage_adm.V_MTPL_SUMMARIZED','STORAGE_ADM.TT_MTPL_SUMMARIZED','AGRISN','AGRISN',null,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(49,'MOTOR.T_AGR_DRIVERS','storage_adm.V_AGR_DRIVERS','STORAGE_ADM.TT_AGR_DRIVERS','AGRISN','AGRISN',null,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDREPAGR','storage_adm.V_MEDREPAGR','STORAGE_ADM.TT_MEDREPAGR','AGRISN','AGRISN',10,'',0,'','','');  
-insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDCOND','storage_adm.V_MEDCOND','STORAGE_ADM.TT_MEDCOND','CONDISN','AGRISN',70,'X_MEDCOND',0,'','','');   
-insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDCONDAGRDE','storage_adm.V_MEDCOND','STORAGE_ADM.TT_MEDCOND','CONDISN','AGRISN',80,'X_ST_MEDCONDAGRDE',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(23,'STORAGE_SOURCE.SUBJ_BEST_ADDR','storage_adm.V_SUBJ_BEST_ADDR','STORAGE_ADM.TT_SUBJ_BEST_ADDR','SUBJISN','SUBJISN',10,'X_SUBADDR_SUBJ',0,'','','');
+insert into storage_adm.ss_process_dest_tables values(27,'STORAGE_SOURCE.REPAGRROLEAGR','storage_adm.V_REPAGRROLEAGR','STORAGE_ADM.TT_REPAGRROLEAGR','AGRISN','AGRISN',10,'',0,'','','');    
 insert into storage_adm.ss_process_dest_tables values(29,'MOTOR.TARIFF_KOEFF','storage_adm.V_TARIFF_KOEFF','STORAGE_ADM.TT_TARIFF_KOEFF','AGRISN','AGRISN',30,'',0,'','',''); 
+insert into storage_adm.ss_process_dest_tables values(29,'MOTOR.TARIFF_KOEFF_OBJ','storage_adm.V_TARIFF_KOEFF_OBJ','STORAGE_ADM.TT_TARIFF_KOEFF_OBJ','AGRISN, PARENTOBJISN, RPTCLASS, RPTCLASSISN','AGRISN',10,'',0,'','','');  
+insert into storage_adm.ss_process_dest_tables values(29,'MOTOR.TARIFF_KOEFF_RPT','storage_adm.V_TARIFF_KOEFF_RPT','STORAGE_ADM.TT_TARIFF_KOEFF_RPT','AGRISN, RPTCLASS, RPTCLASSISN','AGRISN',20,'',0,'','','');
+insert into storage_adm.ss_process_dest_tables values(30,'MOTOR.CARCOND','storage_adm.V_CARCOND','STORAGE_ADM.TT_CARCOND','AGRISN, PARENTOBJISN, OBJISN, RPTCLASS, RPTCLASSISN','AGRISN',10,'',0,'','','');
 insert into storage_adm.ss_process_dest_tables values(32,'MOTOR.REPAGROBJECTEXT','storage_adm.v_REPAGROBJECTEXT','STORAGE_ADM.TT_REPAGROBJECTEXT','OBJISN','OBJISN',10,'X_REPAGROBJECTEXT_OBJ',0,'','','');
 insert into storage_adm.ss_process_dest_tables values(33,'MOTOR.CARCOND_OBJ_SUM','storage_adm.V_CARCOND_OBJ_SUM','STORAGE_ADM.TT_CARCOND_OBJ_SUM','AGRISN, PARENTOBJISN, RPTCLASS, RPTCLASSISN','PARENTOBJISN',null,'',0,'','',''); 
-insert into storage_adm.ss_process_dest_tables values(35,'MOTOR.CAR_CUBE','storage_adm.V_CAR_CUBE','STORAGE_ADM.TT_CAR_CUBE','AGRISN, PARENTOBJISN, RPTCLASS, RPTCLASSISN, COND_DATEBEG, COND_DATEEND','PARENTOBJISN',null,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(45,'MOTOR.DOPUSLUGI_SUMS','storage_adm.V_DOPUSLUGI_SUMS','STORAGE_ADM.TT_DOPUSLUGI_SUMS','AGRISN','AGRISN',null,'',0,'','','');  
-insert into storage_adm.ss_process_dest_tables values(46,'MOTOR.REP_PRESALE','storage_adm.V_REP_PRESALE','STORAGE_ADM.TT_REP_PRESALE','PRESALEISN','PRESALEISN',null,'',0,'','','');   
-insert into storage_adm.ss_process_dest_tables values(48,'MOTOR.CAR_DEALERS','storage_adm.V_CAR_DEALERS','STORAGE_ADM.TT_CAR_DEALERS','CARDEALERISN','CARDEALERISN',null,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(51,'MEDIC.ST_MED_AGRCONDBUH','storage_adm.V_MED_AGRCONDBUH','TT_MED_AGRCONDBUH','AGRISN, coalesce(SUBACCISN, 0), coalesce(RULEISN, 0), coalesce(MONTHDATEVAL, timestamp ''1900-01-01 00:00:00''), coalesce(MAXDATEVAL, timestamp ''1900-01-01 00:00:00''), coalesce(RISKRULEISN, 0), coalesce(STATCODE, 0)','AGRISN',null,'X_MED_AGRCONDBUH_AGR',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(52,'STORAGE_SOURCE.SUBJECT_ATTRIB','storage_adm.V_SUBJECT_ATTRIB','STORAGE_ADM.TT_SUBJECT_ATTRIB','SUBJISN','SUBJISN',null,'',0,'','',''); 
-insert into storage_adm.ss_process_dest_tables values(1,'STORAGES.st_buhbody','storage_adm.v_tt_buhbody','STORAGE_ADM.tt_buhbody','bodyisn','bodyisn',10,'x_st_buhbody_body',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(2,'STORAGES.st_bodydebcre','storage_adm.v_tt_bodydebcre','STORAGE_ADM.tt_bodydebcre','baseisn,db','baseisn',20,'x_st_bodydebcre_base',0,'','',''); 
-insert into storage_adm.ss_process_dest_tables values(4,'STORAGES.ST_BUH_TURN','storage_adm.v_tt_BUH_TURN','STORAGE_ADM.tt_BUH_TURN','PRM_KEY,coalesce(SUBKINDISN,-1),coalesce(OPRISN,-1),coalesce(CURRISN,-1),CODE,coalesce(DEB,timestamp ''1900-01-01 00:00:00'')','PRM_KEY',null,'X_ST_BUH_TURN_UNIC',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(6,'STORAGES.ST_REP_SUBJECT','storage_adm.V_REP_SUBJECT','STORAGE_ADM.tt_REP_SUBJECT','SubjIsn','SubjIsn',null,'x_REP_SUBJECT_subj',0,'','',''); 
-insert into storage_adm.ss_process_dest_tables values(8,'STORAGES.ST_BUH_TURN_CONTR','storage_adm.V_TT_BUH_TURN_CONTR','STORAGE_ADM.TT_BUH_TURN_CONTR','PRM_KEY,coalesce(OPRISN,-1),coalesce(Resident,''A''),coalesce(branchisn,0),coalesce(CURRISN,-1),coalesce(JURIDICAL,''A'')','PRM_KEY',null,'x_st_buh_turn_Contr_unic',0,'','','');   
-insert into storage_adm.ss_process_dest_tables values(9,'STORAGES.ST_REPAGR','STORAGES.V_TT_REPAGR','STORAGES.TT_REPAGR','AGRISN','AGRISN',null,'X_REPAGR',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(-1,'STORAGES.ST_PREM_BY_DEPT','STORAGES.V_TT_PREM_BY_DEPT','STORAGES.TT_PREM_BY_DEPT','PRM_KEY,coalesce(DEPTISN,-1),coalesce(repr_deptisn,-1)','PRM_KEY',null,'X_ST_PREM_UNIC',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(3,'STORAGES.st_docsumbody','storage_adm.v_tt_docsumbody','STORAGE_ADM.tt_docsumbody','BODYISN,DSISN','BODYISN',null,'X_ST_DOCSUMBODY_DS',1,'DATEEND','DATEBEG','');
-insert into storage_adm.ss_process_dest_tables values(5,'STORAGES.st_buhbody_reins','storage_adm.v_tt_buhbody_reins','STORAGE_ADM.tt_buhbody_reins','bodyisn','bodyisn',null,'x_st_buhbody_reins_body',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(7,'STORAGES.st_buh_turn_corr','storage_adm.v_tt_buh_turn_corr','STORAGE_ADM.tt_buh_turn_corr','PRM_KEY,coalesce(SubKindISn,-1),coalesce(OPRISN,-1),CorCode','PRM_KEY',null,'x_st_buh_turn_Corr_unic',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(11,'STORAGES.ST_JuorClaimOSAGO','storage_adm.v_tt_JuorClaimOSAGO','STORAGE_ADM.tt_JuorClaimOSAGO','AGRISN, DISCR','AGRISN',null,'X_ST_JuorClaimOSAGO_AGR',1,'DTEND','DTBEG','');   
-insert into storage_adm.ss_process_dest_tables values(12,'STORAGE_SOURCE.REPREFUND','storage_adm.V_REPREFUND','STORAGE_ADM.tt_reprefund','REFUNDISN,coalesce(AGREXTISN,0)','CLAIMISN',null,'X_REPREFUND_REF_EXT',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(17,'MEDIC.ST_MEDREFUND','storage_adm.V_MEDREFUND','STORAGE_ADM.TT_MEDREFUND','REFUNDISN,coalesce(EXTISN,0)','CLAIMISN',null,'X_MEDREFUND_PK',0,'','',''); 
-insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDOBJECT','storage_adm.V_MEDOBJECT','STORAGE_ADM.TT_MEDOBJECT','OBJISN','AGRISN',60,'',0,'','','');  
-insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDAGRROLE','storage_adm.V_MEDAGRROLE','STORAGE_ADM.TT_MEDAGRROLE','ROLEISN','AGRISN',20,'X_MEDAGRROLE_ROLEISN',0,'','','');   
-insert into storage_adm.ss_process_dest_tables values(18,'MEDIC.ST_MEDSUM','storage_adm.V_MEDSUM','STORAGE_ADM.TT_MEDSUM','DOCSUMISN','DOCSUMISN',null,'',0,'','','');  
-insert into storage_adm.ss_process_dest_tables values(19,'STORAGES.REP_AGR_SALERS','storage_adm.V_REP_AGR_SALERS','STORAGE_ADM.TT_REP_AGR_SALERS','AGRISN, SALERISN, coalesce(SALERCLASSISN, 0), AGRSALERCLASSISN, DATEBEG, DATEEND, DEPTISN','AGRISN',10,'',0,'','','');    
 insert into storage_adm.ss_process_dest_tables values(33,'MOTOR.CARCOND_OBJ_SUM_DO','storage_adm.V_CARCOND_OBJ_SUM_DO','STORAGE_ADM.TT_CARCOND_OBJ_SUM_DO','AGRISN, PARENTOBJISN, RPTCLASS, RPTCLASSISN','PARENTOBJISN',null,'',0,'','','');  
-insert into storage_adm.ss_process_dest_tables values(29,'MOTOR.TARIFF_KOEFF_OBJ','storage_adm.V_TARIFF_KOEFF_OBJ','STORAGE_ADM.TT_TARIFF_KOEFF_OBJ','AGRISN, PARENTOBJISN, RPTCLASS, RPTCLASSISN','AGRISN',10,'',0,'','','');  
-insert into storage_adm.ss_process_dest_tables values(47,'MOTOR.REPAGR_AGENT','storage_adm.V_REPAGR_AGENT','STORAGE_ADM.TT_REPAGR_AGENT','ISN','ISN',null,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(50,'MOTOR.REP_QUEUE_MAIL','storage_adm.V_REP_QUEUE_MAIL','STORAGE_ADM.TT_REP_QUEUE_MAIL','ISN','ISN',null,'',0,'','','');   
-insert into storage_adm.ss_process_dest_tables values(14,'storages.st_buhbody_nms','storage_adm.v_tt_buhbody_nms','STORAGE_ADM.tt_buhbody_nms','BODYISN','BODYISN',null,'X_buhbody_nms_BODY',0,'','','');  
-insert into storage_adm.ss_process_dest_tables values(15,'STORAGE_SOURCE.REPBUHQUIT','storage_adm.v_repbuhquit','storage_adm.tt_repbuhquit','BodyIsn,buhquitbodyisn,buhquitisn,coalesce(quitbodyisn,0),Dateval','HeadIsn',20,'X_REPBUHQUIT_BODY',0,'','',''); 
-insert into storage_adm.ss_process_dest_tables values(15,'STORAGE_SOURCE.REPBUHBODY','storage_adm.V_REPBUHBODY','storage_adm.tt_repbuhbody','BODYISN,coalesce(DOCSUMISN,0),coalesce(factisn,0),coalesce(buhquitisn,0),coalesce(buhquitbodyisn,0),Dateval','HEADISN',10,'X_PREBUHBODY_ASPK',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(-13,'STORAGE_SOURCE.zeropremiumsumaddendum','storage_adm.v_zeropremiumsumaddendum','tt_zeropremiumsumaddendum','ADDISN','AgrIsn',null,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(19,'STORAGES.REP_AGR_SALERS_LINE','storage_adm.V_REP_AGR_SALERS_LINE','STORAGE_ADM.TT_REP_AGR_SALERS_LINE','AGRISN, DATEBEG, DATEEND','AGRISN',20,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(21,'MOTOR.CARREPAGR','storage_adm.V_CARREPAGR','STORAGE_ADM.TT_CARREPAGR','AGRISN','AGRISN',10,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(27,'STORAGE_SOURCE.REPAGRROLEAGR','storage_adm.V_REPAGRROLEAGR','STORAGE_ADM.TT_REPAGRROLEAGR','AGRISN','AGRISN',10,'',0,'','','');    
+insert into storage_adm.ss_process_dest_tables values(35,'MOTOR.CAR_CUBE','storage_adm.V_CAR_CUBE','STORAGE_ADM.TT_CAR_CUBE','AGRISN, PARENTOBJISN, RPTCLASS, RPTCLASSISN, COND_DATEBEG, COND_DATEEND','PARENTOBJISN',null,'',0,'','','');    
+insert into storage_adm.ss_process_dest_tables values(36,'MOTOR.CARSUM','storage_adm.V_CARSUM','STORAGE_ADM.TT_CARSUM','CARSUMISN','CARSUMISN',null,'',0,'','','');
+insert into storage_adm.ss_process_dest_tables values(37,'MOTOR.MTPL_POLICIES','storage_adm.V_MTPL_POLICIES','STORAGE_ADM.TT_MTPL_POLICIES','AGRISN','AGRISN',null,'',0,'','','');
+insert into storage_adm.ss_process_dest_tables values(38,'MOTOR.MTPL_SUMMARIZED','storage_adm.V_MTPL_SUMMARIZED','STORAGE_ADM.TT_MTPL_SUMMARIZED','AGRISN','AGRISN',null,'',0,'','','');    
 insert into storage_adm.ss_process_dest_tables values(39,'MOTOR.PVUFIXSUM','storage_adm.V_PVUFIXSUM','STORAGE_ADM.TT_PVUFIXSUM','BUHBODYISN','BUHBODYISN',null,'',0,'','','');    
 insert into storage_adm.ss_process_dest_tables values(40,'MOTOR.TT_RISK2RPTCLASS','storage_adm.V_RISK2RPTCLASS','STORAGE_ADM.TT_RISK2RPTCLASS','XRPTCLASSISN','XRPTCLASSISN',null,'',0,'','','');
 insert into storage_adm.ss_process_dest_tables values(41,'MOTOR.CARREFUND','storage_adm.V_CARREFUND','STORAGE_ADM.TT_CARREFUND','REFUNDISN','REFUNDISN',null,'',0,'','',''); 
 insert into storage_adm.ss_process_dest_tables values(42,'MOTOR.CARDOCSUMINVOICELINE','storage_adm.V_CARDOCSUMINVOICELINE','STORAGE_ADM.TT_CARDOCSUMINVOICELINE','DOCISN','DOCISN',null,'',0,'','','');    
 insert into storage_adm.ss_process_dest_tables values(43,'MOTOR.CAR_ATTRIB','storage_adm.V_CAR_ATTRIB','STORAGE_ADM.TT_CAR_ATTRIB','OBJISN','OBJISN',null,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(10,'STORAGES.ST_JuorAgrOSAGO','STORAGES.v_tt_JuorAgrOSAGO','STORAGES.tt_JuorAgrOSAGO','AGRISN','AGRISN',null,'X_ST_JOURAGROSAGO_AGR',1,'DTEND','DTBEG','');  
-insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDAGENTAGR','storage_adm.V_MEDAGENTAGR','STORAGE_ADM.TT_MEDAGENTAGR','AGRISN','AGRISN',40,'',0,'','',''); 
-insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDAGREEMENT','storage_adm.V_MEDAGREEMENT','STORAGE_ADM.TT_MEDAGREEMENT','AGRISN','AGRISN',50,'',0,'','','');   
-insert into storage_adm.ss_process_dest_tables values(20,'STORAGES.REP_AGENT_RANKS','storage_adm.V_REP_AGENT_RANKS','STORAGE_ADM.TT_REP_AGENT_RANKS','AGRISN, ADDISN, AGENTISN, ORDERNO','AGRISN',10,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(29,'MOTOR.TARIFF_KOEFF_RPT','storage_adm.V_TARIFF_KOEFF_RPT','STORAGE_ADM.TT_TARIFF_KOEFF_RPT','AGRISN, RPTCLASS, RPTCLASSISN','AGRISN',20,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(30,'MOTOR.CARCOND','storage_adm.V_CARCOND','STORAGE_ADM.TT_CARCOND','AGRISN, PARENTOBJISN, OBJISN, RPTCLASS, RPTCLASSISN','AGRISN',10,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(36,'MOTOR.CARSUM','storage_adm.V_CARSUM','STORAGE_ADM.TT_CARSUM','CARSUMISN','CARSUMISN',null,'',0,'','','');
 insert into storage_adm.ss_process_dest_tables values(44,'MOTOR.CARDRIVER','storage_adm.V_CARDRIVER','STORAGE_ADM.TT_CARDRIVER','AGRISN','AGRISN',null,'',0,'','','');  
+insert into storage_adm.ss_process_dest_tables values(45,'MOTOR.DOPUSLUGI_SUMS','storage_adm.V_DOPUSLUGI_SUMS','STORAGE_ADM.TT_DOPUSLUGI_SUMS','AGRISN','AGRISN',null,'',0,'','','');  
+insert into storage_adm.ss_process_dest_tables values(46,'MOTOR.REP_PRESALE','storage_adm.V_REP_PRESALE','STORAGE_ADM.TT_REP_PRESALE','PRESALEISN','PRESALEISN',null,'',0,'','','');   
+insert into storage_adm.ss_process_dest_tables values(47,'MOTOR.REPAGR_AGENT','storage_adm.V_REPAGR_AGENT','STORAGE_ADM.TT_REPAGR_AGENT','ISN','ISN',null,'',0,'','','');    
+insert into storage_adm.ss_process_dest_tables values(48,'MOTOR.CAR_DEALERS','storage_adm.V_CAR_DEALERS','STORAGE_ADM.TT_CAR_DEALERS','CARDEALERISN','CARDEALERISN',null,'',0,'','','');    
+insert into storage_adm.ss_process_dest_tables values(49,'MOTOR.T_AGR_DRIVERS','storage_adm.V_AGR_DRIVERS','STORAGE_ADM.TT_AGR_DRIVERS','AGRISN','AGRISN',null,'',0,'','','');    
+insert into storage_adm.ss_process_dest_tables values(50,'MOTOR.REP_QUEUE_MAIL','storage_adm.V_REP_QUEUE_MAIL','STORAGE_ADM.TT_REP_QUEUE_MAIL','ISN','ISN',null,'',0,'','','');   
+insert into storage_adm.ss_process_dest_tables values(51,'MEDIC.ST_MED_AGRCONDBUH','storage_adm.V_MED_AGRCONDBUH','TT_MED_AGRCONDBUH','AGRISN, coalesce(SUBACCISN, 0), coalesce(RULEISN, 0), coalesce(MONTHDATEVAL, timestamp ''1900-01-01 00:00:00''), coalesce(MAXDATEVAL, timestamp ''1900-01-01 00:00:00''), coalesce(RISKRULEISN, 0), coalesce(STATCODE, 0)','AGRISN',null,'X_MED_AGRCONDBUH_AGR',0,'','','');
 insert into storage_adm.ss_process_dest_tables values(53,'STORAGES.CLIENTDIRECTIVITY','storage_adm.v_clientdirectivity','STORAGE_ADM.TT_CLIENTDIRECTIVITY','Agrisn','Agrisn',null,'',0,'','','');
+insert into storage_adm.ss_process_dest_tables values(-1,'STORAGE_SOURCE.REP_AGRCLAUSE','storage_adm.v_REP_AGRCLAUSE','tt_REP_AGRCLAUSE','AgrIsn,Classisn','AgrIsn',null,'',0,'','','');    
+insert into storage_adm.ss_process_dest_tables values(-1,'STORAGES.ST_PREM_BY_DEPT','STORAGES.V_TT_PREM_BY_DEPT','STORAGES.TT_PREM_BY_DEPT','PRM_KEY,coalesce(DEPTISN,-1),coalesce(repr_deptisn,-1)','PRM_KEY',null,'X_ST_PREM_UNIC',0,'','','');
+insert into storage_adm.ss_process_dest_tables values(-4,'STORAGES.ST_BUH_TURN_NFS','storage_adm.V_TT_BUHTURN_NFS','TT_BUHTURN_NFS','PRM_KEY,coalesce(OPRISN,-1),coalesce(OSCLASS,-1),coalesce(OSKIND,-1),coalesce(OSSTATUS,-1) ,coalesce(OKOFCODE,''-''),coalesce(ISBULDING,-1),CODE','PRM_KEY',null,'X_ST_BUH_TURN_NFS_UNIC',0,'','','');    
+insert into storage_adm.ss_process_dest_tables values(-13,'STORAGE_SOURCE.zeropremiumsumaddendum','storage_adm.v_zeropremiumsumaddendum','tt_zeropremiumsumaddendum','ADDISN','AgrIsn',null,'',0,'','','');
 
 
 
 --------------------------------------------------------------------------------------------------
 --
 --   storage_adm.ss_process_source_tables
+--   For stage 2 used 1,2,3,4,5,6,7,8,10,12,13,14,15,19,20,22,27
 --
 --------------------------------------------------------------------------------------------------
 insert into storage_adm.ss_process_source_tables values(1,1,'AIS','BUHBODY_T','isn',null,'','
@@ -552,7 +954,7 @@ insert into storage_adm.ss_process_source_tables values(77,19,'AIS','OBJ_ATTRIB'
   when 
     CLASSISN = 1428587803
     and DISCR = ''C'' 
-    and coalesce(add_months(DATEBEG, -1), timestamp ''01-01-3000'' >= current_timestamp
+    and coalesce(oracompat.add_months(DATEBEG, -1), timestamp ''01-01-3000'' >= current_timestamp
   then ISN
 end',null,'V_SS_LOAD_AGR_SALERS_OBJ_ATTR','',0);
 insert into storage_adm.ss_process_source_tables values(78,20,'AIS','AGRROLE','AGRISN',null,'','select /*+ parallel(AR 32) full(AR) */
@@ -680,7 +1082,7 @@ insert into storage_adm.ss_process_source_tables values(131,21,'AIS','OBJ_ATTRIB
   when 
     CLASSISN in (2647785103, 3028738303, 2638580803)
     and DISCR = ''C'' 
-    and coalesce(add_months(DATEBEG, -1), timestamp ''01-01-3000'') >= current_timestamp
+    and coalesce(oracompat.add_months(DATEBEG, -1), timestamp ''01-01-3000'') >= current_timestamp
   then ObjISN
 end',null,'V_SS_LOAD_AGR_CLIENT_OBJ_ATTR','',0);    
 insert into storage_adm.ss_process_source_tables values(132,26,'AIS','OBJ_ATTRIB','case 
