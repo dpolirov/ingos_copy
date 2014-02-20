@@ -789,3 +789,26 @@ COMMENT ON COLUMN storage_source.subject_attrib.sto_priority IS 'FK(Dicti) Пр�
 COMMENT ON COLUMN storage_source.subject_attrib.juridical IS 'Признак юридичности';
 
 
+CREATE TABLE storage_source.rep_city (
+    cityisn                          NUMERIC,
+    regionisn                        NUMERIC,
+    countryisn                       NUMERIC,
+    parentcity                       NUMERIC,
+    parentregionisn                  NUMERIC,
+    parentcountryisn                 NUMERIC,
+    loadisn                          NUMERIC
+)
+DISTRIBUTED BY (cityisn);
+
+COMMENT ON TABLE storage_source.rep_city IS 'Справочник городов с некотрой расшиыкой. Используется в том числе при загрузке Repcond для определения региона нахождения объекта';
+
+
+CREATE TABLE storage_source.agr_detail_agrhash (
+    agrisn                           NUMERIC,
+    agrdetailisn                     NUMERIC
+)
+DISTRIBUTED BY (agrisn);
+
+COMMENT ON COLUMN storage_source.agr_detail_agrhash.agrdetailisn IS 'FK(AGR_DETAILS)';
+
+

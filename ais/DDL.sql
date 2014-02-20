@@ -7987,3 +7987,47 @@ COMMENT ON COLUMN ais.subacc4dept.subaccisn IS 'Формальнеая ссыл�
 COMMENT ON COLUMN ais.subacc4dept.sheettype IS 'Вид отчета, используемого для данного подразделения (1 -прямые, 2 - перестрахование)';
 COMMENT ON COLUMN ais.subacc4dept.statcode IS 'Код статотчетности (38 - премия по прямому страхованию, etc.)';
 COMMENT ON COLUMN ais.subacc4dept.isn IS 'PK. SEQ_DICX.NextVal';
+
+
+CREATE TABLE ais.region (
+    isn                              NUMERIC,
+    parentisn                        NUMERIC,
+    code                             NUMERIC(38),
+    countryisn                       NUMERIC,
+    n_children                       NUMERIC(38),
+    shortname                        VARCHAR(40),
+    active                           VARCHAR(1),
+    updated                          TIMESTAMP DEFAULT current_timestamp,
+    updatedby                        NUMERIC,
+    codegai                          NUMERIC,
+    cityisn                          NUMERIC,
+    codegni                          NUMERIC,
+    postcode                         VARCHAR(10),
+    socr                             VARCHAR(10),
+    gnicode                          VARCHAR(11),
+    gninmb                           VARCHAR(4),
+    ocatd                            VARCHAR(11),
+    timezone                         NUMERIC,
+    synisn                           NUMERIC,
+    fullname                         VARCHAR(255)
+)
+DISTRIBUTED BY (isn);
+
+COMMENT ON TABLE ais.region IS $$Классификатор административно территориального деления стран мира.
+$$;
+COMMENT ON COLUMN ais.region.fullname IS 'полное наименование региона';
+COMMENT ON COLUMN ais.region.isn IS $$FK(DICTI,РЕГИОН). Машинный номер объекта, совпадает с ISN соответствующей записи в словаре
+DICTI.$$;
+COMMENT ON COLUMN ais.region.code IS 'Числовой код региона. DICTI(ISN).Code функционально зависит от него.';
+COMMENT ON COLUMN ais.region.countryisn IS 'FK(DICTI,СТРАНА). Страна региона.';
+COMMENT ON COLUMN ais.region.codegai IS 'Код региона ГАИ Росии в номерном знаке';
+COMMENT ON COLUMN ais.region.cityisn IS 'FK(CITY). Указатель административного центра';
+COMMENT ON COLUMN ais.region.codegni IS 'Код региона ГНИ. Повторяет ГАИ, но есть исключения';
+COMMENT ON COLUMN ais.region.postcode IS 'Почтовый индекс, ZIP-код.';
+COMMENT ON COLUMN ais.region.socr IS 'Аббревиатура типа региона: край,обл...';
+COMMENT ON COLUMN ais.region.gnicode IS 'Цифровой код по справочнику ГНИ';
+COMMENT ON COLUMN ais.region.gninmb IS 'Номер налоговой инспекции';
+COMMENT ON COLUMN ais.region.ocatd IS 'Цифровой код ОКАТД (классификатор адм.-терр.деления)';
+COMMENT ON COLUMN ais.region.timezone IS 'Поправка времени относительно Москвы';
+COMMENT ON COLUMN ais.region.synisn IS 'FK указатель на синоним';
+
