@@ -1,4 +1,4 @@
-create or replace view v_subject_attrib (
+create or replace view storage_adm.v_subject_attrib (
    subjisn,
    home_addrisn,
    home_cityisn,
@@ -65,7 +65,7 @@ create or replace view v_subject_attrib (
    monitoringupd )
 as
 (
-    with tt as (select isn from tt_rowid)
+    with tt as (select isn from storage_adm.tt_rowid)
     select --+ ordered use_nl(s sj optaddr)
           s.subjisn,
           s.home_addrisn,
@@ -102,7 +102,7 @@ as
           s.stoadayspay,
           s.driverst,
           s.motivation,
-          s.no_mail,  -- запрет на информационную рассылку: y - запрещено, n - разрешено
+          s.no_mail,  -- Р·Р°РїСЂРµС‚ РЅР° РёРЅС„РѕСЂРјР°С†РёРѕРЅРЅСѓСЋ СЂР°СЃСЃС‹Р»РєСѓ: y - Р·Р°РїСЂРµС‰РµРЅРѕ, n - СЂР°Р·СЂРµС€РµРЅРѕ
           s.email,
           s.serv_phone,
           s.mobilephone,
@@ -116,17 +116,17 @@ as
           sj.juridical,
           sj.classisn as subj_classisn,
           s.sms_phone,
-          decode(sj.classisn, 497, 'n', deny_info_sms) as deny_info_sms,         -- запрет на информационное оповещение по смс
-          decode(sj.classisn, 497, 'n', deny_promo_sms) as deny_promo_sms,       -- запрет на рекламное оповещение по смс
-          decode(sj.classisn, 497, 'n', deny_info_email) as deny_info_email,     -- запрет на информационное оповещение по email
-          decode(sj.classisn, 497, 'n', deny_promo_email) as deny_promo_email,   -- запрет на рекламное оповещение по email
-          s.agentcategoryisn,    -- категория агента
+          decode(sj.classisn, 497, 'N', deny_info_sms) as deny_info_sms,         -- Р·Р°РїСЂРµС‚ РЅР° РёРЅС„РѕСЂРјР°С†РёРѕРЅРЅРѕРµ РѕРїРѕРІРµС‰РµРЅРёРµ РїРѕ СЃРјСЃ
+          decode(sj.classisn, 497, 'N', deny_promo_sms) as deny_promo_sms,       -- Р·Р°РїСЂРµС‚ РЅР° СЂРµРєР»Р°РјРЅРѕРµ РѕРїРѕРІРµС‰РµРЅРёРµ РїРѕ СЃРјСЃ
+          decode(sj.classisn, 497, 'N', deny_info_email) as deny_info_email,     -- Р·Р°РїСЂРµС‚ РЅР° РёРЅС„РѕСЂРјР°С†РёРѕРЅРЅРѕРµ РѕРїРѕРІРµС‰РµРЅРёРµ РїРѕ email
+          decode(sj.classisn, 497, 'N', deny_promo_email) as deny_promo_email,   -- Р·Р°РїСЂРµС‚ РЅР° СЂРµРєР»Р°РјРЅРѕРµ РѕРїРѕРІРµС‰РµРЅРёРµ РїРѕ email
+          s.agentcategoryisn,    -- РєР°С‚РµРіРѕСЂРёСЏ Р°РіРµРЅС‚Р°
           optaddr.addrisn as bestaddrisn,  -- fk(subaddr) - isn
-          optaddr.subaddr as bestaddr,     -- строка адреса
-          s.mainokvedisn,  -- основной оквэд fk(dicti)
-          q.clientisarrested,  -- признак клиента под арестом
-          decode(sj.classisn, 497, 'n', deny_info_post) as deny_info_post,     -- запрет на информационное оповещение в виде бумажной почтовой рассылки
-          decode(sj.classisn, 497, 'n', deny_info_call) as deny_info_call,     -- запрет на информационное оповещение в виде звонка
+          optaddr.subaddr as bestaddr,     -- СЃС‚СЂРѕРєР° Р°РґСЂРµСЃР°
+          s.mainokvedisn,  -- РѕСЃРЅРѕРІРЅРѕР№ РѕРєРІСЌРґ fk(dicti)
+          q.clientisarrested,  -- РїСЂРёР·РЅР°Рє РєР»РёРµРЅС‚Р° РїРѕРґ Р°СЂРµСЃС‚РѕРј
+          decode(sj.classisn, 497, 'N', deny_info_post) as deny_info_post,     -- Р·Р°РїСЂРµС‚ РЅР° РёРЅС„РѕСЂРјР°С†РёРѕРЅРЅРѕРµ РѕРїРѕРІРµС‰РµРЅРёРµ РІ РІРёРґРµ Р±СѓРјР°Р¶РЅРѕР№ РїРѕС‡С‚РѕРІРѕР№ СЂР°СЃСЃС‹Р»РєРё
+          decode(sj.classisn, 497, 'N', deny_info_call) as deny_info_call,     -- Р·Р°РїСЂРµС‚ РЅР° РёРЅС„РѕСЂРјР°С†РёРѕРЅРЅРѕРµ РѕРїРѕРІРµС‰РµРЅРёРµ РІ РІРёРґРµ Р·РІРѕРЅРєР°
           s.monitoringisn,
           s.monitoringbeg,
           s.monitoringend,
@@ -145,14 +145,14 @@ as
                 o.motivation,
                 o.sto_priority,
                 o.agentcategoryisn,
-                o.mainokvedisn,  -- основной оквэд
-                oracompat.nvl(o.no_mail, 'n') as no_mail,  -- запрет на информационную рассылку: y - запрещено, n - разрешено (по умолчанию)
-                oracompat.nvl(o.deny_info_sms, 'n') as deny_info_sms,
-                oracompat.nvl(o.deny_promo_sms, 'y') as deny_promo_sms,
-                oracompat.nvl(o.deny_info_email, 'n') as deny_info_email,
-                oracompat.nvl(o.deny_promo_email, 'y') as deny_promo_email,
-                oracompat.nvl(o.deny_info_post, 'n') as deny_info_post,
-                oracompat.nvl(o.deny_info_call, 'n') as deny_info_call,
+                o.mainokvedisn,  -- РѕСЃРЅРѕРІРЅРѕР№ РѕРєРІСЌРґ
+                oracompat.nvl(o.no_mail, 'N') as no_mail,  -- Р·Р°РїСЂРµС‚ РЅР° РёРЅС„РѕСЂРјР°С†РёРѕРЅРЅСѓСЋ СЂР°СЃСЃС‹Р»РєСѓ: y - Р·Р°РїСЂРµС‰РµРЅРѕ, n - СЂР°Р·СЂРµС€РµРЅРѕ (РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ)
+                oracompat.nvl(o.deny_info_sms, 'N') as deny_info_sms,
+                oracompat.nvl(o.deny_promo_sms, 'Y') as deny_promo_sms,
+                oracompat.nvl(o.deny_info_email, 'N') as deny_info_email,
+                oracompat.nvl(o.deny_promo_email, 'Y') as deny_promo_email,
+                oracompat.nvl(o.deny_info_post, 'N') as deny_info_post,
+                oracompat.nvl(o.deny_info_call, 'N') as deny_info_call,
                 adr.*,
                 ph.*,
                 vip.*,
@@ -175,15 +175,15 @@ as
                                             max(decode(d.isn, 1686031603, oa.val)) as driverst,
                                             max(decode(d.isn, 1428587803, oa.valn)) as motivation,
                                             max(decode(d.isn, 1683459803, oa.valn)) as sto_priority,
-                                            max(decode(d.isn, 2291578303, oa.valn)) as agentcategoryisn,  -- категория агента
-                                            max(decode(d.isn, 3994769103, oa.valn)) as mainokvedisn,  -- основной оквэд
-                                            max(decode(d.isn, 3096320703, oracompat.nvl2(oa.valn, 'y', 'n'))) as no_mail,  -- запрет на информационную рассылку (по умолчанию разрешена)
-                                            max(decode(d.isn, 3096320703, decode(oa.valn, 3546162703, 'y', 'n'))) as deny_info_sms,
-                                            max(decode(d.isn, 2896523903, decode(oa.valn, 3546162703, 'n', 'y'))) as deny_promo_sms,
-                                            max(decode(d.isn, 3096320703, decode(oa.valn, 3546162503, 'y', 'n'))) as deny_info_email,
-                                            max(decode(d.isn, 2896523903, decode(oa.valn, 3546162503, 'n', 'y'))) as deny_promo_email,
-                                            max(decode(d.isn, 3096320703, decode(oa.valn, 3546162303, 'y', 'n'))) as deny_info_post,
-                                            max(decode(d.isn, 3096320703, decode(oa.valn, 3546162103, 'y', 'n'))) as deny_info_call,
+                                            max(decode(d.isn, 2291578303, oa.valn)) as agentcategoryisn,  -- РєР°С‚РµРіРѕСЂРёСЏ Р°РіРµРЅС‚Р°
+                                            max(decode(d.isn, 3994769103, oa.valn)) as mainokvedisn,  -- РѕСЃРЅРѕРІРЅРѕР№ РѕРєРІСЌРґ
+                                            max(decode(d.isn, 3096320703, oracompat.nvl2(oa.valn::varchar, 'Y', 'N'))) as no_mail,  -- Р·Р°РїСЂРµС‚ РЅР° РёРЅС„РѕСЂРјР°С†РёРѕРЅРЅСѓСЋ СЂР°СЃСЃС‹Р»РєСѓ (РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ СЂР°Р·СЂРµС€РµРЅР°)
+                                            max(decode(d.isn, 3096320703, decode(oa.valn, 3546162703, 'Y', 'N'))) as deny_info_sms,
+                                            max(decode(d.isn, 2896523903, decode(oa.valn, 3546162703, 'N', 'Y'))) as deny_promo_sms,
+                                            max(decode(d.isn, 3096320703, decode(oa.valn, 3546162503, 'Y', 'N'))) as deny_info_email,
+                                            max(decode(d.isn, 2896523903, decode(oa.valn, 3546162503, 'N', 'Y'))) as deny_promo_email,
+                                            max(decode(d.isn, 3096320703, decode(oa.valn, 3546162303, 'Y', 'N'))) as deny_info_post,
+                                            max(decode(d.isn, 3096320703, decode(oa.valn, 3546162103, 'Y', 'N'))) as deny_info_call,
                                             max(decode(d.isn, 3002827403, oa.valn)) as monitoringisn,
                                             max(decode(d.isn, 3002827403, oa.datebeg)) as monitoringbeg,
                                             max(decode(d.isn, 3002827403, oa.dateend)) as monitoringend,
@@ -192,32 +192,40 @@ as
                                             tt
                                                 inner join ais.obj_attrib oa
                                                 on tt.isn = oa.objisn
-                                                inner join (select
-                                                                  connect_by_root d.isn as root,
-                                                                  d.isn
-                                                                from dicti d
-                                                                start with d.isn in (
-                                                                  2647785103,              -- водительский стаж
-                                                                  1686027703,              -- возрастная группа
-                                                                  2200008503,              -- гражданство
-                                                                  2626755703,              -- количество детей
-                                                                  2626755803,              -- нахождение в браке
-                                                                  3028738303, 2638580803,  -- семейное положение
-                                                                  1343855503,              -- срок оплаты стоа
-                                                                  1686031603,              -- водительский стаж (категории),
-                                                                  1428587803,              -- мотивационная группа
-                                                                  3096320703,              -- запрет на информационное оповещение - c.get('attrnoinfoflag')
-                                                                  2896523903,              -- согласие на рекламное оповещение - c.get('attrinfoflag')
-                                                                  1683459803,              -- приоритет при направлении
-                                                                  2291578303,              -- категория агента
-                                                                  3994769103,              -- основной оквэд
-                                                                  3002827403               -- мониторинг
-                                                                )
-                                                                connect by prior d.isn = d.parentisn
+                                                inner join (select t1.root,
+                                                                     t1.isn
+                                                                from (
+                                                                        select unnest(d.__hier) as root,
+                                                                                d.isn
+                                                                            from ais.dicti_nh d    
+                                                                    ) t1
+                                                                    inner join (
+                                                                                    select isn
+                                                                                        from ais.dicti_nh d
+                                                                                        where isn in (
+                                                                                                      2647785103,              -- РІРѕРґРёС‚РµР»СЊСЃРєРёР№ СЃС‚Р°Р¶
+                                                                                                      1686027703,              -- РІРѕР·СЂР°СЃС‚РЅР°СЏ РіСЂСѓРїРїР°
+                                                                                                      2200008503,              -- РіСЂР°Р¶РґР°РЅСЃС‚РІРѕ
+                                                                                                      2626755703,              -- РєРѕР»РёС‡РµСЃС‚РІРѕ РґРµС‚РµР№
+                                                                                                      2626755803,              -- РЅР°С…РѕР¶РґРµРЅРёРµ РІ Р±СЂР°РєРµ
+                                                                                                      3028738303, 
+                                                                                                      2638580803,  	       -- СЃРµРјРµР№РЅРѕРµ РїРѕР»РѕР¶РµРЅРёРµ
+                                                                                                      1343855503,              -- СЃСЂРѕРє РѕРїР»Р°С‚С‹ СЃС‚РѕР°
+                                                                                                      1686031603,              -- РІРѕРґРёС‚РµР»СЊСЃРєРёР№ СЃС‚Р°Р¶ (РєР°С‚РµРіРѕСЂРёРё),
+                                                                                                      1428587803,              -- РјРѕС‚РёРІР°С†РёРѕРЅРЅР°СЏ РіСЂСѓРїРїР°
+                                                                                                      3096320703,              -- Р·Р°РїСЂРµС‚ РЅР° РёРЅС„РѕСЂРјР°С†РёРѕРЅРЅРѕРµ РѕРїРѕРІРµС‰РµРЅРёРµ - c.get('attrnoinfoflag')
+                                                                                                      2896523903,              -- СЃРѕРіР»Р°СЃРёРµ РЅР° СЂРµРєР»Р°РјРЅРѕРµ РѕРїРѕРІРµС‰РµРЅРёРµ - c.get('attrinfoflag')
+                                                                                                      1683459803,              -- РїСЂРёРѕСЂРёС‚РµС‚ РїСЂРё РЅР°РїСЂР°РІР»РµРЅРёРё
+                                                                                                      2291578303,              -- РєР°С‚РµРіРѕСЂРёСЏ Р°РіРµРЅС‚Р°
+                                                                                                      3994769103,              -- РѕСЃРЅРѕРІРЅРѕР№ РѕРєРІСЌРґ
+                                                                                                      3002827403               -- РјРѕРЅРёС‚РѕСЂРёРЅРі                                                
+                                                                                                    )
+                                                                            ) t2
+                                                                    on t1.root = t2.isn
                                                             ) d
                                                 on oa.classisn = d.isn
-                                      where oa.discr = 'c'
-                                            and current_timestamp between oracompat.nvl(oa.datebeg, current_timestamp) and oracompat.nvl(oa.dateend, current_timestamp)
+                                      where oa.discr = 'C'
+                                            and current_timestamp between oracompat.nvl(oa.datebeg::timestamp, current_timestamp::timestamp) and oracompat.nvl(oa.dateend::timestamp, current_timestamp::timestamp)
                                      group by oa.objisn
                                       ) o
                         on tt.isn = o.o_subjisn
@@ -258,20 +266,19 @@ as
                                                     adr.address
                                                   from
                                                        (select --+ ordered use_nl(t adr)
+                                                              distinct 
                                                               adr.subjisn,
                                                               adr.classisn,
-                                                              max(adr.isn) keep(dense_rank first order by adr.updated desc, adr.isn desc) as addrisn,
-                                                              max(adr.cityisn) keep(dense_rank first order by adr.updated desc, adr.isn desc) as cityisn,
-                                                              max(adr.postcode) keep(dense_rank first order by adr.updated desc, adr.isn desc) as postcode,
-                                                              max(adr.address) keep(dense_rank first order by adr.updated desc, adr.isn desc) as address
+                                                              first_value(adr.isn) over (partition by adr.subjisn, adr.classisn order by adr.updated desc, adr.isn desc) as addrisn,
+                                                              first_value(adr.cityisn) over (partition by adr.subjisn, adr.classisn order by adr.updated desc, adr.isn desc, adr.cityisn desc) as cityisn,
+                                                              first_value(adr.postcode) over (partition by adr.subjisn, adr.classisn order by adr.updated desc, adr.isn desc, adr.postcode desc) as postcode,
+                                                              first_value(adr.address) over (partition by adr.subjisn, adr.classisn order by adr.updated desc, adr.isn desc, adr.address) as address
                                                             from
                                                                   tt t,
                                                                   ais.subaddr_t adr
                                                             where
                                                                   t.isn = adr.subjisn
-                                                                  and oracompat.nvl(adr.active, 's') <> 's'  -- учитываем только активные записи
-                                                        group by adr.subjisn, 
-                                                                  adr.classisn
+                                                                  and oracompat.nvl(adr.active, 'S') <> 'S'  -- СѓС‡РёС‚С‹РІР°РµРј С‚РѕР»СЊРєРѕ Р°РєС‚РёРІРЅС‹Рµ Р·Р°РїРёСЃРё
                                                        ) adr
                                                             left join ais.city cty
                                                             on adr.cityisn = cty.isn
@@ -283,16 +290,16 @@ as
                         on tt.isn = adr.adr_subjisn
                         left join ( select --+ ordered use_nl(t p)
                                           ph.*,
-                                          decode(ph.smsphone,null, null,ais.sms.pformatphone(ph.smsphone)) as sms_phone
+                                          decode(ph.smsphone,null, null,ais.sms_pFormatPhone(ph.smsphone::character varying)) as sms_phone
                                         from
-                                          ( select --+ ordered use_nl(t p dx)
+                                          ( select distinct --+ ordered use_nl(t p dx)
                                                   p.subjisn as ph_subjisn,
-                                                  max(decode(p.classisn, 424, p.phone)) keep(dense_rank first order by decode(p.classisn, 424, 0, 1), p.updated desc) as email,
-                                                  max(decode(p.classisn, 1482515703, p.phone)) keep(dense_rank first order by decode(p.classisn, 1482515703, 0, 1), p.updated desc) as serv_phone,
-                                                  max(decode(p.classisn, 25152816, p.phone)) keep(dense_rank first order by decode(p.classisn, 25152816, 0, 1), p.updated desc) as mobilephone,
-                                                  max(decode(p.classisn, 420, p.phone)) keep(dense_rank first order by decode(p.classisn, 420, 0, 1), p.updated desc) as phone,
-                                                  max(decode(p.classisn, 29155416, p.phone)) keep(dense_rank first order by decode(p.classisn, 29155416, 0, 1), p.updated desc) as home_phone,
-                                                  max(oracompat.nvl2(dx.classisn1, p.remark || p.phone, null)) keep(dense_rank first order by oracompat.nvl2(dx.classisn1, 0, 1), dx.classisn2, p.updated desc) as smsphone
+                                                  first_value(decode(p.classisn, 424, p.phone)) over (partition by p.subjisn order by decode(p.classisn, 424, 0, 1), p.updated desc,decode(p.classisn, 424, p.phone) desc) as email,
+                                                  first_value(decode(p.classisn, 1482515703, p.phone)) over (partition by p.subjisn order by decode(p.classisn, 1482515703, 0, 1), p.updated desc, decode(p.classisn, 1482515703, p.phone) desc) as serv_phone,
+                                                  first_value(decode(p.classisn, 25152816, p.phone)) over (partition by p.subjisn order by decode(p.classisn, 25152816, 0, 1), p.updated desc,decode(p.classisn, 25152816, p.phone) desc) as mobilephone,
+                                                  first_value(decode(p.classisn, 420, p.phone)) over (partition by p.subjisn order by decode(p.classisn, 420, 0, 1), p.updated desc, decode(p.classisn, 420, p.phone) desc) as phone,
+                                                  first_value(decode(p.classisn, 29155416, p.phone)) over (partition by p.subjisn order by decode(p.classisn, 29155416, 0, 1), p.updated desc, decode(p.classisn, 29155416, p.phone) desc) as home_phone,
+                                                  first_value(oracompat.nvl2(dx.classisn1, (p.remark || p.phone)::numeric, null::numeric)) over (partition by p.subjisn order by oracompat.nvl2(dx.classisn1, 0::numeric, 1::numeric), dx.classisn2, p.updated desc, oracompat.nvl2(dx.classisn1, (p.remark || p.phone)::numeric, null::numeric) desc) as smsphone
                                                 from
                                                       tt
                                                         inner join ais.subphone_t p
@@ -300,7 +307,6 @@ as
                                                         left join ais.dicx dx
                                                         on p.classisn = dx.classisn1
                                                 where dx.classisn = 3378432503
-                                            group by p.subjisn
                                           ) ph
                                   ) ph
                         on tt.isn = ph.ph_subjisn
@@ -310,16 +316,20 @@ as
                                                     s.isn as vip_subjisn,
                                                     max(vip.isn) as vipclassisn,
                                                     max(sh.securitystr) as subjsecuritystr,
-                                                    conc(distinct sa.securitystr) as addresssecuritystr,
-                                                    conc(distinct sp.securitystr) as phonesecuritystr
+                                                    string_agg(distinct sa.securitystr) as addresssecuritystr,
+                                                    string_agg(distinct sp.securitystr) as phonesecuritystr
                                                   from
-                                                        tt_rowid t
+                                                        storage_adm.tt_rowid t
                                                             inner join ais.subject_t s
                                                             on t.isn = s.isn
                                                             left join (select isn 
-                                                                            from dicti d 
-                                                                            start with isn in (11634718, 2431326703) 
-                                                                            connect by prior isn = parentisn) vip
+                                                                            from ais.dicti_nh d 
+                                                                            where shared_system.is_subtree(d.__hier, 11634718)
+                                                                        union all
+                                                                        select isn    
+                                                                            from ais.dicti_nh d
+                                                                            where shared_system.is_subtree(d.__hier,2431326703)
+                                                                            ) vip
                                                             on s.classisn = vip.isn
                                                             left join ais.subhuman_t sh
                                                             on s.isn = sh.isn
@@ -338,12 +348,12 @@ as
                         on tt.isn = vip.vip_subjisn
                         left join (select --+ ordered use_nl(t sh)
                                          sh.isn as sh_subjisn,
-                                         sh.birthday, rownum as rn
+                                         sh.birthday
                                        from
-                                             tt_rowid t
+                                             storage_adm.tt_rowid t
                                                 inner join ais.subhuman_t sh
                                                 on t.isn = sh.isn
-                                       where sh.birthday is not null   -- отбираем только записи со значащими показателями
+                                       where sh.birthday is not null   -- РѕС‚Р±РёСЂР°РµРј С‚РѕР»СЊРєРѕ Р·Р°РїРёСЃРё СЃРѕ Р·РЅР°С‡Р°С‰РёРјРё РїРѕРєР°Р·Р°С‚РµР»СЏРјРё
                                   ) sh
                         on tt.isn = sh.sh_subjisn          
           ) s
@@ -353,16 +363,16 @@ as
             on s.subjisn = optaddr.subjisn
             left join (select --+ ordered use_nl(t q)
                                q.objisn as subjisn,
-                               max(decode(q.request, '1', 'y', 'n')) as clientisarrested  -- признак "арест"
-                             from tt_rowid t
+                               max(decode(q.request, '1', 'Y', 'N')) as clientisarrested  -- РїСЂРёР·РЅР°Рє "Р°СЂРµСЃС‚"
+                             from storage_adm.tt_rowid t
                                     inner join  ais.queue q
                                     on t.isn = q.objisn
-                             where q.classisn = 1175052903   -- страхователи/полисы под арестом (new) / c.get('qeinarrestednew')
+                             where q.classisn = 1175052903   -- СЃС‚СЂР°С…РѕРІР°С‚РµР»Рё/РїРѕР»РёСЃС‹ РїРѕРґ Р°СЂРµСЃС‚РѕРј (new) / c.get('qeinarrestednew')
                                    and q.objisn2 is null
-                                   and q.formisn = 33024916  -- юр. лицо / c.get('fmlegal')
-                                   and q.status = 'w'        -- как в аис
-                                   and q.request = '1'       -- пока только одно поле про арест, поэтому сразу отбираю только арестованых
+                                   and q.formisn = 33024916  -- СЋСЂ. Р»РёС†Рѕ / c.get('fmlegal')
+                                   and q.status = 'W'        -- РєР°Рє РІ Р°РёСЃ
+                                   and q.request = '1'       -- РїРѕРєР° С‚РѕР»СЊРєРѕ РѕРґРЅРѕ РїРѕР»Рµ РїСЂРѕ Р°СЂРµСЃС‚, РїРѕСЌС‚РѕРјСѓ СЃСЂР°Р·Сѓ РѕС‚Р±РёСЂР°СЋ С‚РѕР»СЊРєРѕ Р°СЂРµСЃС‚РѕРІР°РЅС‹С…
                          group by q.objisn
                         ) q
-            on s.subjisn = q.subjisn
+            on s.subjisn = q.subjisn 
 );

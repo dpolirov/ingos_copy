@@ -1,4 +1,4 @@
-create or replace view v_tt_buhbody_reins (
+create or replace view storage_adm.v_tt_buhbody_reins (
    parentisn,
    bodyisn,
    code,
@@ -33,7 +33,7 @@ create or replace view v_tt_buhbody_reins (
 as
 (
 
-    select --+ ordered use_nl(opr)
+        select --+ ordered use_nl(opr)
          s.parentisn,
          s.bodyisn,
          s.code,
@@ -46,7 +46,7 @@ as
          s.dssubjisn ,
          s.amountsum,
          s.fullamountsum,
-         oracompat.nvl(s.amountsum/s.fullamountsum,1) as dskoef,
+         oracompat.nvl(s.amountsum/s.fullamountsum,1::numeric) as dskoef,
          s.docsumcnt,
          s.dsisn,
          s.discr,
@@ -66,28 +66,22 @@ as
          subaccisn,
          fid
     from
-        ...
-        left join 
-        (select isn, unnest(__hier) as __hier_isn
-            from docsum
-            where splitisn is null
-        ) as q on q.__hier_isn = s.splitisn
-        (
+            (
             select --+ ordered use_nl(b sd ba pc pd bh)
                   b.parentisn,
                   b.isn bodyisn,
                   b.code, 
-                  oracompat.nvl(b.damountrub,0) damountrub,
-                  oracompat.nvl(b.camountrub,0) camountrub,
+                  oracompat.nvl(b.damountrub,0::numeric) damountrub,
+                  oracompat.nvl(b.camountrub,0::numeric) camountrub,
                   b.dateval, 
                   b.oprisn,
                   b.subaccisn,
                   b.subjisn,
                   b.agrisn,
-                  sum (gcc2.gcc2(oracompat.nvl (pc.amount, pd.amount),
+                  sum (shared_system.gcc2(oracompat.nvl (pc.amount, pd.amount),
                   oracompat.nvl(pc.currisn,pd.currisn),35,b.dateval)) over (partition by b.isn) as fullamountsum,
                   count (*) over (partition by b.isn) as docsumcnt,
-                  gcc2.gcc2(oracompat.nvl (pc.amount, pd.amount),oracompat.nvl(pc.currisn,pd.currisn),35,b.dateval) as amountsum,
+                  shared_system.gcc2(oracompat.nvl (pc.amount, pd.amount),oracompat.nvl(pc.currisn,pd.currisn),35,b.dateval) as amountsum,
                   oracompat.nvl (pc.isn, pd.isn) as dsisn,
                   oracompat.nvl (pc.subjisn, pd.subjisn) as dssubjisn,
                   oracompat.nvl (pc.agrisn, pd.agrisn) as dsagrisn,
@@ -105,36 +99,43 @@ as
                   oracompat.nvl (pc.reaccisn,pd.reaccisn) as reaccisn,
                   sd.statcode,
                   bh.fid
-              from tt_rowid t
-                        inner join buhbody b
+              from storage_adm.tt_rowid t
+                        inner join ais.buhbody b
                         on t.isn = b.isn
-                        inner join buhsubacc ba
+                        inner join ais.buhsubacc ba
                         on b.subaccisn = ba.isn
                         inner join (select subaccisn,statcode 
                                         from storages.v_rep_subacc4dept 
                                         where statcode in
                                             (select statcode 
-                                                from rep_statcode 
-                                                where grp in ('входящее перестрахование','исходящее перестрахование'))
+                                                from storages.rep_statcode 
+                                                where grp in ('РІС…РѕРґСЏС‰РµРµ РїРµСЂРµСЃС‚СЂР°С…РѕРІР°РЅРёРµ','РёСЃС…РѕРґСЏС‰РµРµ РїРµСЂРµСЃС‚СЂР°С…РѕРІР°РЅРёРµ'))
                                      union 
                                      select isn,cast(oracompat.substr(id,1,3) as numeric) 
-                                        from buhsubacc 
+                                        from ais.buhsubacc 
                                         where (id like '913%' or id like '914%')
-                                            and dateend >= '31-dec-2010'
+                                            and dateend >= to_date('31-dec-2010','dd-mon-yyyy')
                                     ) sd
                         on b.subaccisn = sd.subaccisn
-                        inner join buhhead bh
+                        inner join ais.buhhead bh
                         on b.headisn = bh.isn
-                        left join docsum pc
+                        left join ais.docsum pc
                         on b.isn = pc.creditisn
-                        left join docsum pd
+                        and pc.discr between 'F' and 'P'
+                        left join ais.docsum pd
                         on b.isn = pd.debetisn
-              where pc.discr between 'f' and 'p'
-                  and pd.discr between 'f' and 'p'
-                  and  sd.statcode is not null
-                  and oracompat.nvl (b.damountrub,b.camountrub) <> 0              -- условие из   vz_repbuhbody_list
-                  and b.status = 'а'                                  -- условие из   vz_repbuhbody_list
-                  and b.oprisn not in (9534516, 24422716)           -- условие из   vz_repbuhbody_list
+                        and pd.discr between 'F' and 'P'
+              where 
+                    sd.statcode is not null
+                  and oracompat.nvl (b.damountrub,b.camountrub) <> 0              -- СѓСЃР»РѕРІРёРµ РёР·   vz_repbuhbody_list
+                  and b.status = 'Рђ'                                  -- СѓСЃР»РѕРІРёРµ РёР·   vz_repbuhbody_list
+                  and b.oprisn not in (9534516, 24422716)           -- СѓСЃР»РѕРІРёРµ РёР·   vz_repbuhbody_list
             --  and b.dateval<=ba.dateend
         )s
+        left join 
+        (select isn, unnest(__hier) as __hier_isn
+            from ais.docsum_nh
+            where splitisn is null
+        ) as q 
+        on q.__hier_isn = s.splitisn
 );

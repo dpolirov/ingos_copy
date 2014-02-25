@@ -1,4 +1,4 @@
-create or replace view v_rep_agr_salers_line (
+create or replace view storage_adm.v_rep_agr_salers_line (
    agrisn,
    datebeg,
    dateend,
@@ -18,14 +18,14 @@ create or replace view v_rep_agr_salers_line (
 as
 (
     with p as (
-    -- sts 24.08.2012 - âüşõà ïî ïğîäàâöàì (àíàëîã tt_agr_salers_line)
-    -- èñïîëüçóåòñÿ òàáëèöà storage_adm.tt_rep_agr_salers, êîòîğàÿ çàïîëíÿåòñÿ ïğè çàãğóçêå òàáëèöû tt_agr_salers
-    -- ïğè çàãğóçêå õğàíèëèùà ïî ëîãàì
+    -- sts 24.08.2012 - Ğ²ÑŒÑÑ…Ğ° Ğ¿Ğ¾ Ğ¿Ñ€Ğ¾Ğ´Ğ°Ğ²Ñ†Ğ°Ğ¼ (Ğ°Ğ½Ğ°Ğ»Ğ¾Ğ³ tt_agr_salers_line)
+    -- Ğ¸ÑĞ¿Ğ¾Ğ»ÑŒĞ·ÑƒĞµÑ‚ÑÑ Ñ‚Ğ°Ğ±Ğ»Ğ¸Ñ†Ğ° storage_adm.tt_rep_agr_salers, ĞºĞ¾Ñ‚Ğ¾Ñ€Ğ°Ñ Ğ·Ğ°Ğ¿Ğ¾Ğ»Ğ½ÑĞµÑ‚ÑÑ Ğ¿Ñ€Ğ¸ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞµ Ñ‚Ğ°Ğ±Ğ»Ğ¸Ñ†Ñ‹ tt_agr_salers
+    -- Ğ¿Ñ€Ğ¸ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞµ Ñ…Ñ€Ğ°Ğ½Ğ¸Ğ»Ğ¸Ñ‰Ğ° Ğ¿Ğ¾ Ğ»Ğ¾Ğ³Ğ°Ğ¼
 
                   select --+ ordered use_nl(t ar) index(ar x_rep_agr_salers_agr)
                           distinct
                             agrisn,
-                            -- sts - óáğàë nvl(), ò.ê. â íîâîé âåğñèè datebeg è dateend âñåãäà çàïîëíåíû
+                            -- sts - ÑƒĞ±Ñ€Ğ°Ğ» nvl(), Ñ‚.Ğº. Ğ² Ğ½Ğ¾Ğ²Ğ¾Ğ¹ Ğ²ĞµÑ€ÑĞ¸Ğ¸ datebeg Ğ¸ dateend Ğ²ÑĞµĞ³Ğ´Ğ° Ğ·Ğ°Ğ¿Ğ¾Ğ»Ğ½ĞµĞ½Ñ‹
                             datebeg,
                             dateend
                       from
@@ -50,65 +50,82 @@ as
             salerfdept,
             salerfdept0isn
         from (
-              select --+ ordered use_nl(per ar d1) index(ar x_rep_agr_salers_agr)
-                    per.agrisn,
-                    per.db as datebeg,
-                    per.de as dateend,
-                    --max(decode(agrsalerclassisn ,1738886903,null,decode(d1.code ,'sales_g',salerisn))) keep (dense_rank first order by decode(agrsalerclassisn ,1738886903,1,0)) salergoisn ,
-                    first_value(decode(agrsalerclassisn ,1738886903,null,decode(d1.code ,'sales_g',salerisn))) over (partition by per.agrisn, per.db, per.de order by decode(agrsalerclassisn ,1738886903,1,0)) salergoisn,
-                   -- max(decode(agrsalerclassisn ,1738886903,null,decode(d1.code ,'sales_g',salerclassisn)))  keep (dense_rank first order by decode(agrsalerclassisn ,1738886903,1,0)) salergoclassisn,
-                    first_value(decode(agrsalerclassisn ,1738886903,null,decode(d1.code ,'sales_g',salerclassisn))) over (partition by per.agrisn, per.db, per.de order by decode(agrsalerclassisn ,1738886903,1,0)) salergoclassisn,
-                    --max(decode(agrsalerclassisn ,1738886903,null,decode(d1.code ,'sales_g',deptisn)))  keep (dense_rank first order by decode(agrsalerclassisn ,1738886903,1,0)) salergodept,
-                    first_value(decode(agrsalerclassisn ,1738886903,null,decode(d1.code ,'sales_g',deptisn))) over (partition by per.agrisn, per.db, per.de order by decode(agrsalerclassisn ,1738886903,1,0)) salergodept,
-                    --max(decode(agrsalerclassisn ,1738886903,null,decode(d1.code ,'sales_g',dept0isn)))  keep (dense_rank first order by decode(agrsalerclassisn ,1738886903,1,0))  salergodept0isn,
-                    first_value(decode(agrsalerclassisn ,1738886903,null,decode(d1.code ,'sales_g',dept0isn))) over (partition by per.agrisn, per.db, per.de order by decode(agrsalerclassisn ,1738886903,1,0)) salergodept0isn
-                    --max(decode(agrsalerclassisn ,1738886903,salerisn)) salercrgoisn,
-                    max(decode(agrsalerclassisn ,1738886903,salerisn)) over (partition by per.agrisn, per.db, per.de) salercrgoisn,
-                    --max(decode(agrsalerclassisn ,1738886903,salerclassisn))salercrclassisn,
-                    max(decode(agrsalerclassisn ,1738886903,salerclassisn)) over (partition by per.agrisn, per.db, per.de) salercrclassisn,
-                    --max(decode(agrsalerclassisn ,1738886903,deptisn)) salercrgodept,
-                    max(decode(agrsalerclassisn ,1738886903,deptisn)) over (partition by per.agrisn, per.db, per.de) salercrgodept,
-                    --max(decode(agrsalerclassisn ,1738886903,dept0isn)) salercrgodept0isn,
-                    max(decode(agrsalerclassisn ,1738886903,dept0isn)) over (partition by per.agrisn, per.db, per.de) salercrgodept0isn,
-                    --max(decode(d1.code ,'sales_f',salerisn))salerfisn,
-                    max(decode(d1.code ,'sales_f',salerisn)) over (partition by per.agrisn, per.db, per.de) salerfisn,
-                    --max(decode(d1.code ,'sales_f',salerclassisn)) salerfclassisn,
-                    max(decode(d1.code ,'sales_f',salerclassisn)) over (partition by per.agrisn, per.db, per.de) salerfclassisn,
-                    --max(decode(d1.code ,'sales_f',deptisn)) salerfdept,
-                    max(decode(d1.code ,'sales_f',deptisn)) over (partition by per.agrisn, per.db, per.de) salerfdept,
-                    --max(decode(d1.code ,'sales_f',dept0isn)) salerfdept0isn
-                    max(decode(d1.code ,'sales_f',dept0isn)) over (partition by per.agrisn, per.db, per.de) salerfdept0isn
-                from storages.rep_agr_salers ar 
-                        left join ais.dicti d1
-                        on ar.agrsalerclassisn = d1.isn, 
-                       (
-                          select *
-                              from (
-                                    select
-                                          d as db,
-                                          lag(d-1) over(partition by agrisn order by d desc) as de,
-                                          agrisn
-                                        from (
-                                              select distinct agrisn, datebeg as d from p
-                                              union
-                                              select distinct agrisn, dateend+1 as d from p
+                select agrisn,
+                        datebeg,
+                        dateend,
+                        max(salergoisn) as salergoisn,
+                        max(salergoclassisn) as salergoclassisn,
+                        max(salergodept) as salergodept,
+                        max(salergodept0isn) as salergodept0isn,
+                        max(salercrgoisn) as salercrgoisn,
+                        max(salercrclassisn) as salercrclassisn,
+                        max(salercrgodept) as salercrgodept,
+                        max(salercrgodept0isn) as salercrgodept0isn,
+                        max(salerfisn) as salerfisn,
+                        max(salerfclassisn) as salerfclassisn,
+                        max(salerfdept) as salerfdept,
+                        max(salerfdept0isn) as salerfdept0isn
+                    from (
+                          select --+ ordered use_nl(per ar d1) index(ar x_rep_agr_salers_agr)
+                                per.agrisn,
+                                per.db as datebeg,
+                                per.de as dateend,
+                                --max(decode(agrsalerclassisn ,1738886903,null,decode(d1.code ,'sales_g',salerisn))) keep (dense_rank first order by decode(agrsalerclassisn ,1738886903,1,0)) salergoisn ,
+                                first_value(decode(agrsalerclassisn ,1738886903,null,decode(d1.code ,'sales_g',salerisn))) over (order by decode(agrsalerclassisn ,1738886903,1,0) asc) salergoisn,
+                               -- max(decode(agrsalerclassisn ,1738886903,null,decode(d1.code ,'sales_g',salerclassisn)))  keep (dense_rank first order by decode(agrsalerclassisn ,1738886903,1,0)) salergoclassisn,
+                                first_value(decode(agrsalerclassisn ,1738886903,null,decode(d1.code ,'sales_g',salerclassisn))) over (order by decode(agrsalerclassisn ,1738886903,1,0) asc) salergoclassisn,
+                                --max(decode(agrsalerclassisn ,1738886903,null,decode(d1.code ,'sales_g',deptisn)))  keep (dense_rank first order by decode(agrsalerclassisn ,1738886903,1,0)) salergodept,
+                                first_value(decode(agrsalerclassisn ,1738886903,null,decode(d1.code ,'sales_g',deptisn))) over (order by decode(agrsalerclassisn ,1738886903,1,0) asc) salergodept,
+                                --max(decode(agrsalerclassisn ,1738886903,null,decode(d1.code ,'sales_g',dept0isn)))  keep (dense_rank first order by decode(agrsalerclassisn ,1738886903,1,0))  salergodept0isn,
+                                first_value(decode(agrsalerclassisn ,1738886903,null,decode(d1.code ,'sales_g',dept0isn))) over (order by decode(agrsalerclassisn ,1738886903,1,0) asc) salergodept0isn,
+                                --max(decode(agrsalerclassisn ,1738886903,salerisn)) salercrgoisn,
+                                decode(agrsalerclassisn ,1738886903,salerisn) salercrgoisn,
+                                --max(decode(agrsalerclassisn ,1738886903,salerclassisn))salercrclassisn,
+                                decode(agrsalerclassisn ,1738886903,salerclassisn) salercrclassisn,
+                                --max(decode(agrsalerclassisn ,1738886903,deptisn)) salercrgodept,
+                                decode(agrsalerclassisn ,1738886903,deptisn) salercrgodept,
+                                --max(decode(agrsalerclassisn ,1738886903,dept0isn)) salercrgodept0isn,
+                                decode(agrsalerclassisn ,1738886903,dept0isn) salercrgodept0isn,
+                                --max(decode(d1.code ,'sales_f',salerisn))salerfisn,
+                                decode(d1.code ,'sales_f',salerisn) salerfisn,
+                                --max(decode(d1.code ,'sales_f',salerclassisn)) salerfclassisn,
+                                decode(d1.code ,'sales_f',salerclassisn) salerfclassisn,
+                                --max(decode(d1.code ,'sales_f',deptisn)) salerfdept,
+                                decode(d1.code ,'sales_f',deptisn) salerfdept,
+                                --max(decode(d1.code ,'sales_f',dept0isn)) salerfdept0isn
+                                decode(d1.code ,'sales_f',dept0isn) salerfdept0isn
+                            from storages.rep_agr_salers ar 
+                                    left join ais.dicti d1
+                                    on ar.agrsalerclassisn = d1.isn, 
+                                   (
+                                      select *
+                                          from (
+                                                select
+                                                      d as db,
+                                                      lag(d-interval '1 day') over(partition by agrisn order by d desc) as de,
+                                                      agrisn
+                                                    from (
+                                                          select distinct agrisn, datebeg as d from p
+                                                          union
+                                                          select distinct agrisn, dateend + interval '1 day' as d from p
+                                                        ) x
                                             ) x
-                                ) x
-                          where de is not null
-                    ) per
-                where per.agrisn = ar.agrisn
-                  /*
-                  and (
-                    -- sts - óáğàë nvl(), ò.ê. â íîâîé âåğñèè datebeg è dateend âñåãäà çàïîëíåíû
-                    per.db between ar.datebeg and ar.dateend
-                    or
-                    ar.datebeg between per.db and per.de
-                  )
-                  */
-                      and per.de >= ar.datebeg and per.db <= ar.dateend
+                                      where de is not null
+                                ) per
+                            where per.agrisn = ar.agrisn
+                              /*
+                              and (
+                                -- sts - ÑƒĞ±Ñ€Ğ°Ğ» nvl(), Ñ‚.Ğº. Ğ² Ğ½Ğ¾Ğ²Ğ¾Ğ¹ Ğ²ĞµÑ€ÑĞ¸Ğ¸ datebeg Ğ¸ dateend Ğ²ÑĞµĞ³Ğ´Ğ° Ğ·Ğ°Ğ¿Ğ¾Ğ»Ğ½ĞµĞ½Ñ‹
+                                per.db between ar.datebeg and ar.dateend
+                                or
+                                ar.datebeg between per.db and per.de
+                              )
+                              */
+                                  and per.de >= ar.datebeg and per.db <= ar.dateend
+                        ) as q      
               group by
-                          per.agrisn,
-                          per.db,
-                          per.de
-        )
-)
+                          q.agrisn,
+                          q.datebeg,
+                          q.dateend
+        ) as qq
+);

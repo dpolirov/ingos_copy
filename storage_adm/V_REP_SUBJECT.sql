@@ -1,4 +1,4 @@
-create or replace view v_rep_subject (
+create or replace view storage_adm.v_rep_subject (
    subjisn,
    classisn,
    roleclassisn,
@@ -71,11 +71,11 @@ as
             s.isn subjisn ,s.classisn,s.roleclassisn,s.countryisn,s.branchisn,
             s.juridical,s.resident,s.vip,s.inn,s.id,s.fid,s.code,
             s.shortname,s.fullname,s.active,s.updated,s.updatedby,
-            decode(s.licenseno,null,
-             (select min(extid )from ais.subdoc sd where sd.subjisn = s.isn and classisn in (1735713203,974582025)),
-             s.licenseno) licenseno,
+            decode(s.licenseno::varchar,null,
+             (select min(extid ) from ais.subdoc sd where sd.subjisn = s.isn and classisn in (1735713203,974582025))::varchar,
+             s.licenseno::varchar) licenseno,
             decode(s.licensedate,null,
-             (select trunc( min(signed ) ) from ais.subdoc sd where sd.subjisn=s.isn and classisn in (1735713203,974582025)),
+             (select oracompat.trunc( min(signed )::date) from ais.subdoc sd where sd.subjisn=s.isn and classisn in (1735713203,974582025)),
             s.licensedate)  licensedate,
             s.okpo,s.okohx,s.synisn,
             s.createdby,s.created,
@@ -101,28 +101,28 @@ as
             s.dealer,
             (
              case
-                when s.juridical = 'y' and s.resident = 'y' then
+                when s.juridical = 'Y' and s.resident = 'Y' then
                     (case
-         /*если филиал*/when s.parentsubj is not null and s.inn = psb.inn then
-                            (case /*если филиал и головная ликвидированна*/
+         /*РµСЃР»Рё С„РёР»РёР°Р»*/when s.parentsubj is not null and s.inn = psb.inn then
+                            (case /*РµСЃР»Рё С„РёР»РёР°Р» Рё РіРѕР»РѕРІРЅР°СЏ Р»РёРєРІРёРґРёСЂРѕРІР°РЅРЅР°*/
                                 when
                                   (select max(isn) 
-                                    from obj_attrib oa where oa.objisn = cast(s.parentsubj as numeric) and oa.classisn = c.get('attrliquidation') and dateend <= current_timestamp) is not null
-    /*ais.u.getname(ais.utl.getnumberattrib( to_number(s.parentsubj),'liquidation','c',date # sq(prompt ('отчетная дата'; 'date'))# )) is not null*/
-                                 then oracompat.nvl(ais.reins_utils.getsuccessor(to_number(s.parentsubj),current_timestamp ), cast(s.parentsubj as numeric))
+                                    from ais.obj_attrib oa where oa.objisn = cast(s.parentsubj as numeric) and oa.classisn = shared_system.get('attrliquidation') and dateend <= current_timestamp) is not null
+    /*ais.u.getname(ais.utl.getnumberattrib( to_number(s.parentsubj),'liquidation','c',date # sq(prompt ('РѕС‚С‡РµС‚РЅР°СЏ РґР°С‚Р°'; 'date'))# )) is not null*/
+                                 then oracompat.nvl(shared_system.reins_utils_getsuccessor(s.parentsubj::numeric,current_timestamp::timestamp ), cast(s.parentsubj as numeric))
                                else
                                 cast(s.parentsubj as numeric) end
                             )
-     /*если ликвидация*/when
-    /* ais.u.getname(ais.utl.getnumberattrib(s.subjisn,'liquidation','c',date #sq( prompt ('отчетная дата'; 'date'))# )) is not null  */
+     /*РµСЃР»Рё Р»РёРєРІРёРґР°С†РёСЏ*/when
+    /* ais.u.getname(ais.utl.getnumberattrib(s.subjisn,'liquidation','c',date #sq( prompt ('РѕС‚С‡РµС‚РЅР°СЏ РґР°С‚Р°'; 'date'))# )) is not null  */
                             (select max(isn) 
-                                from obj_attrib oa where oa.objisn = s.isn and oa.classisn = c.get('attrliquidation') and dateend <= current_timestamp) is not null
-                        then oracompat.nvl(ais.reins_utils.getsuccessor(s.isn,current_timestamp ),s.isn)
+                                from ais.obj_attrib oa where oa.objisn = s.isn and oa.classisn = shared_system.get('attrliquidation') and dateend <= current_timestamp) is not null
+                        then oracompat.nvl(shared_system.reins_utils_getsuccessor(s.isn,current_timestamp::timestamp),s.isn)
                         else
                           s.isn 
                      end)
-    /* не резиденты : совпадают регномера и страна регистрации */
-                when  s.resident = 'n' and s.parentsubj is not null and s.regnm = (select max(o.val) keep (dense_rank last order by oracompat.nvl(dateend,'01-jan-3000')) 
+    /* РЅРµ СЂРµР·РёРґРµРЅС‚С‹ : СЃРѕРІРїР°РґР°СЋС‚ СЂРµРіРЅРѕРјРµСЂР° Рё СЃС‚СЂР°РЅР° СЂРµРіРёСЃС‚СЂР°С†РёРё */
+                when  s.resident = 'n' and s.parentsubj is not null and s.regnm = (select distinct first_value(o.val) over (order by oracompat.nvl(dateend::date,to_date('01-01-3000','dd-mm-yyyy')) asc) 
                                                                                         from ais.obj_attrib o where o.objisn = psb.isn and o.classisn = 1813887503)
                      and s.countryisn = psb.countryisn
                 then cast(s.parentsubj as numeric)
@@ -132,84 +132,105 @@ as
         from (
                 select  --+ ordered use_nl(sc) use_merge(sa)
                          sb.*,
-                        (select max(o.val) keep (dense_rank last order by oracompat.nvl(dateend,'01-jan-3000')) 
+                        (select distinct first_value(o.val) over (order by oracompat.nvl(dateend::date,to_date('01-01-3000','dd-mm-yyyy')) asc) 
                             from ais.obj_attrib o where o.objisn = sb.isn and o.classisn = 1813887503) regnm,
                         (select max(o.dateend) 
                             from ais.obj_attrib o where o.objisn = sb.isn and o.classisn = 1813887503) regnmdtend,
                          sc.shortname sbclass,
-                        (select oracompat.nvl(min(oracompat.nvl(dateend,decode(isn,null,null,'01-jan-3000'))) ,'01-jan-1900')
+                        (select oracompat.nvl(min(oracompat.nvl(dateend::date,decode(isn,null,null,to_date('01-01-3000','dd-mm-yyyy')))) ,to_date('01-01-1900','dd-mm-yyyy'))
                             from ais.subdoc where subjisn = sb.isn and classisn = 1735713203) relicend,
-                        (select oracompat.nvl(min(oracompat.nvl(dateend,decode(isn,null,null,'01-jan-3000'))) ,'01-jan-1900')
+                        (select oracompat.nvl(min(oracompat.nvl(dateend::date,decode(isn,null,null,to_date('01-01-3000','dd-mm-yyyy')))) ,to_date('01-01-1900','dd-mm-yyyy'))
                             from ais.subdoc where subjisn = sb.isn and classisn = 974582025) licend,
-                         case  when resident = 'n' then oracompat.nvl(namelat,sb.fullname) else sb.fullname end nrezname,
+                         case  when resident = 'n' 
+                            then oracompat.nvl(namelat,sb.fullname) 
+                            else sb.fullname 
+                         end nrezname,
                         (select max(o.val) 
                             from ais.obj_attrib o where o.objisn = sb.isn and o.classisn = 2453825203) likvidstatus,
                           (select max(o.dateend) 
                             from ais.obj_attrib o where o.objisn = sb.isn and o.classisn = 2453825203) likvidstatusdtend,
-                         (select max(o.val) keep (dense_rank first order by oracompat.nvl(datebeg,'01-jan-1900') desc) 
+                         (select distinct first_value(o.val) over (order by oracompat.nvl(datebeg::date,to_date('01-01-1900','dd-mm-yyyy')) desc, o.val desc) 
                             from ais.obj_attrib o where o.objisn = sb.isn and o.classisn = 1979965303) r_best,
-                         (select max(o.val) keep (dense_rank first order by oracompat.nvl(datebeg,'01-jan-1900') desc)
+                         (select distinct first_value(o.val) over (order by oracompat.nvl(datebeg::date,to_date('01-01-1900','dd-mm-yyyy')) desc, o.val desc) 
                             from ais.obj_attrib o where o.objisn = sb.isn and o.classisn = 1979962403) r_fitch,
-                         (select max(o.val) keep (dense_rank first order by oracompat.nvl(datebeg,'01-jan-1900') desc)
+                         (select distinct first_value(o.val) over (order by oracompat.nvl(datebeg::date,to_date('01-01-1900','dd-mm-yyyy')) desc, o.val desc) 
                             from ais.obj_attrib o where o.objisn = sb.isn and o.classisn = 1979960103) r_moodys,
-                         (select max(o.val) keep (dense_rank first order by oracompat.nvl(datebeg,'01-jan-1900') desc)
+                         (select distinct first_value(o.val) over (order by oracompat.nvl(datebeg::date,to_date('01-01-1900','dd-mm-yyyy')) desc, o.val desc) 
                             from ais.obj_attrib o where o.objisn = sb.isn and o.classisn = 1979958603) r_sp,
-                         (select max(o.val)keep (dense_rank first order by oracompat.nvl(datebeg,'01-jan-1900') desc) 
+                         (select distinct first_value(o.val) over (order by oracompat.nvl(datebeg::date,to_date('01-01-1900','dd-mm-yyyy')) desc, o.val desc) 
                             from ais.obj_attrib o where o.objisn = sb.isn and o.classisn = 1979966903) r_weiss,    
-                        (select max(o.val)keep (dense_rank first order by oracompat.nvl(datebeg,'01-jan-1900') desc) 
+                        (select distinct first_value(o.val) over (order by oracompat.nvl(datebeg::date,to_date('01-01-1900','dd-mm-yyyy')) desc, o.val desc) 
                             from ais.obj_attrib o where o.objisn=sb.isn and o.classisn = 3019835703) valaam_name,
-                        (select max(so.humanisn)keep (dense_rank first order by so.updated)
-                            from subowner so, storage_source.rep_dept rd 
+                        (select distinct first_value(so.humanisn) over (order by so.updated asc, so.humanisn asc)
+                            from ais.subowner so, storage_source.rep_dept rd 
                             where so.subjisn = sb.isn and so.deptisn = rd.deptisn
                                   and (rd.dept1isn = 3381054603 or rd.oisn = 1746865203 or rd.dept2isn in(3381054003,1393203203))
                         ) crisn,
-                        (select max(so.deptisn)keep(dense_rank first order by so.updated)
-                            from subowner so, storage_source.rep_dept rd
+                        (select distinct first_value(so.deptisn) over (order by so.updated asc, so.deptisn asc)
+                            from ais.subowner so, storage_source.rep_dept rd
                             where so.subjisn = sb.isn and so.deptisn = rd.deptisn
                                 and (rd.dept1isn = 3381054603 or rd.oisn = 1746865203 or rd.dept2isn in(3381054003,1393203203))
                         ) crdeptisn,
-                        (select max(o.valn)keep (dense_rank first order by oracompat.nvl(datebeg,'01-jan-1900') desc) 
+                        (select distinct first_value(o.valn) over (order by oracompat.nvl(datebeg::date,to_date('01-01-1900','dd-mm-yyyy')) desc, o.valn desc) 
                             from ais.obj_attrib o where o.objisn = sb.isn and o.classisn = 1693932103) dealer,
                          sa.addrcode,
                          sa.addrtype,
                          sa.cityisn,
                          sa.postcode,
                          sa.address,
-                         decode(sb.parentisn,null,null,
-                                    (select /*+ optimizer_features_enable('11.1.0.6') */
-                                            isn
-                                         from ais.subject_t ssb
-                                          --where parentisn is null
-                                          where connect_by_isleaf = 1
-                                         start with ssb.isn = sb.parentisn
-                                         connect by prior ssb.parentisn = ssb.isn and oracompat.nvl(ssb.resident,'m') = oracompat.nvl(sb.resident,'m')
-                                    )) parentsubj
-                    from tt_rowid t
+                         decode(sb.parentisn,null,null, t1.isn) parentsubj
+                    from storage_adm.tt_rowid t
                             inner join ais.subject_t sb
                             on t.isn = sb.isn
+                            left join (select t1.isn
+                                            from (
+                                                    select ssb.isn,
+                                                           unnest(ssb.__hier) as unh,
+                                                           ssb.resident,
+                                                           ssb.parentisn
+                                                     from ais.subject_t_nh ssb
+                                                ) t1
+                                                inner join (
+                                                             select sb.parentisn,
+                                                                    sb.resident
+                                                                from ais.subject_t sb) t2
+                                                on t1.unh = t2.parentisn
+                                            where oracompat.nvl(t1.resident,'m') = oracompat.nvl(t2.resident,'m')
+                                                and t1.parentisn is null
+                                        ) as t1
+                            on t1.isn = sb.isn            
                             left join ais.dicti sc
                             on sc.isn = sb.classisn
-                            left join (select subjisn,
-                                                max(dc.code) keep (dense_rank first  order by decode(cityisn,null,1,0), dc.code,sa.isn) addrcode,
-                                                max(dc.shortname) keep (dense_rank first  order by decode(cityisn,null,1,0), dc.code,sa.isn) addrtype,
-                                                max(countryisn) keep (dense_rank first  order by decode(cityisn,null,1,0), dc.code,sa.isn) countryisn,
-                                                max(cityisn)keep (dense_rank first  order by decode(cityisn,null,1,0), dc.code,sa.isn) cityisn,
-                                                max(postcode) keep (dense_rank first  order by decode(cityisn,null,1,0), dc.code,sa.isn) postcode,
-                                                max(address) keep (dense_rank first  order by decode(cityisn,null,1,0), dc.code,sa.isn) address
-                                            from tt_rowid t,
-                                                ais.subaddr_t sa,
-                                                dicti dc
-                                            where sa.classisn = dc.isn
-                                            and t.isn = sa.subjisn
-                                        group by subjisn
-                                        ) sa 
+                            left join ( select sa.subjisn, 
+                                                max(sa.addrcode) as addrcode,
+                                                max(sa.addrtype) as addrtype,
+                                                max(sa.countryisn) as countryisn,
+                                                max(sa.cityisn) as cityisn,
+                                                max(sa.postcode) as postcode,
+                                                max(sa.address) as address
+                                            from    
+                                                (select distinct subjisn,
+                                                                    first_value(dc.code) over (order by decode(cityisn,null,1,0) asc, dc.code asc,sa.isn asc) addrcode,
+                                                                    first_value(dc.shortname) over (order by decode(cityisn,null,1,0) asc, dc.code asc,sa.isn asc) addrtype,
+                                                                    first_value(countryisn) over (order by decode(cityisn,null,1,0) asc, dc.code asc,sa.isn asc) countryisn,
+                                                                    first_value(cityisn)over (order by decode(cityisn,null,1,0) asc, dc.code asc,sa.isn asc) cityisn,
+                                                                    first_value(postcode) over (order by decode(cityisn,null,1,0) asc, dc.code asc,sa.isn asc) postcode,
+                                                                    first_value(address) over (order by decode(cityisn,null,1,0) asc, dc.code asc,sa.isn asc) address
+                                                                from storage_adm.tt_rowid t,
+                                                                    ais.subaddr_t sa,
+                                                                    ais.dicti dc
+                                                                where sa.classisn = dc.isn
+                                                                and t.isn = sa.subjisn
+                                                ) as sa
+                                          group by subjisn
+                                    ) sa 
                             on sb.isn = sa.subjisn
          ) s
             left join ais.subject_t psb
             on s.parentsubj = psb.isn
-            left join subbank sbb
+            left join ais.subbank sbb
             on s.isn = sbb.isn
-            left join dicti psbcl
+            left join ais.dicti psbcl
             on psb.classisn = psbcl.isn
             left join ais.subject_t updby
             on s.updatedby = updby.isn

@@ -1,4 +1,4 @@
-create or replace view v_rep_agent_ranks (
+create or replace view storage_adm.v_rep_agent_ranks (
    agrisn,
    addisn,
    is_move_obj_addisn,
@@ -40,82 +40,92 @@ create or replace view v_rep_agent_ranks (
 as
 (
     with agr as (
-                -- äàííûå ïî àãåíòàì, ïğèâÿçàííûì (ïî äàòå íà÷àëà) ê àääåíäóìàì (òàğàğà)
-                  select --+ ordered use_nl(ra a)
+	select --+ ordered use_nl(ra a)
                         ra.agrisn,
                         ra.agr_id,
                         ra.agr_datebeg,
                         ra.agr_dateend,
                         ra.agr_datesign,
                         ra.agr_ruleisn,
-                        oracompat.nvl(a.datebeg, ra.agr_datebeg) as datebeg,
-                        lead(a.datebeg, 1, ra.agr_dateend) over(partition by ra.agrisn order by a.datebeg nulls first) as dateend,
-                        decode(a.ruleisn, 37564716, 1, 0) as is_move_obj, -- ïåğåíîñ òñ
-                        decode(a.ruleisn, 34710416, 1, 0) as is_add_cancel, -- ïğåêğàùåíèå äîãîâîğà
+                        oracompat.nvl(a.datebeg::timestamp, ra.agr_datebeg::timestamp) as datebeg,
+                        lead(a.datebeg, 1, ra.agr_dateend) over(partition by ra.agrisn order by a.datebeg,
+                                                                                                    case when a.datebeg is null
+                                                                                                            then 1 else 0
+                                                                                                    end desc) as dateend,
+                        decode(a.ruleisn, 37564716, 1, 0) as is_move_obj, -- Ğ¿ĞµÑ€ĞµĞ½Ğ¾Ñ Ñ‚Ñ
+                        decode(a.ruleisn, 34710416, 1, 0) as is_add_cancel, -- Ğ¿Ñ€ĞµĞºÑ€Ğ°Ñ‰ĞµĞ½Ğ¸Ğµ Ğ´Ğ¾Ğ³Ğ¾Ğ²Ğ¾Ñ€Ğ°
                         oracompat.nvl(a.isn, ra.agrisn) as addisn,
                         oracompat.nvl(a.id, ra.agr_id) as addid,
                         oracompat.nvl(a.ruleisn, ra.agr_ruleisn) as ruleisn
                       from
                            (select --+ ordered use_nl(t ra) use_hash(carrules)
                                   t.isn as agrisn,
-                                  -- àòğèáóòû äîãîâîğà
+                                  -- Ğ°Ñ‚Ñ€Ğ¸Ğ±ÑƒÑ‚Ñ‹ Ğ´Ğ¾Ğ³Ğ¾Ğ²Ğ¾Ñ€Ğ°
                                   ra.id as agr_id,
                                   oracompat.trunc(ra.datebeg) as agr_datebeg,
                                   oracompat.trunc(ra.dateend) as agr_dateend,
                                   oracompat.trunc(ra.datesign) as agr_datesign,
                                   ra.ruleisn as agr_ruleisn,
-                                  oracompat.nvl2(carrules.isn, ra.agrisn, null) as parentisn  -- áóäåì èñêàòü àääåíäóìû òîëüêî äëÿ ìîòîğíîãî ñòğàõîâàíèÿ
+                                  oracompat.nvl2(carrules.isn, ra.agrisn, null) as parentisn  -- Ğ±ÑƒĞ´ĞµĞ¼ Ğ¸ÑĞºĞ°Ñ‚ÑŒ Ğ°Ğ´Ğ´ĞµĞ½Ğ´ÑƒĞ¼Ñ‹ Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ Ğ´Ğ»Ñ Ğ¼Ğ¾Ñ‚Ğ¾Ñ€Ğ½Ğ¾Ğ³Ğ¾ ÑÑ‚Ñ€Ğ°Ñ…Ğ¾Ğ²Ğ°Ğ½Ğ¸Ñ
                                 from
-                                      tt_rowid t
+                                      storage_adm.tt_rowid t
                                         inner join storage_source.repagr ra
                                         on t.isn = ra.agrisn
                                         left join motor.v_dicti_rule carrules
                                         on ra.ruleisn = carrules.isn
-                                where ra.status in ('â', 'ä', 'ù')
+                                where ra.status in ('Ğ’', 'Ğ”', 'Ğ©')
                           ) ra,
                             ais.agreement a
                       where
                         (
-                          (ra.agrisn = a.isn and a.discr = 'ä')  -- äîãîâîğ
+                          (ra.agrisn = a.isn and a.discr = 'Ğ”')  -- Ğ´Ğ¾Ğ³Ğ¾Ğ²Ğ¾Ñ€
                           or
-                          (ra.parentisn = a.parentisn and a.discr = 'à')  -- àääåíäóìû
+                          (ra.parentisn = a.parentisn and a.discr = 'Ğ')  -- Ğ°Ğ´Ğ´ĞµĞ½Ğ´ÑƒĞ¼Ñ‹
                         )
-            ),
-    add_move as (
+),
+add_move as (
                   select
                         a.agrisn,
                         a.addisn,
                         a.addid,
                         a.datebeg,
                         lead(a.datebeg, 1, a.agr_dateend) over (partition by a.agrisn order by a.datebeg) as dateend
-                      from agr a
+                      from storage_adm.agr a
                       where
                         a.is_move_obj = 1
             ),
     add_cancel as (
-                      select
+                      select distinct
                             ad.root_isn,
-                            max(ad.addisn) keep(dense_rank last order by lv) as addisn
+                            first_value(ad.addisn) over (partition by ad.root_isn order by lv asc) as addisn
                           from (
-                                select
-                                      level lv,
-                                      connect_by_root ad.isn as root_isn,
-                                      oracompat.nvl(ad.previsn, ad.isn) addisn
-                                from agreement ad
-                                start with ad.isn in (select distinct agr.addisn 
-                                                            from agr 
-                                                            where agr.is_add_cancel = 1)
-                                connect by ad.isn = prior ad.previsn and ad.premiumsum = 0
+                                 select t1.lv,
+                                        t1.unh as root_isn,
+                                        t1.addisn
+                                    from (
+                                            select unnest(ag.__hier) as unh,
+                                                    shared_system.get_level(ag.__hier) as lv,
+                                                    ag.isn,
+                                                    oracompat.nvl(ag.previsn, ag.isn) as addisn
+                                                from ais.agreement_nh_prev ag    
+                                        ) as t1
+                                        inner join (
+                                                        select a.isn
+                                                            from ais.agreement_nh_prev a
+                                                            where isn in (select distinct agr.addisn 
+                                                                                from agr 
+                                                                                where agr.is_add_cancel = 1)
+                                                ) as t2
+                                        on t1.unh = t2.isn
                             ) ad
-                      group by ad.root_isn
                 )
     select --+ ordered use_nl(a s)
           a.agrisn,
           a.addisn,
           a.is_move_obj_addisn,
-          a.addid,  -- íîìåğ àääåíäóìà (íîìåğ äîãîâîğà äëÿ äîãîâîğà)
+          a.addid,  -- Ğ½Ğ¾Ğ¼ĞµÑ€ Ğ°Ğ´Ğ´ĞµĞ½Ğ´ÑƒĞ¼Ğ° (Ğ½Ğ¾Ğ¼ĞµÑ€ Ğ´Ğ¾Ğ³Ğ¾Ğ²Ğ¾Ñ€Ğ° Ğ´Ğ»Ñ Ğ´Ğ¾Ğ³Ğ¾Ğ²Ğ¾Ñ€Ğ°)
           a.orderno,
-          a.agr_id,       -- íîìåğ äîãîâîğà
+          a.agr_id,       -- Ğ½Ğ¾Ğ¼ĞµÑ€ Ğ´Ğ¾Ğ³Ğ¾Ğ²Ğ¾Ñ€Ğ°
           a.agr_datebeg,
           a.agr_dateend,
           a.agr_datesign,
@@ -128,7 +138,7 @@ as
           a.agentclassisn,
           a.addruleisn,
           a.is_move_obj,
-          a.sharepc_agent_by_add,  -- ïğîöåíò êîìèññèè ïî àãåíòó
+          a.sharepc_agent_by_add,  -- Ğ¿Ñ€Ğ¾Ñ†ĞµĞ½Ñ‚ ĞºĞ¾Ğ¼Ğ¸ÑÑĞ¸Ğ¸ Ğ¿Ğ¾ Ğ°Ğ³ĞµĞ½Ñ‚Ñƒ
           a.agent_sumclassisn,
           a.agent_sumclassisn2,
           a.agent_calcflg,
@@ -145,8 +155,8 @@ as
           a.is_move_obj_dateend,
           a.sharepc_by_is_move_obj,
           a.cnt_agent_by_is_move_obj,
-          a.is_add_cancel,  -- ïğèçíàê àääåíäóìà "ïğåêğàùåíèå äîãîâîğà"
-          a.is_add_cancel_addisn,  -- ññûëêà íà ïåğâûé íåíóëåâîé àääåíäóì/äîãîâîğ îò àääåíäóìà "ïğåêğàùåíèå äîãîâîğà"
+          a.is_add_cancel,  -- Ğ¿Ñ€Ğ¸Ğ·Ğ½Ğ°Ğº Ğ°Ğ´Ğ´ĞµĞ½Ğ´ÑƒĞ¼Ğ° "Ğ¿Ñ€ĞµĞºÑ€Ğ°Ñ‰ĞµĞ½Ğ¸Ğµ Ğ´Ğ¾Ğ³Ğ¾Ğ²Ğ¾Ñ€Ğ°"
+          a.is_add_cancel_addisn,  -- ÑÑÑ‹Ğ»ĞºĞ° Ğ½Ğ° Ğ¿ĞµÑ€Ğ²Ñ‹Ğ¹ Ğ½ĞµĞ½ÑƒĞ»ĞµĞ²Ğ¾Ğ¹ Ğ°Ğ´Ğ´ĞµĞ½Ğ´ÑƒĞ¼/Ğ´Ğ¾Ğ³Ğ¾Ğ²Ğ¾Ñ€ Ğ¾Ñ‚ Ğ°Ğ´Ğ´ĞµĞ½Ğ´ÑƒĞ¼Ğ° "Ğ¿Ñ€ĞµĞºÑ€Ğ°Ñ‰ĞµĞ½Ğ¸Ğµ Ğ´Ğ¾Ğ³Ğ¾Ğ²Ğ¾Ñ€Ğ°"
           s.classisn as subjclassisn
     from (
           select
@@ -172,15 +182,15 @@ as
                       max(a.datebeg) as add_datebeg,
                       max(a.dateend) as add_dateend,
                       max(a.ruleisn) as addruleisn,
-                      max(a.is_move_obj) as is_move_obj, -- ïåğåíîñ òñ
-                      max(a.is_move_obj_addisn) as is_move_obj_addisn,   -- àääåíäóì "ïåğåíîñ òñ", ê êîòîğîìó îòíîñèòñÿ òåêóùèé àääåíäóì (äëÿ ïåğâîíà÷àëüíîãî ñîñòîÿíèÿ = agrisn)
+                      max(a.is_move_obj) as is_move_obj, -- Ğ¿ĞµÑ€ĞµĞ½Ğ¾Ñ Ñ‚Ñ
+                      max(a.is_move_obj_addisn) as is_move_obj_addisn,   -- Ğ°Ğ´Ğ´ĞµĞ½Ğ´ÑƒĞ¼ "Ğ¿ĞµÑ€ĞµĞ½Ğ¾Ñ Ñ‚Ñ", Ğº ĞºĞ¾Ñ‚Ğ¾Ñ€Ğ¾Ğ¼Ñƒ Ğ¾Ñ‚Ğ½Ğ¾ÑĞ¸Ñ‚ÑÑ Ñ‚ĞµĞºÑƒÑ‰Ğ¸Ğ¹ Ğ°Ğ´Ğ´ĞµĞ½Ğ´ÑƒĞ¼ (Ğ´Ğ»Ñ Ğ¿ĞµÑ€Ğ²Ğ¾Ğ½Ğ°Ñ‡Ğ°Ğ»ÑŒĞ½Ğ¾Ğ³Ğ¾ ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ñ = agrisn)
                       max(a.is_move_obj_id) as is_move_obj_id,
                       max(a.is_move_obj_datebeg) as is_move_obj_datebeg,
                       max(a.is_move_obj_dateend) as is_move_obj_dateend,
                       max(a.is_add_cancel) as is_add_cancel,
                       max(a.is_add_cancel_addisn) as is_add_cancel_addisn,
-                      min(oracompat.nvl(ar.datebeg, '01-jan-1900')) as role_datebeg,
-                      max(oracompat.nvl(ar.dateend, '01-jan-3000')) as role_dateend,
+                      min(oracompat.nvl(ar.datebeg::date, to_date('01-01-1900','dd-mm-yyyy'))) as role_datebeg,
+                      max(oracompat.nvl(ar.dateend::date, to_date('01-01-3000','dd-mm-yyyy'))) as role_dateend,
                       max(ar.classisn) as agentclassisn,
                       sum(ar.sharepc) as sharepc_agent_by_add,
                       max(ar.sumclassisn) as agent_sumclassisn,
@@ -188,7 +198,7 @@ as
                       max(ar.calcflg) as agent_calcflg,
                       sum(ar.base) as agent_base,
                       sum(ar.baseloss) as agent_baseloss,
-                      min(ar.planfact) as agent_planfact,  -- min - ïğèîğèòåò f - ôàêò
+                      min(ar.planfact) as agent_planfact,  -- min - Ğ¿Ñ€Ğ¸Ğ¾Ñ€Ğ¸Ñ‚ĞµÑ‚ f - Ñ„Ğ°ĞºÑ‚
                       max(ar.deptisn) as agent_deptisn
                     from
                         ( select
@@ -200,8 +210,8 @@ as
                                 end as dateend_calc,
                                 oracompat.nvl(add_move.addisn, agr.agrisn) as is_move_obj_addisn,
                                 oracompat.nvl(add_move.addid, agr.agr_id) as is_move_obj_id,
-                                oracompat.nvl(add_move.datebeg, agr.agr_datebeg) as is_move_obj_datebeg,
-                                first_value(agr.dateend - decode(agr.dateend, agr.agr_dateend, 0, 1)) over (partition by oracompat.nvl(add_move.addisn, agr.agrisn) order by agr.datebeg desc) as is_move_obj_dateend,
+                                oracompat.nvl(add_move.datebeg::timestamp, agr.agr_datebeg::timestamp) as is_move_obj_datebeg,
+                                first_value(agr.dateend::timestamp - decode(agr.dateend, agr.agr_dateend, 0, 1) * interval '1 day') over (partition by oracompat.nvl(add_move.addisn, agr.agrisn) order by agr.datebeg desc) as is_move_obj_dateend,
                                 oracompat.nvl(add_cancel.addisn, agr.addisn) as is_add_cancel_addisn
                               from agr
                                         left join add_move
@@ -214,12 +224,12 @@ as
                             inner join ais.agrrole ar
                             on a.agrisn = ar.agrisn
                     where ar.classisn in (
-                                            437,   -- àãåíò
-                                            2481446203, -- àãåíò (áîíóñíàÿ êîìèññèÿ)
-                                            2530118403  -- ãåíåğàëüíûé àãåíò
+                                            437,   -- Ğ°Ğ³ĞµĞ½Ñ‚
+                                            2481446203, -- Ğ°Ğ³ĞµĞ½Ñ‚ (Ğ±Ğ¾Ğ½ÑƒÑĞ½Ğ°Ñ ĞºĞ¾Ğ¼Ğ¸ÑÑĞ¸Ñ)
+                                            2530118403  -- Ğ³ĞµĞ½ĞµÑ€Ğ°Ğ»ÑŒĞ½Ñ‹Ğ¹ Ğ°Ğ³ĞµĞ½Ñ‚
                                         )
-                          and oracompat.nvl(ar.dateend, '01-jan-3000') >= a.datebeg
-                          and oracompat.nvl(ar.datebeg, '01-jan-1900') < a.dateend_calc
+                          and oracompat.nvl(ar.dateend::date, to_date('01-01-3000','dd-mm-yyyy')) >= a.datebeg
+                          and oracompat.nvl(ar.datebeg::date, to_date('01-01-1900','dd-mm-yyyy')) < a.dateend_calc
                 group by
                       a.agrisn,
                       a.addisn,

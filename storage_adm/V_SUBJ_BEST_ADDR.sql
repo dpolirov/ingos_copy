@@ -1,23 +1,23 @@
-create or replace view v_subj_best_addr (
+create or replace view storage_adm.v_subj_best_addr (
    subjisn,
    addrisn,
    subaddr )
 as
 (
     select
-    -- источник данных для витрины с оптимальным адресом, выгружаемой функцией крылова
+    -- РёСЃС‚РѕС‡РЅРёРє РґР°РЅРЅС‹С… РґР»СЏ РІРёС‚СЂРёРЅС‹ СЃ РѕРїС‚РёРјР°Р»СЊРЅС‹Рј Р°РґСЂРµСЃРѕРј, РІС‹РіСЂСѓР¶Р°РµРјРѕР№ С„СѓРЅРєС†РёРµР№ РєСЂС‹Р»РѕРІР°
       s.subjisn,
       s.addrisn,
-      ais.addr_utils.getsubaddr(s.addrisn, 'irdtvmshbf') as subaddr
+      shared_system.addr_utils_getsubaddr(s.addrisn::numeric, 'irdtvmshbf'::varchar) as subaddr
     from (
           select
                 s.subjisn,
-                cast(ais.addr_utils.getaddrisn(s.subjisn) as numeric) as addrisn
+                cast(shared_system.addr_utils_getaddrisn(s.subjisn) as numeric) as addrisn
               from (
                     select distinct sa.subjisn  
                         from 
-                          tt_rowid t,    
-                          ais.subject_t s,  -- для удаления паразитных записей, которые есть в subaddr и нет в subject
+                          storage_adm.tt_rowid t,    
+                          ais.subject_t s,  -- РґР»СЏ СѓРґР°Р»РµРЅРёСЏ РїР°СЂР°Р·РёС‚РЅС‹С… Р·Р°РїРёСЃРµР№, РєРѕС‚РѕСЂС‹Рµ РµСЃС‚СЊ РІ subaddr Рё РЅРµС‚ РІ subject
                           ais.subaddr_t sa
                         where
                               t.isn = s.isn

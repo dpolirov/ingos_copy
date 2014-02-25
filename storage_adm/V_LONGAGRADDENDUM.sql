@@ -1,4 +1,4 @@
-create or replace view v_longagraddendum (
+create or replace view storage_adm.v_longagraddendum (
    agrisn,
    addisn,
    discr,
@@ -14,8 +14,10 @@ as
        a.datebeg,
        a.datesign,
        case a.discr
-         when '‡' then a.premiumsum
-         when '‰' then (select a.premiumsum - oracompat.nvl(sum(z.premiumsum), 0) from agreement_nh z where  z.parentisn = a.isn and z.discr = '‡')
+         when '–ê' then a.premiumsum
+         when '–î' then (select a.premiumsum - oracompat.nvl(sum(z.premiumsum), 0::numeric) 
+                            from ais.agreement_nh z 
+                            where  z.parentisn = a.isn and z.discr = '–ê')
        end as premiumsum,
        a.currisn
     from (select   isn,  
@@ -25,19 +27,19 @@ as
                     datesign, 
                     premiumsum, 
                     currisn 
-                from agreement_nh) as a
+                from ais.agreement_nh) as a
             inner join (select --+ ordered use_nl ( t ag )
                                  distinct   t.isn
-                            from tt_rowid t, agreement_nh ag
+                            from storage_adm.tt_rowid t, ais.agreement_nh ag
                             where ag.isn=t.isn
-                                and sign(oracompat.months_between (ag.dateend,ag.datebeg)-13)=1
-                                and ag.discr in ('‰', '„')
+                                and sign(oracompat.months_between (ag.dateend::date,ag.datebeg::date)-13)=1
+                                and ag.discr in ('–î', '–ì')
                                 and ag.classisn in (select isn
-                                                       from dicti_nh d
-                                                       where hierarchies.is_subtree(__hier,34711216))
+                                                       from ais.dicti_nh d
+                                                       where shared_system.is_subtree(__hier,34711216))
                         ) as t2 
             on a.unisn = t2.isn
-    where oracompat.nvl(a.discr,'y') = '‡'
+    where oracompat.nvl(a.discr,'Y') = '–ê'
 );
 
 /*

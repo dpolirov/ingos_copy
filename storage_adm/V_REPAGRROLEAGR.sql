@@ -1,4 +1,4 @@
-create or replace view v_repagrroleagr (
+create or replace view storage_adm.v_repagrroleagr (
    agrisn,
    agentisn,
    salergoisn,
@@ -54,104 +54,121 @@ create or replace view v_repagrroleagr (
    agent_maxcomission_sharepc )
 as
 (
-    select r.agrisn,
-           max(decode(r.classisn, 437, r.subjisn))keep(dense_rank last order by decode(r.classisn, 437, 1, 0), r.calcflg, r.orderno,r.datebeg desc, r.isn desc) agentisn,  -- агент
-           max(decode(r.code, 'sales_g', r.subjisn))keep(dense_rank last order by decode(r.code, 'sales_g', 1, 0),r.dateend, r.isn) salergoisn,                -- продавец головного офиса
-           max(decode(r.code, 'sales_f', r.subjisn))keep(dense_rank last order by decode(r.code, 'sales_f', 1, 0), r.dateend, r.isn) salerfisn,                 -- продавец филиала
-           max(decode(r.classisn, 1738886903, r.subjisn))keep(dense_rank last order by decode(r.classisn, 1738886903, 1, 0), r.dateend, r.isn) crossalerisn,    -- кросс-продавец головного офиса
-           max(decode(r.classisn, 731194000, r.subjisn))keep(dense_rank last order by decode(r.classisn, 731194000, 1, 0), r.calcflg, r.dateend, r.isn) cardealerisn,      -- автосалон
-           max(decode(r.classisn, 438, r.subjisn))keep(dense_rank last order by decode(r.classisn, 438, 1, 0), r.calcflg, r.dateend, r.isn) brokerisn,                     -- брокер
-           max(decode(r.classisn, 13381416, r.subjisn))keep(dense_rank last order by decode(r.classisn, 13381416, 1, 0), r.calcflg, r.dateend, r.isn) partnerisn,          -- партнер
-           max(decode(r.classisn, 682566316, r.subjisn))keep(dense_rank last order by decode(r.classisn, 682566316, 1, 0), r.calcflg, r.dateend, r.isn) leaseficiaryisn,   -- лизингополучатель
-           max(decode(r.classisn, 1064403825, r.subjisn))keep(dense_rank last order by decode(r.classisn, 1064403825, 1, 0), r.calcflg, r.dateend, r.isn) pawnbrokerisn,   -- залогодержатель
-           max(decode(r.classisn, 47228116, r.subjisn))keep(dense_rank last order by decode(r.classisn, 47228116, 1, 0), r.calcflg, r.dateend, r.isn) recommenderisn,      -- рекомендатель
-           max(decode(r.classisn, 1574889603, r.subjisn))keep(dense_rank last order by decode(r.classisn, 1574889603, 1, 0), r.calcflg, r.dateend, r.isn) irecommenderisn, -- внутренний рекомендатель
-           max(decode(r.classisn, 13157916, r.subjisn))keep(dense_rank last order by decode(r.classisn, 13157916, 1, 0), r.calcflg, r.dateend, r.isn) emitisn,             -- эмитент полиса
-           max(decode(r.classisn, 1617366603, r.subjisn))keep(dense_rank last order by decode(r.classisn, 1617366603, 1, 0), r.calcflg, r.dateend, r.isn) bemitisn,        -- эмитент бизнеса
-           max(decode(r.classisn, 437, r.roledeptisn))keep (dense_rank last order by decode(r.classisn, 437, 1, 0), r.calcflg, r.orderno,r.datebeg desc, r.isn desc) agentdeptisn,
-           max(decode(r.classisn, 437, r.juridical))keep (dense_rank last order by decode(r.classisn, 437, 1, 0), r.calcflg, r.orderno,r.datebeg desc, r.isn desc) agentjuridical,
-           max(decode(r.classisn, 437, r.collectflg))keep (dense_rank last order by decode(r.classisn, 437, 1, 0), r.calcflg, r.orderno,r.datebeg desc, r.isn desc) agentcollectflg,
-           count(decode(r.classisn, 437, r.subjisn)) agentcount,
-           count(decode(r.classisn, 13157916, r.subjisn)) emitcount,
-           min(greatest(oracompat.nvl(decode(r.classisn, 13157916, r.sharepc), 0),
-                        oracompat.nvl(decode(r.classisn, 1617366603/*bemittent*/, r.sharepc), 0))) filcommision,
-           min(decode(r.classisn, 1738886903, r.sharepc)) transfercomission,
-           max(decode(r.classisn, 433, r.subjisn))keep(dense_rank last order by decode(r.classisn, 433, 1, 0), r.calcflg,r.datebeg asc, r.isn desc) beneficiaryisn,            -- выгодоприобретатель
-           max(decode(r.classisn, 438, r.roledeptisn))keep(dense_rank last order by decode(r.classisn, 438, 1, 0), r.calcflg, r.datebeg asc, r.isn) brokerdeptisn,
-           max(decode(r.classisn, 438, r.juridical))keep(dense_rank last order by decode(r.classisn, 438, 1, 0), r.calcflg, r.datebeg asc, r.isn) brokerjuridical,
-           max(decode(r.classisn, 438, r.collectflg))keep(dense_rank last order by decode(r.classisn, 438, 1, 0), r.calcflg, r.datebeg asc , r.isn) brokercollectflg,
-           count(decode(r.classisn, 438, r.subjisn)) brokercount,
-           max(decode(r.classisn, 2616961403, r.subjisn))keep(dense_rank last order by decode(r.classisn, 2616961403, 1, 0), r.calcflg, r.dateend, r.isn) headclient,       -- головной клиент
-           max(decode(r.classisn, 437, r.sharepc))keep (dense_rank last order by decode(r.classisn, 437, 1, 0), r.calcflg, r.orderno, r.datebeg desc, r.isn desc) agentsharepc,
-           max(decode(r.classisn, 438, r.sharepc))keep(dense_rank last order by decode(r.classisn, 438, 1, 0), r.calcflg, r.dateend, r.isn) brokersharepc,
-           max(decode(classisn,434,subjisn,435,subjisn,null)) keep(dense_rank last order by decode(classisn,434,1,435,1,0), decode(subjclassisn,12212016,0,658813916,0,1), decode(calcflg,'y',1,0),oracompat.nvl(r.sharepc,0),subjisn) reinclientisn, -- перестрахователь или перестраховщик из участников , брокеров не в приоритет
-           max(decode(r.code, 'sales_g', r.roledeptisn))keep(dense_rank last order by decode(r.code, 'sales_g', 1, 0), /* r.calcflg, */ r.dateend, r.isn) salergodeptisn,                -- подразделение продавца головного офиса
-           max(decode(r.code, 'sales_f', r.roledeptisn))keep(dense_rank last order by decode(r.code, 'sales_f', 1, 0), /* r.calcflg, */ r.dateend, r.isn) salerfdeptisn,                  -- подразделение продавца филиала
-           max(decode(r.classisn, 1943199903, r.subjisn))keep(dense_rank last order by decode(r.classisn, 1943199903, 1, 0), r.calcflg, r.dateend, r.isn) managerkkisn,          --распорядитель кк(комерч. кредит)
-           max(decode(r.classisn, 2846444203, r.subjisn))keep(dense_rank last order by  decode(r.classisn, 2846444203, 1, 0), r.calcflg, r.dateend, r.isn) empopgoisn,  --сотрудник оп го
-           max(decode(r.classisn, 2846444203, r.roledeptisn))keep(dense_rank last order by  decode(r.classisn, 2846444203, 1, 0), r.calcflg, r.dateend, r.isn) empopgodeptisn,
-           max(case 
-                    when r.code = 'sales_g' or r.classisn = 2846444203 
-                        then uprisn 
-               end) keep (dense_rank last order by case 
-                                                           when r.code = 'sales_g' 
-                                                                then 3 
-                                                           when r.classisn = 2846444203 
-                                                                then 2 
-                                                           else 1 
-                                                      end, decode(r.code, 'sales_g', 'y', r.calcflg), r.dateend, r.isn) uprisn, -- egao 17.04.2012 виды аналитики "подразделения ингосстрах"
-           max(decode(r.classisn,1101648603,r.subjisn))keep(dense_rank last order by decode(r.classisn,1101648603,1,0), r.calcflg, r.dateend, r.isn) as empoperu,
-           max(decode(r.code, 'sales_g', r.classisn))keep(dense_rank last order by decode(r.code, 'sales_g', 1, 0), /* r.calcflg, */ r.dateend, r.isn) as salergoclassisn,        -- класс (роль в договоре) продавца головного офиса
-           max(decode(r.code, 'sales_f', r.classisn))keep(dense_rank last order by decode(r.code, 'sales_f', 1, 0), /* r.calcflg, */ r.dateend, r.isn) as salerfclassisn ,         -- класс (роль в договоре) продавца филиала
-           max(decode(r.classisn, 1738886903, r.roledeptisn))keep(dense_rank last order by decode(r.classisn, 1738886903, 1, 0), /* r.calcflg, */ r.dateend, r.isn) as crossalerdeptisn,
-           max(decode(r.classisn, 3081540003, r.subjisn)) keep(dense_rank last order by decode(r.classisn, 3081540003, 1, 0), r.dateend, r.isn) as avtodillerisn,   -- автодилер (cardealerisn уже есть выше как "автосалон", поэтому avtodillerisn)
-           max(decode(r.classisn, 2626553403, r.subjisn)) keep(dense_rank last order by decode(r.classisn, 2626553403, 1, 0), r.dateend, r.isn) as admcuratorisn,   -- административный куратор
-           max(decode(r.classisn, 693962316, r.subjisn)) keep(dense_rank last order by decode(r.classisn, 693962316, 1, 0), r.dateend, r.isn) as doctorcuratorisn,   -- врач-куратор
-           max(decode(r.classisn, 693962016, r.subjisn)) keep(dense_rank last order by decode(r.classisn, 693962016, 1, 0), r.dateend, r.isn) as underwriterisn,   -- андеррайтер
-           max(decode(r.classisn, 444, r.subjisn)) keep(dense_rank last order by decode(r.classisn, 444, 1, 0), r.dateend, r.isn) as underwriteroldisn,   -- андеррайтер(старый)
-           max(decode(r.classisn, 35435216, r.subjisn))keep(dense_rank last order by decode(r.classisn, 35435216, 1, 0), r.calcflg, r.dateend, r.isn) as representativeisn,      -- представитель
-           max(decode(r.classisn, 3676722703, r.subjisn))keep(dense_rank last order by decode(r.classisn, 3676722703, 1, 0), /* r.calcflg, */ r.dateend, r.isn) as crossalerfisn,    -- кросс-продавец филиала
-           max(decode(r.classisn, 3676722703, r.roledeptisn))keep(dense_rank last order by decode(r.classisn, 3676722703, 1, 0), /* r.calcflg, */ r.dateend, r.isn) as crossalerfdeptisn, -- подразделение кросс-продавца филиала
-           max(decode(r.classisn, 437, r.subjisn))keep(dense_rank last order by decode(r.classisn, 437, 1, 0), r.sharepc, r.dateend, r.datebeg, r.isn) as agent_maxcomission_isn,         -- агент с максимальной комиссией
-           max(decode(r.classisn, 4207938903, r.subjisn))keep(dense_rank last order by decode(r.classisn, 4207938903, 1, 0), r.calcflg, r.dateend, r.isn) contractorisn, -- подрядчик
-           avg(decode(r.classisn, 4207938903, r.sharepc)) contrcomission, -- процент подрядчика
-           count(decode(r.classisn, 4207938903, 1, null)) contrcount, -- количество подрядчиков
-           max(decode(r.classisn, 437, r.sharepc))keep(dense_rank last order by decode(r.classisn, 437, 1, 0), r.sharepc, r.dateend, r.datebeg, r.isn) as agent_maxcomission_sharepc
-      from ( select --+ ordered use_nl(t r s sh) use_hash(d rdt) index(r x_repagrrole_agr) index ( sh x_subhuman )
-                    r.agrisn,
-                    r.classisn,
-                    r.subjisn,
-                    oracompat.nvl(r.datebeg, to_date('01-01-1900','dd-mm-yyyy')) datebeg,
-                    oracompat.nvl(r.dateend, to_date('01-01-3000','dd-mm-yyyy')) dateend,
-                    r.sharepc,
-                    r.sharesum,
-                    oracompat.nvl(r.calcflg, 'n') calcflg,
-                    r.deptisn roledeptisn,
-                    d.code,
-                    r.collectflg,
-                    sh.deptisn,
-                    s.juridical,
-                    r.isn,
-                    s.classisn subjclassisn,
-                    rdt.uprisn, -- egao 13.04.2012
-                    abs(r.orderno) as orderno  -- sts 22.05.2012 - сортировка по модулю
-               from tt_rowid t
-                        inner join ais.agrrole r
-                        on t.isn = r.agrisn
-                        left join ( select
-                                             d.isn,
-                                             d.code
-                                        from dicti d
-                                        where d.code in ('sales_g', 'sales_f')
-                                            and d.isn <> 1738886903 ) d
-                        on r.classisn = d.isn
-                        left join subject s
-                        on r.subjisn = s.isn
-                        left join subhuman sh
-                        on r.subjisn = sh.isn
-                        left join rep_dept rdt
-                        on rdt.deptisn = r.deptisn
-                ) r
-     where r.classisn <> 430 -- страхователь
-     group by r.agrisn
+select distinct R.AGRISN,
+
+       -- sts 20.09.2011 - РґРѕР±Р°РІРёР» nvl() РЅР° РґР°С‚С‹ Рё РїСЂРёРІРµР» СЃРѕСЂС‚РёСЂРѕРІРєСѓ СЃРІСЏР·Р°РЅРЅС‹С… РїРѕР»РµР№ Рє РѕРґРЅРѕРјСѓ РІРёРґСѓ
+       -- РЅРїСЂ, РїРѕР»СЏ Р°РіРµРЅС‚Р° РёРјРµР»Рё СЂР°Р·РЅСѓСЋ СЃРѕСЂС‚РёСЂРѕРІРєСѓ РґР»СЏ AGENTISN Рё AGENTJURIDICAL
+       -- kgs Р°РіРµРЅС‚Р°Рј Рё Р±СЂРѕРєРµСЂР°Рј Рё РёС… Р°С‚С‚СЂРёР±СѓС‚Р°Рј РїРѕСЃС‚Р°РІРёР» FIST, R.DATEBEG asc
+
+       first_value(case R.CLASSISN when 437 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 437 then 1 else 0 end desc, R.CALCFLG desc, R.ORDERNO desc, R.DATEBEG, R.ISN, case R.CLASSISN when 437 then R.SUBJISN end desc) as AGENTISN,  -- Р°РіРµРЅС‚
+       first_value(case R.CODE when 'SALES_G' then R.SUBJISN end) over (partition by R.AGRISN order by case R.CODE when 'SALES_G' then 1 else 0 end desc, /*sts 10.10.2012 - С„Р»Р°Рі РЅРµ СѓС‡РёС‚С‹РІР°С‚СЊ (by Р“РѕС€Р°) R.CALCFLG, */ R.DATEEND desc, R.ISN desc, case R.CODE when 'SALES_G' then R.SUBJISN end desc) as SALERGOISN,                -- РїСЂРѕРґР°РІРµС† РіРѕР»РѕРІРЅРѕРіРѕ РѕС„РёСЃР°
+       first_value(case R.CODE when 'SALES_F' then R.SUBJISN end) over (partition by R.AGRISN order by case R.CODE when 'SALES_F' then 1 else 0 end desc, /* R.CALCFLG, */ R.DATEEND desc, R.ISN desc, case R.CODE when 'SALES_F' then R.SUBJISN end desc) as SALERFISN,                 -- РїСЂРѕРґР°РІРµС† С„РёР»РёР°Р»Р°
+       first_value(case R.CLASSISN when 1738886903 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 1738886903 then 1 else 0 end desc, /* R.CALCFLG, */ R.DATEEND desc, R.ISN desc, case R.CLASSISN when 1738886903 then R.SUBJISN end desc) as CROSSALERISN,    -- РєСЂРѕСЃСЃ-РїСЂРѕРґР°РІРµС† РіРѕР»РѕРІРЅРѕРіРѕ РѕС„РёСЃР°
+       first_value(case R.CLASSISN when 731194000 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 731194000 then 1 else 0 end desc, R.CALCFLG desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 731194000 then R.SUBJISN end desc) as CARDEALERISN,      -- Р°РІС‚РѕСЃР°Р»РѕРЅ
+       first_value(case R.CLASSISN when 438 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 438 then 1 else 0 end desc, R.CALCFLG desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 438 then R.SUBJISN end desc) as BROKERISN,                     -- Р±СЂРѕРєРµСЂ
+       first_value(case R.CLASSISN when 13381416 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 13381416 then 1 else 0 end desc, R.CALCFLG desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 13381416 then R.SUBJISN end desc) as PARTNERISN,          -- РїР°СЂС‚РЅРµСЂ
+       first_value(case R.CLASSISN when 682566316 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 682566316 then 1 else 0 end desc, R.CALCFLG desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 682566316 then R.SUBJISN end desc) as LEASEFICIARYISN,   -- Р»РёР·РёРЅРіРѕРїРѕР»СѓС‡Р°С‚РµР»СЊ
+       first_value(case R.CLASSISN when 1064403825 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 1064403825 then 1 else 0 end desc, R.CALCFLG desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 1064403825 then R.SUBJISN end desc) as PAWNBROKERISN,   -- Р·Р°Р»РѕРіРѕРґРµСЂР¶Р°С‚РµР»СЊ
+       first_value(case R.CLASSISN when 47228116 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 47228116 then 1 else 0 end desc, R.CALCFLG desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 47228116 then R.SUBJISN end desc) as RECOMMENDERISN,      -- СЂРµРєРѕРјРµРЅРґР°С‚РµР»СЊ
+       first_value(case R.CLASSISN when 1574889603 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 1574889603 then 1 else 0 end desc, R.CALCFLG desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 1574889603 then R.SUBJISN end desc) as IRECOMMENDERISN, -- РІРЅСѓС‚СЂРµРЅРЅРёР№ СЂРµРєРѕРјРµРЅРґР°С‚РµР»СЊ
+       first_value(case R.CLASSISN when 13157916 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 13157916 then 1 else 0 end desc, R.CALCFLG desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 13157916 then R.SUBJISN end desc) as EMITISN,             -- СЌРјРёС‚РµРЅС‚ РїРѕР»РёСЃР°
+       first_value(case R.CLASSISN when 1617366603 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 1617366603 then 1 else 0 end desc, R.CALCFLG desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 1617366603 then R.SUBJISN end desc) as BEMITISN,        -- СЌРјРёС‚РµРЅС‚ Р±РёР·РЅРµСЃР°
+       first_value(case R.CLASSISN when 437 then R.ROLEDEPTISN end) over (partition by R.AGRISN order by case R.CLASSISN when 437 then 1 else 0 end desc, R.CALCFLG desc, R.ORDERNO desc, R.DATEBEG, R.ISN, case R.CLASSISN when 437 then R.ROLEDEPTISN end desc) as AGENTDEPTISN,
+       first_value(case R.CLASSISN when 437 then R.JURIDICAL end) over (partition by R.AGRISN order by case R.CLASSISN when 437 then 1 else 0 end desc, R.CALCFLG desc, R.ORDERNO desc, R.DATEBEG, R.ISN, case R.CLASSISN when 437 then R.JURIDICAL end desc) as AGENTJURIDICAL,
+       first_value(case R.CLASSISN when 437 then R.COLLECTFLG end) over (partition by R.AGRISN order by case R.CLASSISN when 437 then 1 else 0 end desc, R.CALCFLG desc, R.ORDERNO desc, R.DATEBEG, R.ISN, case R.CLASSISN when 437 then R.COLLECTFLG end desc) as AGENTCOLLECTFLG,
+       count(case R.CLASSISN when 437 then R.SUBJISN end) over (partition by R.AGRISN) as AGENTCOUNT,
+       count(case R.CLASSISN when 13157916 then R.SUBJISN end) over (partition by R.AGRISN) as EMITCOUNT,
+       min(greatest(coalesce(case R.CLASSISN when 13157916/*c.get('emittent')*/ then R.SHAREPC end, 0),
+                    coalesce(case R.CLASSISN when 1617366603/*bemittent*/ then R.SHAREPC end, 0))) over (partition by R.AGRISN) as FILCOMMISION,
+       min(case R.CLASSISN when 1738886903 then R.SHAREPC end) over (partition by R.AGRISN) as TRANSFERCOMISSION,
+       /* sts 12.07.2012 task(34327332503)
+       count(decode(R.CLASSISN, 430, 1)) INSURANTCOUNT,
+       */
+       first_value(case R.CLASSISN when 433 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 433 then 1 else 0 end desc, R.CALCFLG desc, R.DATEBEG desc, R.ISN desc, case R.CLASSISN when 433 then R.SUBJISN end desc) as BENEFICIARYISN,            -- РІС‹РіРѕРґРѕРїСЂРёРѕР±СЂРµС‚Р°С‚РµР»СЊ
+       first_value(case R.CLASSISN when 438 then R.ROLEDEPTISN end) over (partition by R.AGRISN order by case R.CLASSISN when 438 then 1 else 0 end desc, R.CALCFLG desc, R.DATEBEG desc, R.ISN desc, case R.CLASSISN when 438 then R.ROLEDEPTISN end desc) as BROKERDEPTISN,
+       first_value(case R.CLASSISN when 438 then R.JURIDICAL end) over (partition by R.AGRISN order by case R.CLASSISN when 438 then 1 else 0 end desc, R.CALCFLG desc, R.DATEBEG desc, R.ISN desc, case R.CLASSISN when 438 then R.JURIDICAL end desc) as BROKERJURIDICAL,
+       first_value(case R.CLASSISN when 438 then R.COLLECTFLG end) over (partition by R.AGRISN order by case R.CLASSISN when 438 then 1 else 0 end desc, R.CALCFLG desc, R.DATEBEG desc, R.ISN desc, case R.CLASSISN when 438 then R.COLLECTFLG end desc) as BROKERCOLLECTFLG,
+       count(case R.CLASSISN when 438 then R.SUBJISN end) over (partition by R.AGRISN) as BROKERCOUNT,
+       first_value(case R.CLASSISN when 2616961403 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 2616961403 then 1 else 0 end desc, R.CALCFLG desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 2616961403 then R.SUBJISN end desc) as HEADCLIENT,       -- РіРѕР»РѕРІРЅРѕР№ РєР»РёРµРЅС‚
+       first_value(case R.CLASSISN when 437 then R.SHAREPC end) over (partition by R.AGRISN order by case R.CLASSISN when 437 then 1 else 0 end desc, R.CALCFLG desc, R.ORDERNO desc, R.DATEBEG, R.ISN, case R.CLASSISN when 437 then R.SHAREPC end desc) as AGENTSHAREPC,
+       first_value(case R.CLASSISN when 438 then R.SHAREPC end) over (partition by R.AGRISN order by case R.CLASSISN when 438 then 1 else 0 end desc, R.CALCFLG desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 438 then R.SHAREPC end desc) as BROKERSHAREPC,
+       first_value(case classisn when 434 then SubjIsn when 435 then SubjIsn end) over (partition by R.AGRISN order by case classisn when 434 then 1 when 435 then 1 else 0 end desc, case SUBJCLASSISN when 12212016 then 0 when 658813916 then 0 else 1 end desc, case CalcFlg when 'Y' then 1 else 0 end desc, coalesce(R.SHAREPC,0) desc, SubjIsn desc, case classisn when 434 then SubjIsn when 435 then SubjIsn end desc) as REINCLIENTISN, -- РїРµСЂРµСЃС‚СЂР°С…РѕРІР°С‚РµР»СЊ РёР»Рё РїРµСЂРµСЃС‚СЂР°С…РѕРІС‰РёРє РёР· СѓС‡Р°СЃС‚РЅРёРєРѕРІ , Р±СЂРѕРєРµСЂРѕРІ РЅРµ РІ РїСЂРёРѕСЂРёС‚РµС‚
+       -- sts 20.09.2011 - РґРѕР±Р°РІРёР» РїРѕРґСЂР°Р·РґРµР»РµРЅРёСЏ РїСЂРѕРґР°РІС†РѕРІ
+       first_value(case R.CODE when 'SALES_G' then R.ROLEDEPTISN end) over (partition by R.AGRISN order by case R.CODE when 'SALES_G' then 1 else 0 end desc, /* R.CALCFLG, */ R.DATEEND desc, R.ISN desc, case R.CODE when 'SALES_G' then R.ROLEDEPTISN end desc) as SALERGODEPTISN,                -- РїРѕРґСЂР°Р·РґРµР»РµРЅРёРµ РїСЂРѕРґР°РІС†Р° РіРѕР»РѕРІРЅРѕРіРѕ РѕС„РёСЃР°
+       first_value(case R.CODE when 'SALES_F' then R.ROLEDEPTISN end) over (partition by R.AGRISN order by case R.CODE when 'SALES_F' then 1 else 0 end desc, /* R.CALCFLG, */ R.DATEEND desc, R.ISN desc, case R.CODE when 'SALES_F' then R.ROLEDEPTISN end desc) as SALERFDEPTISN,                  -- РїРѕРґСЂР°Р·РґРµР»РµРЅРёРµ РїСЂРѕРґР°РІС†Р° С„РёР»РёР°Р»Р°
+       first_value(case R.CLASSISN when 1943199903 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 1943199903 then 1 else 0 end desc, R.CALCFLG desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 1943199903 then R.SUBJISN end desc) as MANAGERKKISN,          --СЂР°СЃРїРѕСЂСЏРґРёС‚РµР»СЊ РєРє(РєРѕРјРµСЂС‡. РєСЂРµРґРёС‚)
+       -- {EGAO 13.04.2012
+       first_value(case R.CLASSISN when 2846444203 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 2846444203 then 1 else 0 end desc, R.CALCFLG desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 2846444203 then R.SUBJISN end desc) as EMPOPGOISN,  --СЃРѕС‚СЂСѓРґРЅРёРє РѕРї РіРѕ
+       first_value(case R.CLASSISN when 2846444203 then R.ROLEDEPTISN end) over (partition by R.AGRISN order by case R.CLASSISN when 2846444203 then 1 else 0 end desc, R.CALCFLG desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 2846444203 then R.ROLEDEPTISN end desc) as EMPOPGODEPTISN,
+       --}
+       --{EGAO 17.04.2012
+       first_value(CASE WHEN r.code='SALES_G' OR R.CLASSISN=2846444203 THEN uprisn END) over (partition by R.AGRISN ORDER BY CASE WHEN r.code='SALES_G' THEN 3 WHEN R.CLASSISN=2846444203 THEN 2 ELSE 1 END desc, case r.code when 'SALES_G' then 'Y' else R.CALCFLG end desc, R.DATEEND desc, R.ISN desc, CASE WHEN r.code='SALES_G' OR R.CLASSISN=2846444203 THEN uprisn END desc) as uprisn, -- EGAO 17.04.2012 Р’РёРґС‹ Р°РЅР°Р»РёС‚РёРєРё "РџРѕРґСЂР°Р·РґРµР»РµРЅРёСЏ РРЅРіРѕСЃСЃС‚СЂР°С…"
+       --}
+       -- EGAO 21.05.2012 РІ СЂР°РјРєР°С… Р”РРў-12-2-167253
+       first_value(case r.classisn when 1101648603 then r.subjisn end) over (partition by R.AGRISN ORDER BY case r.classisn when 1101648603 then 1 else 0 end desc, r.calcflg desc, r.dateend desc, r.isn desc, case r.classisn when 1101648603 then r.subjisn end desc) AS empoperu,
+       -- sts 20.09.2012 - РґРѕР±Р°РІРёР» СЂРѕР»Рё РїСЂРѕРґР°РІС†РѕРІ
+       first_value(case R.CODE when 'SALES_G' then R.CLASSISN end) over (partition by R.AGRISN order by case R.CODE when 'SALES_G' then 1 else 0 end desc, /* R.CALCFLG, */ R.DATEEND desc, R.ISN desc, case R.CODE when 'SALES_G' then R.CLASSISN end desc) as SALERGOCLASSISN,        -- РєР»Р°СЃСЃ (СЂРѕР»СЊ РІ РґРѕРіРѕРІРѕСЂРµ) РїСЂРѕРґР°РІС†Р° РіРѕР»РѕРІРЅРѕРіРѕ РѕС„РёСЃР°
+       first_value(case R.CODE when 'SALES_F' then R.CLASSISN end) over (partition by R.AGRISN order by case R.CODE when 'SALES_F' then 1 else 0 end desc, /* R.CALCFLG, */ R.DATEEND desc, R.ISN desc, case R.CODE when 'SALES_F' then R.CLASSISN end desc) as SALERFCLASSISN ,         -- РєР»Р°СЃСЃ (СЂРѕР»СЊ РІ РґРѕРіРѕРІРѕСЂРµ) РїСЂРѕРґР°РІС†Р° С„РёР»РёР°Р»Р°
+       first_value(case R.CLASSISN when 1738886903 then R.ROLEDEPTISN end) over (partition by R.AGRISN order by case R.CLASSISN when 1738886903 then 1 else 0 end desc, /* R.CALCFLG, */ R.DATEEND desc, R.ISN desc, case R.CLASSISN when 1738886903 then R.ROLEDEPTISN end desc) as CROSSALERDEPTISN,
+       -- sts 07.12.2012 - РґРѕР±Р°РІРёР» СЂРѕР»СЊ Р°РІС‚РѕРґРёР»Р»РµСЂ
+       first_value(case R.CLASSISN when 3081540003 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 3081540003 then 1 else 0 end desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 3081540003 then R.SUBJISN end desc) as AvtoDillerISN,   -- РђР’РўРћР”РР›Р•Р  (CarDealerISN СѓР¶Рµ РµСЃС‚СЊ РІС‹С€Рµ РєР°Рє "РђРІС‚РѕСЃР°Р»РѕРЅ", РїРѕСЌС‚РѕРјСѓ AvtoDillerISN)
+       -- sts 07.12.2012 - task(40524747403)
+       first_value(case R.CLASSISN when 2626553403 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 2626553403 then 1 else 0 end desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 2626553403 then R.SUBJISN end desc) as AdmCuratorISN,   -- РђРґРјРёРЅРёСЃС‚СЂР°С‚РёРІРЅС‹Р№ РєСѓСЂР°С‚РѕСЂ
+       first_value(case R.CLASSISN when 693962316 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 693962316 then 1 else 0 end desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 693962316 then R.SUBJISN end desc) as DoctorCuratorISN,   -- Р’СЂР°С‡-РєСѓСЂР°С‚РѕСЂ
+       first_value(case R.CLASSISN when 693962016 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 693962016 then 1 else 0 end desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 693962016 then R.SUBJISN end desc) as UnderwriterISN,   -- РђРЅРґРµСЂСЂР°Р№С‚РµСЂ
+       first_value(case R.CLASSISN when 444 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 444 then 1 else 0 end desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 444 then R.SUBJISN end desc) as UnderwriterOldISN,   -- РђРЅРґРµСЂСЂР°Р№С‚РµСЂ(СЃС‚Р°СЂС‹Р№)
+       -- sts 05.01.2013 - task(Р”РРў-12-4-173936)
+       first_value(case R.CLASSISN when 35435216 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 35435216 then 1 else 0 end desc, R.CALCFLG desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 3676722703 then R.SUBJISN end desc) as REPRESENTATIVEISN,      -- РџР Р•Р”РЎРўРђР’РРўР•Р›Р¬
+       -- VAA 07.05.2013 Р”РРў-13-2-199474
+       first_value(case R.CLASSISN when 3676722703 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 3676722703 then 1 else 0 end desc, /* R.CALCFLG, */ R.DATEEND desc, R.ISN desc, case R.CLASSISN when 3676722703 then R.SUBJISN end desc) as CROSSALERFISN,    -- РєСЂРѕСЃСЃ-РїСЂРѕРґР°РІРµС† С„РёР»РёР°Р»Р°
+       first_value(case R.CLASSISN when 3676722703 then R.ROLEDEPTISN end) over (partition by R.AGRISN order by case R.CLASSISN when 3676722703 then 1 else 0 end desc, /* R.CALCFLG, */ R.DATEEND desc, R.ISN desc, case R.CLASSISN when 3676722703 then R.ROLEDEPTISN end desc) as CROSSALERFDEPTISN, -- РїРѕРґСЂР°Р·РґРµР»РµРЅРёРµ РєСЂРѕСЃСЃ-РїСЂРѕРґР°РІС†Р° С„РёР»РёР°Р»Р°
+       -- kds (06.08.2013) task(52120579303)
+       first_value(case R.CLASSISN when 437 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 437 then 1 else 0 end desc, R.SHAREPC desc, R.DATEEND desc, R.datebeg desc, R.isn desc, case R.CLASSISN when 437 then R.SUBJISN end desc) as AGENT_MAXCOMISSION_ISN,         -- Р°РіРµРЅС‚ СЃ РјР°РєСЃРёРјР°Р»СЊРЅРѕР№ РєРѕРјРёСЃСЃРёРµР№
+       -- kds (30.09.2013) task(???)
+       first_value(case R.CLASSISN when 4207938903 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 4207938903 then 1 else 0 end desc, R.CALCFLG desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 4207938903 then R.SUBJISN end desc) as CONTRACTORISN, -- РџРѕРґСЂСЏРґС‡РёРє
+       avg(case R.CLASSISN when 4207938903 then R.SHAREPC end) over (partition by R.AGRISN) as CONTRCOMISSION, -- РџСЂРѕС†РµРЅС‚ РїРѕРґСЂСЏРґС‡РёРєР°
+       count(case R.CLASSISN when 4207938903 then 1 else null end) over (partition by R.AGRISN) as CONTRCOUNT, -- РљРѕР»РёС‡РµСЃС‚РІРѕ РїРѕРґСЂСЏРґС‡РёРєРѕРІ
+       -- VAA 14.01.2014
+       first_value(case R.CLASSISN when 437 then R.SHAREPC end) over (partition by R.AGRISN order by case R.CLASSISN when 437 then 1 else 0 end desc, R.SHAREPC desc, R.DATEEND desc, r.datebeg desc, r.isn desc, case R.CLASSISN when 437 then R.SHAREPC end desc) as AGENT_MAXCOMISSION_SHAREPC
+  from ( select 
+                R.AGRISN,
+                R.CLASSISN,
+                R.SUBJISN,
+                coalesce(R.DATEBEG, TO_DATE('01-01-1900','DD-MM-YYYY')) as DATEBEG,
+                coalesce(R.DATEEND, TO_DATE('01-01-3000','DD-MM-YYYY')) as DATEEND,
+                R.SHAREPC,
+                R.SHARESUM,
+                coalesce(R.CALCFLG, 'N') as CALCFLG,
+                R.DEPTISN as ROLEDEPTISN,
+                D.CODE,
+                R.COLLECTFLG,
+                SH.DEPTISN,
+                S.JURIDICAL,
+                R.ISN,
+                S.CLASSISN as SUBJCLASSISN,
+                rdt.uprisn, -- EGAO 13.04.2012
+                abs(R.OrderNO) as OrderNO  -- sts 22.05.2012 - СЃРѕСЂС‚РёСЂРѕРІРєР° РїРѕ РјРѕРґСѓР»СЋ
+           from storage_adm.tt_rowid t 
+			join 
+                ais.AGRROLE R 
+                 on t.ISN = R.AGRISN 
+			left join
+                ais.SUBJECT S 
+                 on R.SUBJISN = S.ISN
+			left join
+                ais.SUBHUMAN SH 
+                 on R.SUBJISN = SH.ISN
+			left join
+               (select
+                         D.ISN,
+                         D.CODE
+                    from ais.DICTI D
+                   where D.CODE in ('SALES_G', 'SALES_F')
+                     and D.ISN <> 1738886903) as D -- РєСЂРѕСЃСЃ-РїСЂРѕРґР°РІРµС† РіРѕР»РѕРІРЅРѕРіРѕ РѕС„РёСЃР° (sts - С‚.Рє. РєСЂРѕСЃСЃ РїСЂРѕРґР°РІРµС† РІС‹С€Рµ РёРґРµС‚ РѕС‚РґРµР»СЊРЅРѕ)
+                 on R.CLASSISN  = D.ISN
+			left join
+                storage_source.rep_dept rdt -- EGAO 13.04.2012
+                 on rdt.deptisn = R.deptisn
+            ) as R
+ where R.CLASSISN <> 430; -- СЃС‚СЂР°С…РѕРІР°С‚РµР»СЊ
 );

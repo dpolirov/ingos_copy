@@ -1,4 +1,4 @@
-create or replace view v_tt_bodydebcre (
+create or replace view storage_adm.v_tt_bodydebcre (
    baseisn,
    db,
    de,
@@ -26,7 +26,7 @@ as
               sum(damountrub)-sum(camountrub) as basesaldo,
               max(subaccisn) subaccisn,
               max(code) code,
-              max(oracompat.nvl(basedamountrub,0)-oracompat.nvl(basecamountrub,0)) as baseamountrub,
+              max(oracompat.nvl(basedamountrub,0::numeric)-oracompat.nvl(basecamountrub,0::numeric)) as baseamountrub,
               max(basedamountrub) as basedamountrub,
               max(basecamountrub) as basecamountrub,
               max(basedateval) as basedateval,
@@ -34,24 +34,24 @@ as
               max(subjisn) as subjisn, 
               max(currisn) as currisn, 
               max(agrisn) as agrisn,
-              max(oracompat.nvl(basedamount,0)-oracompat.nvl(basecamount,0)) as baseamount,
+              max(oracompat.nvl(basedamount,0::numeric)-oracompat.nvl(basecamount,0::numeric)) as baseamount,
               max(basedamount) as basedamount,
               max(basecamount) as basecamount,
               sum(damount)-sum(camount) as basesaldoval
         from
             (
-            /*все варианты dateval и datequit в один не прирывный столбик - набор интервалов*/
+            /*РІСЃРµ РІР°СЂРёР°РЅС‚С‹ dateval Рё datequit РІ РѕРґРёРЅ РЅРµ РїСЂРёСЂС‹РІРЅС‹Р№ СЃС‚РѕР»Р±РёРє - РЅР°Р±РѕСЂ РёРЅС‚РµСЂРІР°Р»РѕРІ*/
             select /*+index(dbe ) */
-                    dbe.baseisn,dbe.dateval db,oracompat.nvl(lead(dbe.dateval) over (partition by dbe.baseisn order by dbe.dateval )-1,'01-jan-3000') de
+                    dbe.baseisn,dbe.dateval db,oracompat.nvl(lead(dbe.dateval) over (partition by dbe.baseisn order by dbe.dateval ) - interval '1 day','01-jan-3000') de
                 from(
 
                       select /*+ index(b x_st_buhbody_base)  */distinct b.baseisn,b.dateval 
                         from storages.st_buhbody b
-                        where b.baseisn  in (select isn from tt_rowid)   -- baseisn = 397668316)
+                        where b.baseisn  in (select isn from storage_adm.tt_rowid)   -- baseisn = 397668316)
                       union
                       select /*+ index(b x_st_buhbody_base)  */ distinct b.baseisn,b.datequit 
                         from storages.st_buhbody b
-                        where b.baseisn in (select isn from tt_rowid)
+                        where b.baseisn in (select isn from storage_adm.tt_rowid)
                     ) dbe
             ) dt, storages.st_buhbody b
         where dt.baseisn = b.baseisn
