@@ -421,7 +421,8 @@ CREATE TABLE storage_adm.tt_bodydebcre (
     agrisn                           NUMERIC,
     baseamount                       NUMERIC,
     basedamount                      NUMERIC,
-    basecamount                      NUMERIC
+    basecamount                      NUMERIC,
+    basesaldoval                     NUMERIC
 )
 ;
 --WARNING: No primary key defined for storage_adm.tt_bodydebcre
@@ -932,7 +933,8 @@ CREATE TABLE storage_adm.tt_repagrroleagr (
     agent_maxcomission_isn           NUMERIC,
     contractorisn                    NUMERIC,
     contrcomission                   NUMERIC,
-    contrcount                       NUMERIC
+    contrcount                       NUMERIC,
+    AGENT_MAXCOMISSION_SHAREPC                    int
 )
 ;
 --WARNING: No primary key defined for storage_adm.tt_repagrroleagr

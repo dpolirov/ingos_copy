@@ -812,3 +812,59 @@ DISTRIBUTED BY (agrisn);
 COMMENT ON COLUMN storage_source.agr_detail_agrhash.agrdetailisn IS 'FK(AGR_DETAILS)';
 
 
+CREATE TABLE storage_source.rep_dept (
+    isn                              NUMERIC,
+    loadisn                          NUMERIC,
+    deptisn                          NUMERIC,
+    deptactive                       VARCHAR(1),
+    classisn                         NUMERIC,
+    deptname                         VARCHAR(150),
+    deptbname                        VARCHAR(150),
+    dept0isn                         NUMERIC,
+    dept0name                        VARCHAR(150),
+    rcisn                            NUMERIC,
+    rcname                           VARCHAR(150),
+    filname                          VARCHAR(150),
+    filisn                           NUMERIC,
+    dept1name                        VARCHAR(150),
+    dept1isn                         NUMERIC,
+    deptcityisn                      NUMERIC,
+    filcityisn                       NUMERIC,
+    oisn                             NUMERIC,
+    oname                            VARCHAR(150),
+    depttype                         VARCHAR(100),
+    doisn                            NUMERIC,
+    doname                           VARCHAR(150),
+    dept2isn                         NUMERIC,
+    dept2name                        VARCHAR(150),
+    uprisn                           NUMERIC,
+    dept3isn                         NUMERIC,
+    dept3name                        VARCHAR(150),
+    dept4isn                         NUMERIC,
+    dept4name                        VARCHAR(150),
+    upr_name                         VARCHAR(150),
+    upr_abbreviation                 VARCHAR(10),
+    dept0_fullname                   VARCHAR(255),
+    dept1_fullname                   VARCHAR(255),
+    dept2_fullname                   VARCHAR(255),
+    dept3_fullname                   VARCHAR(255),
+    dept4_fullname                   VARCHAR(255),
+    uprall_isn                       NUMERIC,
+    uprall_abreviation               VARCHAR(10),
+    uprall_fullname                  VARCHAR(255),
+    uprall_active                    VARCHAR(1),
+    dept1_active                     VARCHAR(1),
+    dept2_active                     VARCHAR(1),
+    dept3_active                     VARCHAR(1),
+    dept4_active                     VARCHAR(1),
+    o_active                         VARCHAR(1),
+    sectorisn                        NUMERIC,
+    sector_abreviation               VARCHAR(10),
+    sector_name                      VARCHAR(255),
+    sector_active                    VARCHAR(1)
+)
+DISTRIBUTED BY (deptisn);
+
+COMMENT ON TABLE storage_source.rep_dept IS 'Дерево подразделений в плоском виде с всякой аналитикой (филиал, рц, 0 уровень, 1 уровень)';
+
+
