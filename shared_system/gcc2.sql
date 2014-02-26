@@ -1,9 +1,36 @@
+CREATE OR REPLACE FUNCTION shared_system.gcc2_prepare_rep_currate(pDateStart timestamp) returns void as $$
+begin
+    truncate table storages.rep_currate;
+    insert into storages.rep_currate(cin, cout, cdate, crate)
+    select ad.currfromisn, ad.currtoisn, ad.dateval, r2.rate 
+        from (
+             select  c.dateval, r.currfromisn, r.currtoisn, max(r.dateval) dateavail
+                from(
+                    select current_date - generate_series dateval
+                        from generate_series(0,extract(day from current_timestamp - pDateStart)::int)
+                    ) c
+                left join ais.currate r
+                    on r.dateval<=c.dateval
+                where r.codefrom in ('EUR','USD') 
+                    and r.codeto in ('RUR','USD')
+                    and r.codefrom <> r.codeto
+                group by c.dateval, r.currfromisn, r.currtoisn
+            )  ad
+            inner join ais.currate r2 
+                on  ad.currfromisn=r2.currfromisn 
+                and ad.currtoisn=r2.currtoisn 
+                and ad.dateavail=r2.dateval;
+end;
+$$ LANGUAGE plpgsql
+volatile;
+
+
 CREATE OR REPLACE FUNCTION shared_system.gcc2_load_pl() RETURNS void AS $$
-    my $rv = spi_exec_query("select rate, to_char(dateval, 'yyyymmdd') dateval, currfromisn, currtoisn from ais.currate  where currfromisn in (35,53,29448516) and  currtoisn in (35,53,29448516) and dateval>=timestamp '2014-02-20' order by  currfromisn, currtoisn , dateval");
+    my $rv = spi_exec_query("select crate, to_char(cdate, 'yyyymmdd') cdate, cin, cout from storages.rep_currate order by  cin, cout, cdate");
     foreach my $rn (0 .. $rv->{processed} - 1) {
-        my $currkey = "$rv->{rows}[$rn]->{currfromisn}|$rv->{rows}[$rn]->{currtoisn}";
-        $rv->{rows}[$rn]->{rate} =~ s/0*$//g;        
-        $_SHARED{$currkey}{$rv->{rows}[$rn]->{dateval}} = $rv->{rows}[$rn]->{rate};       
+        my $currkey = "$rv->{rows}[$rn]->{cin}|$rv->{rows}[$rn]->{cout}";
+        $rv->{rows}[$rn]->{crate} =~ s/0*$//g;        
+        $_SHARED{$currkey}{$rv->{rows}[$rn]->{cdate}} = $rv->{rows}[$rn]->{crate};       
         
     }
 $$ LANGUAGE plperl
@@ -31,6 +58,7 @@ volatile;
 
 
 CREATE or replace FUNCTION shared_system.gcc2_setdata_pl(p_currpair varchar, p_keys varchar[], p_values varchar[]) RETURNS void AS $$
+    
     my @keys   = split(/,/, substr $_[1], 1, -1);
     my @values = split(/,/, substr $_[2], 1, -1);
     my $n = scalar @keys;
@@ -42,13 +70,6 @@ $$ LANGUAGE plperl
 volatile;
 
 
-CREATE or replace FUNCTION public.gcc2_setdata(p_currpair varchar, p_keys varchar[], p_values varchar[]) RETURNS void AS $$
-begin
-    perform shared_system.gcc2_setdata_pl(p_currpair, p_keys, p_values) from shared_system.segment_distributor;
-    perform shared_system.gcc2_setdata_pl(p_currpair, p_keys, p_values);
-end;
-$$ LANGUAGE plpgsql
-volatile;
 
 
 CREATE OR REPLACE FUNCTION shared_system.gcc2_load() RETURNS void AS $$
@@ -63,28 +84,48 @@ begin
                 array_agg(d[2])
             into v_keys,
                  v_values
-            from shared_system.gcc2_getdata(v_currpair) as d;
-        perform shared_system.gcc2_setdata(v_currpair, v_keys, v_values);
+            from shared_system.gcc2_getdata(v_currpair) as d;        
+        perform shared_system.gcc2_setdata_pl(v_currpair, v_keys, v_values) from shared_system.segment_distributor;
     end loop;
 end;
 $$ LANGUAGE plpgsql
 volatile;
 
 
-CREATE OR REPLACE FUNCTION shared_system.gcc2(pAmount numeric,pCurIn numeric, pCurOut numeric, pDate timestamp) RETURNS numeric AS $$
-    $_[3] =~ s/(\d\d\d\d)-(\d\d)-(\d\d).*/\1\2\3/g;
-    return $_SHARED->{"$_[1]|$_[2]"}{$_[3]};
+
+CREATE OR REPLACE FUNCTION shared_system.GetRateExact(pCurIn numeric, pCurOut numeric, pStrDate varchar(8)) RETURNS numeric AS $$    
+    return $_SHARED{"$_[0]|$_[1]"}{$_[2]};    
 $$ LANGUAGE plperl
 volatile;
 
-/*
-select gcc2_load_pl();
-select shared_system.gcc2(123,53,35,timestamp '2014-02-20')
-select gcc2_getcurrpairs()
-select gcc2_getdata('53|35')
-select gcc2_load()
-select clear_shared()
-select gcc2_setdata_pl('53|35', array['111','222'],array['0.111','0.222']) ;
-select array['111','222']
-select gcc2(123,53,35,timestamp '2014-02-20'), gp_segment_id from ais.currate limit 100;
-*/
+
+CREATE OR REPLACE FUNCTION shared_system.GetRate(pCurIn numeric, pCurOut numeric, pDate timestamp) RETURNS numeric AS $$
+declare 
+    vRate numeric;
+begin
+    vRate = shared_system.GetRateExact(pCurIn, pCurOut, to_char(pDate,'YYYYMMDD'));
+    if vRate is null then
+        vRate = 1/shared_system.GetRateExact(pCurOut, pCurIn, to_char(pDate,'YYYYMMDD'));
+    end if;
+    return vRate;
+end;
+$$ LANGUAGE plpgsql
+volatile;
+
+
+CREATE OR REPLACE FUNCTION shared_system.gcc2(pAmount in numeric,pCurIn in numeric, pCurOut in numeric, pDate in timestamp) returns numeric AS $$
+declare 
+    vRate numeric;
+begin
+    if coalesce(round(pAmount,4),0)=0 then return pAmount; end if;
+    if pCurIn = pCurOut then return pAmount;end if;
+    if pCurIn is null or pCurOut is null or pDate is null then return null; end if;
+    vRate = shared_system.GetRateExact(pCurIn, pCurOut, to_char(pDate,'YYYYMMDD'));
+    if vRate is null then
+        vRate = 1/shared_system.GetRateExact(pCurOut, pCurIn, to_char(pDate,'YYYYMMDD'));
+    end if;
+    return pAmount*vRate;
+end;
+$$ LANGUAGE plpgsql
+volatile;
+

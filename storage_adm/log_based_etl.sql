@@ -144,16 +144,16 @@ begin
     insert into storage_adm.histlog_chunks(isn, max_completed_dttm, chunk_rows) values 
         (nextval('storage_adm.histlog_chunks_seq'), v_max_dttm, vChunkRows);
     
-/*
+
     --Move records from histlog to histlog_arch
     v_step = 'Move histlog chunk to arch';
     insert into hist.histlog_arch
-    select * from histlog_chunk;
+    select * from storage_adm.tt_histlog_chunk;
 
     delete from hist.histlog h 
         using storage_adm.tt_histlog_chunk c 
         where h.isn=c.isn;
-*/
+
         
     EXCEPTION
         WHEN OTHERS THEN
@@ -344,6 +344,7 @@ declare
     v_dest_tbl      record;
     v_function_name CHARACTER VARYING = 'STORAGE_ADM.LOADSTORAGE(pProcIsn int, pFull smallint)';
     v_step          CHARACTER VARYING = 'NA';
+    v_process_name  CHARACTER VARYING = 'Load From Logs';
 begin
     --originally was logged to ais
     --ais.logevent('LOAD_STORAGE','storage_adm.load_storage.LoadStorage pProcIsn='||pProcIsn,pCode => 143503,pTComponent => 'LoadStorage');
@@ -351,16 +352,19 @@ begin
     -- Prepare_Log_Buffer
     -- called if  pFillBufer=1
     RAISE NOTICE 'STORAGE_ADM.LOADSTORAGE started for procisn=% pFull=%', pProcIsn, pFull;
+    v_step = 'Get Process Info';
     
     select * into vProc from storage_adm.ss_processes where isn = pProcIsn;
-    
+    v_process_name = v_process_name||' ('||pProcIsn||':'||vProc.Name||')';
     --REPLOG_I (vLoadIsn, 'LoadStorage','Get Log process '||vProc.Name, 'Begin', null, null);
     
     vLoadIsn = storage_adm.GetLoadIsn();
     if vLoadIsn = 0 then
         --process was started not from prcLoadStorage_*** therefore we dont know task isn
-        perform storage_adm.CreateLoad(0);
+        vLoadIsn = storage_adm.CreateLoad(0);
     end if;
+    perform storage_adm.RepLog_i (vLoadIsn, v_process_name, '',  'Begin');
+
     perform storage_adm.SetLoadParams(vLoadIsn, pProcIsn, pFull);
     
     -- if pFillBuffer=1 then
@@ -372,7 +376,7 @@ begin
         delete from storage_adm.SS_BUF_LOG where procisn = pProcIsn;
     end if;
     get diagnostics vRc = ROW_COUNT;
-    RAISE NOTICE '%: % records were deleted from ss_buf_log',v_step,vRc;
+    perform storage_adm.RepLog_i (vLoadIsn, v_process_name, v_step,  'Del', vRc, null);
     
     v_step = 'Fill SS_BUF_LOG';
     if pFull=0 then
@@ -397,7 +401,7 @@ begin
                     and h.procisn = pProcIsn and h.loadisn = vLoadIsn and h.findisn is not null
                 group by h.findisn) t;
         get diagnostics vRc = ROW_COUNT;
-        RAISE NOTICE '%: % records were inserted in ss_buflog for non-fullload tables',v_step,vRc;
+        perform storage_adm.RepLog_i (vLoadIsn, v_process_name, v_step||' from ss_histlog',  'Ins', vRc, null);
         
         --for fullload tables - get from get_view query
         for v_view in (select get_view 
@@ -408,7 +412,7 @@ begin
                     from '||v_view||' v where v.* is not null');
             --v returns one variable that have type of isn and can have any name
             get diagnostics vRc = ROW_COUNT;
-            RAISE NOTICE '%: % records were inserted in ss_buflog from get_view %',v_step,vRc,v_view;
+            perform storage_adm.RepLog_i (vLoadIsn, v_process_name, v_step||' from get_view',  'Ins', vRc, null);
         end loop;
     else
         --pFull=1
@@ -421,17 +425,19 @@ begin
                     from ('||v_view||') v');
             --v returns one variable that have type of isn and can have any name
             get diagnostics vRc = ROW_COUNT;
-            RAISE NOTICE '%: % records were inserted in ss_buflog from fullLoadView %',v_step,vRc,v_view;
+            perform storage_adm.RepLog_i (vLoadIsn, v_process_name, v_step||' from fullLoadView',  'Ins', vRc, null);
         end loop;
     end if;
     --end if; pFillBuffer
     --REPLOG_I (vLoadIsn, 'LoadStorage','Get Log process '||vProc.Name, 'End', null, null);
 
     --call Load_Proc_By_tt_RowId
-    vSql = 'select STORAGE_ADM.Load_Proc_By_tt_RowId('||vLoadIsn||','||pProcIsn||','||pFull||')';
-    execute vSql;
-    /*dbms_jobs.job_submit(vSql, 1);
+    --vSql = 'select STORAGE_ADM.Load_Proc_By_tt_RowId('||vLoadIsn||','||pProcIsn||','||pFull||')';
+    --execute vSql;    
+    /*dbms_jobs.job_submit(vSql, 1);    
     RAISE NOTICE '%: Job submitted%',v_step,vSql;*/
+    perform STORAGE_ADM.Load_Proc_By_tt_RowId(vLoadIsn,pProcIsn,pFull);
+    perform storage_adm.RepLog_i (vLoadIsn, v_process_name, '',  'End');
 
     EXCEPTION
         WHEN OTHERS THEN
@@ -440,6 +446,7 @@ begin
             vProcessShortname = shared_system.getparamv('processshortname');
             vStartId = shared_system.getparamv('startid');            
             perform storage_adm.LOGREP(vTaskIsn,vProcessShortname,'('||v_function_name||' : '||v_step||' : '||sqlerrm,vStartId,-1,null,null);*/
+            perform storage_adm.RepLog_i (vLoadIsn, v_process_name, v_step,  'ERROR', null, null, sqlerrm);
             RAISE EXCEPTION '(%:%:%)', v_function_name, v_step, sqlerrm;
         END;
 end;
@@ -492,8 +499,7 @@ begin
             if v_dest_tbl.TT_FUNCTION_NAME is not null then
                 vSql = 'perform '||v_dest_tbl.TT_FUNCTION_NAME;
             else
-                vSql = 'Insert into '||v_dest_tbl.TT_TABLE_NAME||'
-                            select v.* from '||v_dest_tbl.VIEW_NAME||' v';
+                vSql = 'Insert into '||v_dest_tbl.TT_TABLE_NAME||' select v.* from '||v_dest_tbl.VIEW_NAME||' v';
             end if;
             execute vSql;
             GET DIAGNOSTICS vRc = ROW_COUNT;
@@ -736,7 +742,7 @@ begin
     
     If (pFull=0) then
         -- clear log
-        v_step = v_dest_tbl.TABLE_NAME||' Clear Log';
+        v_step = v_dest_tbl.TABLE_NAME||' Set loadisn to SS_BUF_LOG';
         --perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step, 'Begin');
         
         Update storage_adm.SS_BUF_LOG
@@ -774,23 +780,25 @@ language plpgsql;
 create or replace function STORAGE_ADM.replog_i(pLoadIsn numeric, pModule varchar, pOperation varchar,
                                                    pAction varchar, pObjCount bigint, pSqlText text, pErrMsg varchar) returns void as $BODY$
     declare vResult varchar;
+    declare vSql varchar;
+    declare dq char(2);
 begin
-    vResult = shared_system.autonomous_transaction(
-        'insert into storage_adm.replog(isn, loadisn, module, operation, action, objcount, sqltext) values ('||
+    dq = '$'||'$';    
+    vsql = 
+        'insert into storage_adm.replog(isn, loadisn, module, operation, action, objcount, sqltext, errmsg) values ('||
         nextval('storage_adm.replog_seq')||','||
-        coalesce(cast(pLoadIsn as varchar), 'null')||',$TXT$'||
-        coalesce(pModule, 'null')||'$TXT$,$TXT$'||
-        coalesce(pOperation, 'null')||'$TXT$,$TXT$'||
-        coalesce(pAction, 'null')||'$TXT$,'||
-        coalesce(cast(pObjCount as varchar), 'null')||',$TXT$'||
-        coalesce(pSqlText,'null')||'$TXT$,$TXT$'||
-        coalesce(pErrMsg,'null')||'$TXT$)'
-    );
+        coalesce(cast(pLoadIsn  as varchar), 'null')||','||
+        coalesce(dq||pModule   ||dq, 'null')||','||
+        coalesce(dq||pOperation||dq, 'null')||','||
+        coalesce(dq||pAction   ||dq, 'null')||','||
+        coalesce(cast(pObjCount as varchar), 'null')||','||
+        coalesce(dq||pSqlText  ||dq,'null')||','||
+        coalesce(dq||pErrMsg   ||dq,'null')||')';
+    RAISE NOTICE '% : ploadisn=%, % %, % records affected. Query:%', pOperation, pLoadIsn, pModule, pAction, pObjCount, pSqlText;
+    vResult = shared_system.autonomous_transaction_pl(vSql);
     if vResult <> '' then 
         RAISE EXCEPTION 'STORAGE_ADM.replog_i : %', vResult;
     end if;
-    RAISE NOTICE '% : ploadisn=%, % %, % records affected. Query:
-%', pOperation, pLoadIsn, pModule, pAction, pObjCount, pSqlText;
 end;
 $BODY$
 language plpgsql;

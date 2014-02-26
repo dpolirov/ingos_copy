@@ -485,3 +485,13 @@ CREATE TABLE storages.st_rep_subject (
 --WARNING: No primary key defined for storages.st_rep_subject
 
 COMMENT ON COLUMN storages.st_rep_subject.repsynkisn IS '"дедупликация для отчета"';
+
+
+CREATE TABLE storages.rep_currate (
+    cin                              NUMERIC,
+    cout                             NUMERIC,
+    cdate                            TIMESTAMP,
+    crate                            NUMERIC,
+    dateval                          TIMESTAMP
+)
+distributed by (cdate);

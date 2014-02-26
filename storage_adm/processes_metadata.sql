@@ -94,6 +94,7 @@ INSERT INTO sa_params (isn, name, cvalue) VALUES (8, 'sole:auto:top_banner', 'de
     vLoadIsn        numeric;
     vStepNumber     numeric;
     vStatus         numeric;
+    vDateRep        timestamp;
     v_function_name CHARACTER VARYING = ''STORAGE_ADM.prcLoadStorageTest_{PARENTISN}'';
     v_step          CHARACTER VARYING = ''NA'';
 begin
@@ -189,7 +190,7 @@ insert into sa_complex_ref(parentisn, childisn, childrownum) values (1471,970,13
 -- psql -c "select 'insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values ('||taskisn||','||atomrownum||','''||replace(atomsource,'''','''''')||''','''||atomname||''');' from storage_adm.sa_sole_ref order by taskisn,atomrownum;"|sed 's/ *$//g'|sed 's/^ //g'>sa_sole_ref_stage2.sql
 --
 --------------------------------------------------------------------------------------------------
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (704,12,'REPORT_BUH_STORAGE_NEW.LoadBuh2Cond(LoadIsn); ','LoadBuh2Cond');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (704,12,'perform REPORT_BUH_STORAGE_NEW.LoadBuh2Cond(LoadIsn); ','LoadBuh2Cond');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (719,5, 'perform STORAGE_ADM.LoadStorage(27, 0);','RepAgrRoleAgr');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (719,10,'perform storage_adm.LoadStorage(13, 0);','RepAgr');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (721,1,' perform storage_adm.LoadStorage(12, 0);','RepRefund');
@@ -224,64 +225,50 @@ insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (727,3
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (839,2,' perform  REPORT_BUH_STORAGE_NEW.Create_Agr_Analitiks();','Agr_analytics');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (839,3,' perform  report_budget.load_budget_body_agrs();','Budget_body_agr');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (968,1,'Declare 
-LoadIsn Number;
-vDaterep Date:=Trunc(sysdate,''MM'')-1;
-Begin 
-null;
-SYSTEM.INVALIDOBJECTPKG.CompileSchema(''STORAGES''); -- EGAO 04.09.2010
+vDaterep = date_Trunc(''month'', current_timestamp)-1;
 
-LoadIsn:=REPORT_STORAGE.createload(pProcType=>12,pDaterep=>vDaterep,pclassisn=>1);
+--LoadIsn =storage_adm.createload(pProcType=>12,pDaterep=>vDaterep,pclassisn=>1);
+vLoadIsn =storage_adm.createload(12);
 Update
    Sa_Processes
 Set
-  LASTRUNISN=LoadIsn
+  LASTRUNISN=vLoadIsn
  Where Isn=12;
-Commit;
--- To_Date(''31052005'',''DDMMYYYY'')
 
 -- сделали загрузку актуальной
 Update Repload Set
 classisn = null
-where PROCISN=12  and Daterep=vDaterep and isn<>LoadIsn;
-Commit;
+where PROCISN=12  and Daterep=vDaterep and isn<>vLoadIsn;
+
+perform REPORT_RZU.LoadReserve(vLoadIsn,vDaterep );  
 
 
-
-REPORT_RZU.LoadReserve(LoadIsn,vDaterep );  
-
---ofsa_owner.STG_LCR_FILL.main@owb(vDaterep);
- 
- 
 Update
    Sa_Processes
 Set
   LASTRUNISN=0
  Where Isn=12;
-Commit;
-
-end;','rsu');
+','rsu');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (970,1,'
-SYSTEM.INVALIDOBJECTPKG.CompileSchema(''STORAGES''); -- EGAO 04.09.2010
 
-LoadIsn:=REPORT_STORAGE.createload(ptype=>REPORT_STORAGE.cLoadFull,pProcType=>21);
+--LoadIsn:=REPORT_STORAGE.createload(ptype=>REPORT_STORAGE.cLoadFull,pProcType=>21);
+vLoadIsn=REPORT_STORAGE.createload(21);
 
  Update 
     Sa_Processes
  Set
-   LASTRUNISN=LoadIsn
+   LASTRUNISN=vLoadIsn
     Where Isn=21;
 Commit;
 
-rep_stat.full_repbuhsummary(loadisn);
+perform rep_stat.full_repbuhsummary(vloadisn);
 
 
 ','prem,ubytki, com');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (971,1,'Declare 
-  vDaterep Date:=Trunc(sysdate,''MM'')-1;
-Begin 
-  SYSTEM.INVALIDOBJECTPKG.CompileSchema(''STORAGES'');
-  REPORT_RNP_NEW.make_rnp_all;  
-end;','rnp 2 in 1');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (971,1,'
+    vDaterep = date_Trunc(''month'', current_timestamp)-1;
+    perform REPORT_RNP_NEW.make_rnp_all;  
+','rnp 2 in 1');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1015,1,'perform storage_adm.LoadStorage(1, 0);','ST_BuhBody');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1015,2,'perform storage_adm.LoadStorage(2, 0);','BuhBaseBody');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1015,3,'perform storage_adm.LoadStorage(3, 0);','DocSumBody');
@@ -299,35 +286,26 @@ insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1015,
  storage_adm.load_storage.LoadStorage(22,0,0);     
  */
 ','REP_DOCS_DOCSUM_CLMINV');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1026,1,'--STORAGES.P_STORAGELOAD_SENDMAIL(''BE'');','Почта. Начало');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1205,0,'--STORAGES.P_STORAGELOAD_SENDMAIL(''EN'');','Stop');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1288,1,'Declare 
-LoadIsn Number;
-vDaterep Date:=add_months(trunc(SYSDATE,''mm'')-1,1);
-Begin 
-null;
-SYSTEM.INVALIDOBJECTPKG.CompileSchema(''STORAGES''); -- EGAO 04.09.2010
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1026,1,'perform STORAGES.P_STORAGELOAD_SENDMAIL(''BE'');','Почта. Начало');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1205,0,'perform STORAGES.P_STORAGELOAD_SENDMAIL(''EN'');','Stop');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1288,1,'
+vDaterep = date_Trunc(''month'', current_timestamp)-1 + interval ''1 month'';
+--LoadIsn:=REPORT_STORAGE.createload(pProcType=>12,pDaterep=>vDaterep,pclassisn=>1);
+vLoadIsn=storage_adm.createload(12);
 
-LoadIsn:=REPORT_STORAGE.createload(pProcType=>12,pDaterep=>vDaterep,pclassisn=>1);
 Update
    Sa_Processes
 Set
-  LASTRUNISN=LoadIsn
+  LASTRUNISN=vLoadIsn
  Where Isn=12;
-Commit;
--- To_Date(''31052005'',''DDMMYYYY'')
 
 -- сделали загрузку актуальной
 Update Repload Set
 classisn = null
-where PROCISN=12  and Daterep=vDaterep and isn<>LoadIsn;
-Commit;
+where PROCISN=12  and Daterep=vDaterep and isn<>vLoadIsn;
 
+perform REPORT_RZU.LoadReserve(vLoadIsn,vDaterep );  
 
-
-REPORT_RZU.LoadReserve(LoadIsn,vDaterep );  
-
---ofsa_owner.STG_LCR_FILL.main@owb(vDaterep);
  
  
 Update
@@ -335,63 +313,57 @@ Update
 Set
   LASTRUNISN=0
  Where Isn=12;
-Commit;
 
-end;','rzu');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1289,1,'Declare 
-  vDaterep Date:=add_months(trunc(SYSDATE,''mm'')-1,1); 
-Begin 
-  SYSTEM.INVALIDOBJECTPKG.CompileSchema(''STORAGES'');
-  REPORT_RNP_NEW.make_rnp_all(vDaterep);  
-end;','rnp 2 in 1');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1291,1,'Declare 
-  vDaterep Date:=add_months(SYSDATE,1); 
-Begin
-  SYSTEM.INVALIDOBJECTPKG.CompileSchema(''STORAGES''); -- EGAO 04.09.2010
-LoadIsn:=REPORT_STORAGE.createload(ptype=>REPORT_STORAGE.cLoadFull,pProcType=>21);
+
+','rzu');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1289,1,'
+vDaterep = date_Trunc(''month'', current_timestamp)-1 + interval ''1 month'';
+  perform REPORT_RNP_NEW.make_rnp_all(vDaterep);  
+','rnp 2 in 1');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1291,1,'
+  vDaterep =current_timestamp+1; 
+--LoadIsn:=REPORT_STORAGE.createload(ptype=>REPORT_STORAGE.cLoadFull,pProcType=>21);
+vLoadIsn=storage_adm.createload(21);
 
  Update 
     Sa_Processes
  Set
-   LASTRUNISN=LoadIsn
+   LASTRUNISN=vLoadIsn
     Where Isn=21;
-Commit;
 
-rep_stat.full_repbuhsummary(loadisn, vDaterep);
-end;
+perform rep_stat.full_repbuhsummary(vloadisn, vDaterep);
 
 
 ','prem, ubytok, commission');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1306,1,'DECLARE 
-  vloadisn NUMBER := report_rnp_new.GetActiveLoad(add_months(trunc(sysdate,''mm'')-1,1));
-BEGIN
-  INSERT_AGRRE(0);
-  report_rnp_new.make_rnp_re_rsbu(vloadisn);
-  report_rnp_new.make_rnp_re_msfo(vloadisn);
-  report_rnp_new.make_rnp_re_subject(vloadisn);
-END;','re');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1306,1,' 
+  vloadisn = report_rnp_new.GetActiveLoad(trunc(sysdate,''mm'')-1 + interval ''1 month'');
+  perform INSERT_AGRRE(0);
+  perform report_rnp_new.make_rnp_re_rsbu(vloadisn);
+  perform report_rnp_new.make_rnp_re_msfo(vloadisn);
+  perform report_rnp_new.make_rnp_re_subject(vloadisn);
+','re');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1346,0,'-- грузим repbuh2obj с начала года по текущий месяц включительно
-storages.rep_motivation.load_repbuh2obj(trunc(ADD_MONTHS(sysdate,-12),''MM''), add_months(trunc(sysdate, ''mm''), 1));','repbuh2obj');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1366,0,'storages.INSERT_AGRRE(0);
-storages.make_repbuhre2resection;
-make_repbuh2resection;
-make_repbuhre2directanalytics;
-MAKE_AGRXINSUREDSUM4REFUND;','Вызов');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1406,0,'shared_system.GET_STORAGE_STAT ;','Stat');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1407,10,'storage_adm.load_storage.LoadStorage(pProcIsn => 19, pGetLog => 0, pFull => 0);','rep_agr_salers');
+perform storages.rep_motivation.load_repbuh2obj(date_trunc(''month'', current_timestamp-interval ''12 month''), date_trunc(''month'', current_timestamp) - interval ''1 month'');','repbuh2obj');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1366,0,'perform storages.INSERT_AGRRE(0);
+perform storages.make_repbuhre2resection;
+perform storages.make_repbuh2resection;
+perform storages.make_repbuhre2directanalytics;
+perform storages.MAKE_AGRXINSUREDSUM4REFUND;','Вызов');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1406,0,'perform shared_system.GET_STORAGE_STAT ;','Stat');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1407,10,'perform storage_adm.load_storage.LoadStorage(19, 0);','rep_agr_salers');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1408,10,'-- грузим repbuh2obj с начала года по текущий месяц включительно
-storages.rep_motivation.load_repbuh2obj(trunc(ADD_MONTHS(sysdate,-12),''MM''), add_months(trunc(sysdate, ''mm''), 1));
+perform storages.rep_motivation.load_repbuh2obj(oracompat.runc(oracompat.ADD_MONTHS(current_timestamp,-12),''MM''), oracompat.add_months(oracompat.trunc(current_timestamp, ''mm''), 1));
 
 ','RepBuh2Obj');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1409,10,'storage_adm.load_storage.LoadStorage(pProcIsn => 20, pGetLog => 0, pFull => 0);','Rep_Agent_Ranks');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1410,10,'COGNOS.MAKE_DIC_TABLES(''Y'');','Обновление справочников Cognos');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1430,10,'PKG_MAKE_DICTI_TABLES.MAKE_MOTOR_DICTI_TABLES;','Формирование справочников');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1452,10,'LOAD_STORAGE_ADDS.AgrGrpAdds(loadisn);  ','LoadAgrAdds');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1452,11,'LOAD_STORAGE_ADDS.BuhBodyGrpAdds(Loadisn);','LoadBuhAdds');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1409,10,'perform storage_adm.LoadStorage(20,0);','Rep_Agent_Ranks');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1410,10,'perform COGNOS.MAKE_DIC_TABLES(''Y'');','Обновление справочников Cognos');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1430,10,'perform PKG_MAKE_DICTI_TABLES.MAKE_MOTOR_DICTI_TABLES;','Формирование справочников');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1452,10,'perform LOAD_STORAGE_ADDS.AgrGrpAdds(loadisn);  ','LoadAgrAdds');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1452,11,'perform LOAD_STORAGE_ADDS.BuhBodyGrpAdds(Loadisn);','LoadBuhAdds');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1452,12,'/* доля перестрах в убытках*/
-LOAD_STORAGE_ADDS.refundgrpadds(loadisn);','LoadRefundAdds');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1452,13,'LOAD_STORAGE_ADDS.LoadAgrRuleExt(loadisn);','LoadAgrRuleExt');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1470,0,'REPORT_BUH_STORAGE_NEW.LoadBuh2Cond_BY_DATE(LoadIsn,''01-sep-2013'');','repbuh2cond');
+perform LOAD_STORAGE_ADDS.refundgrpadds(loadisn);','LoadRefundAdds');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1452,13,'perform LOAD_STORAGE_ADDS.LoadAgrRuleExt(vloadisn);','LoadAgrRuleExt');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1470,0,'perform REPORT_BUH_STORAGE_NEW.LoadBuh2Cond_BY_DATE(vLoadIsn,''01-sep-2013'');','repbuh2cond');
 
 
 --------------------------------------------------------------------------------------------------
@@ -594,9 +566,9 @@ insert into storage_adm.ss_process_source_tables values(3,3,'AIS','DOCSUM','DEBE
 insert into storage_adm.ss_process_source_tables values(4,4,'AIS','BUHBODY_T','ISN',null,'(SELECT --+ FULL(S) PARALLEL (S,32) ORDERED USE_NL(B)
  DISTINCT cast(DECODE(B.OPRISN,686696616/*C.GET(''OPARTQUIT'')*/,NULL,
 cast(TO_CHAR(date_TRUNC(''MONTH'',B.DATEVAL),''YYYYMMDD'')||B.SUBACCISN as numeric)) as numeric)
-FROM SS_HISTLOG S, AIS.BUHBODY_T B
+FROM storage_adm.SS_HISTLOG S, AIS.BUHBODY_T B
 WHERE S.PROCISN=4
-AND S.LOADISN=GetLoadIsn()
+AND S.LOADISN=storage_adm.GetLoadIsn()
 AND S.FINDISN=B.ISN)','  select cast(to_char(k.month,''YYYYMMDD'')||BS.ISN as numeric)
  from 
  (select distinct k.month 

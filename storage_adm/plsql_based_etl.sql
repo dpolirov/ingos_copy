@@ -279,7 +279,7 @@ begin
     perform shared_system.setparamv('processshortname',pProcessShortname);
     perform shared_system.setparamn('startid', pStartId);
     execute pSql;
-    --do not log end of complex task if not all child tasks ended. processfinished is set in complex task
+    --do not log end of complex task if not all child tasks ended. processfinished is set in the end of complex task
     if coalesce(shared_system.getparamn('processfinished'), 1) <> 1 then
         perform storage_adm.LOGREP(false, pTaskIsn, pProcessShortname, 'END TASK', pStartId, 1, pSql, null);
     end if;
