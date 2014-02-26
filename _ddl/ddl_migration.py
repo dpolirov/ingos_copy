@@ -4,14 +4,16 @@
 #
 # Script generates DDL for Greenplum based on Oracle catalog.
 # Options:
-#   -f <path>           Required. Path to text file containing list of migrated tables 
+#   -f <path>           Optional. Path to text file containing list of migrated tables 
+#   -t <path>           Optional. Table name 
 #   -d                  Optional. Generate DROP TABLE IF EXISTS statemets for each table.
 #   -c <path>           Optional. Path to config file with credentials for Oracle database.
 #                                           Default ./ddl_migration.conf 
 import json
 from optparse import Option, OptionParser
 from gppylib.gpparseopts import OptParser, OptChecker
-import os
+import os, sys
+
 # set encoding parameter for cx_Oracle
 os.environ["NLS_LANG"] = ".UTF8"
 import cx_Oracle
@@ -71,6 +73,12 @@ def convertType(type, precision, scale, length) :
     
     return newtype
 
+def quotesym(s):
+  if "'" in s :
+    return '$$'
+  else:
+    return "'"
+
 
 # error handling
 #----------------------------------------
@@ -93,6 +101,7 @@ class DDLOptions:
         parser.remove_option("-h")    
         parser.add_option("-h", "-?", "--help",  action="store_true")
         parser.add_option("-f", "--file",        type="string")
+        parser.add_option("-t", "--table",       type="string")
         parser.add_option("-c", "--config",      type="string")
         parser.add_option("-d", "--drop",        action="store_true")
         (parser_result, args) = parser.parse_args()
@@ -100,8 +109,8 @@ class DDLOptions:
         if parser_result.help :
             print helpstr
             sys.exit(0)
-        if not parser_result.file:
-            raise Exception("Failed to start utility. Please, specify path to input file with -f key")
+        if not parser_result.file and not parser_result.table:
+            print "Failed to start utility. Please, specify path to input file with -f key or table with -t key"
             sys.exit(1)
 
         configpath = parser_result.config or "./ddl_migration.conf"
@@ -120,17 +129,18 @@ class DDLOptions:
         if not config_ok :       
             raise Exception('Wrong structure in configuration file. Should be: "oracle" on top level;  "login", "password", and "server" on second level')
 
-            
-        try:
-            inputfile = open(parser_result.file, "r")
-            for line in inputfile.readlines() :
-                line = line.strip()
-                if len(line) > 0 and not line.startswith("#") and not line.startswith("--") :
-                    self.tables_list.append(line)
-            inputfile.close()
-        except Exception, e :
-            raise Exception("Could not read input file " + parser_result.file + ". " +str(e))
-
+        if parser_result.file :
+            try:
+                inputfile = open(parser_result.file, "r")
+                for line in inputfile.readlines() :
+                    line = line.strip()
+                    if len(line) > 0 and not line.startswith("#") and not line.startswith("--") :
+                        self.tables_list.append(line)
+                inputfile.close()
+            except Exception, e :
+                raise Exception("Could not read input file " + parser_result.file + ". " +str(e))
+        else :
+            self.tables_list.append(parser_result.table)
         self.drop = parser_result.drop
 
 
@@ -233,7 +243,8 @@ for fulltablename in options.tables_list :
         # generate DDL for column       
         coldef = "    " + name.ljust(33) + convertType(column["DATA_TYPE"], column["DATA_PRECISION"], column["DATA_SCALE"], column["DATA_LENGTH"]) + default_stmt
         if ncol < numcols :
-            coldef += ','        ncol += 1
+            coldef += ','
+        ncol += 1
         
         print coldef
 
@@ -252,16 +263,20 @@ for fulltablename in options.tables_list :
     if len(result) > 0 :
         comments = [dict(zip([y[0] for y in cursor_comments.description], x)) for x in result]
         if comments[0]["TABLE_COMMENT"] is not None :
-            print "COMMENT ON TABLE %s.%s IS $COMM$%s$COMM$;" % (owner, table, comments[0]["TABLE_COMMENT"])
+            q = quotesym(comments[0]["TABLE_COMMENT"])
+            print "COMMENT ON TABLE %s.%s IS %s%s%s;" % (owner, table, q, comments[0]["TABLE_COMMENT"], q)
         for comment in comments :
             if comment["COLUMN_COMMENT"] is not None :
-                print "COMMENT ON COLUMN %s.%s.%s IS $COMM$%s$COMM$;" % (owner, table, columns_renamed[comment["COLUMN_NAME"].lower()], comment["COLUMN_COMMENT"])
+                q = quotesym(comment["COLUMN_COMMENT"])
+                print "COMMENT ON COLUMN %s.%s.%s IS %s%s%s;" % (owner, table, columns_renamed[comment["COLUMN_NAME"].lower()], q, comment["COLUMN_COMMENT"], q)
     print
     print
 
+# print full list of error and warnings in the end of file
 if len(errors) != 0:
-    print
-    print "/*********** Errors and warnings **********"
+    print "------------------- Errors and warnings ----------------------"
+    print "--"
     for msg in errors :
-        print msg
-    print "*******************************************/"
+        print "-- " + msg
+    print "--"
+    print "--------------------------------------------------------------"
