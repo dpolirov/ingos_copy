@@ -495,3 +495,44 @@ CREATE TABLE storages.rep_currate (
     dateval                          TIMESTAMP
 )
 distributed by (cdate);
+
+
+CREATE TABLE storages.repload (
+    isn                              NUMERIC,
+    datebeg                          TIMESTAMP,
+    dateend                          TIMESTAMP,
+    terminal                         VARCHAR(255),
+    buhdate                          TIMESTAMP,
+    tablename                        VARCHAR(40),
+    updatedby                        NUMERIC,
+    updated                          TIMESTAMP,
+    classisn                         NUMERIC,
+    description                      VARCHAR(4000),
+    loadtype                         NUMERIC,
+    lastisnloaded                    NUMERIC,
+    lastrundate                      TIMESTAMP,
+    lastenddate                      TIMESTAMP,
+    procisn                          NUMERIC,
+    daterep                          TIMESTAMP,
+    schema                           VARCHAR(30)
+)
+distributed by (isn);
+--WARNING: No primary key defined for storages.repload
+
+COMMENT ON COLUMN storages.repload.daterep IS 'Дата отчета';
+COMMENT ON COLUMN storages.repload.datebeg IS 'Дата начала для логовой сессии';
+COMMENT ON COLUMN storages.repload.dateend IS 'Дата окончания для логовой сессии';
+COMMENT ON COLUMN storages.repload.classisn IS '1- активная загрузка';
+COMMENT ON COLUMN storages.repload.loadtype IS 'Тип сессии - полная загрузка, по логам';
+COMMENT ON COLUMN storages.repload.lastisnloaded IS 'Последний удачно загруж , для полной сессии';
+COMMENT ON COLUMN storages.repload.lastrundate IS 'Дата последнего запуска';
+COMMENT ON COLUMN storages.repload.lastenddate IS 'Дата последнего завершения';
+COMMENT ON COLUMN storages.repload.procisn IS 'Isn задачи';
+
+
+CREATE TABLE storages.tt_rule_rpngrp (
+    ruleisn                          NUMERIC,
+    groupisn                         NUMERIC,
+    typerule                         VARCHAR(30)
+) distributed by (ruleisn)
+;

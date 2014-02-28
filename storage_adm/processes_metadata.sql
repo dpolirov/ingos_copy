@@ -401,6 +401,7 @@ insert into storage_adm.ss_processes values(14,'BODY_ISN_GROUP','Загрузк�
 insert into storage_adm.ss_processes values(15,'REPBUHBODYGROUP','Загрузка REPBUHBODY - проводки проходят серьезную очистку и результат - HEADISN','Y',110,5000,'N','');
 insert into storage_adm.ss_processes values(19,'AgrSalers','Загрузка продавцов','Y',180,5000,'N','storage_adm.prc_rep_agr_salers_afterscript();');
 insert into storage_adm.ss_processes values(20,'AgrAgents','Загрузка агентов','Y',190,5000,'N','');
+insert into storage_adm.ss_processes values(23,'BEST_ADDR','Загрузка витрины с Крыловским адресом','Y',10,10000,'N','');   
 insert into storage_adm.ss_processes values(27,'RepAgrRoleAgr','Загрузка витрины по ролям договора','Y',10,10000,'N','');  
 insert into storage_adm.ss_processes values(52,'SUBJECT_ATTRIB','Загрузка витрины STORAGE_SOURCE.SUBJECT_ATTRIB','Y',10,100000,'N','');   
 -- later stages
@@ -412,7 +413,6 @@ insert into storage_adm.ss_processes values(17,'MedRefundGroup','Загрузк�
 insert into storage_adm.ss_processes values(18,'MedBuhGroup','Загрузка Медицины: Бухгалтерия','Y',170,1000,'N','');   
 insert into storage_adm.ss_processes values(21,'CarRepAgr','Загрузка витрины CarRepAgr','Y',200,5000,'N','');    
 insert into storage_adm.ss_processes values(22,'REP_DOCS_DOCSUM_CLMINV','Загрузка витрины REP_DOCS_DOCSUM_CLMINV - sts: отключил в загрузчике № 1015. Вместо него - включил 24 процесс в загрузчик 1330','N',220,10000,'N','');
-insert into storage_adm.ss_processes values(23,'BEST_ADDR','Загрузка витрины с Крыловским адресом','Y',10,10000,'N','');   
 insert into storage_adm.ss_processes values(24,'REP_DOCS_DOCSUM_CLMINV_LINE','Загрузка витрины по счетам, строкам калькуляции и их документам','N',10,10000,'N','');
 insert into storage_adm.ss_processes values(25,'REP_DOCS_DOCSUM','Загрузка витрины по моторным документам и доксуммам','Y',10,5000,'N','');    
 insert into storage_adm.ss_processes values(26,'REP_CLMINV_LINE','Загрузка витрины по моторным счетам, строкам калькуляции','Y',10,5000,'N','');    
@@ -449,83 +449,82 @@ insert into storage_adm.ss_processes values(53,'ClientDirectivity','Загруз
 --
 --------------------------------------------------------------------------------------------------
 -- stage 2
-insert into storage_adm.ss_process_dest_tables values(1,'STORAGES.st_buhbody','storage_adm.v_tt_buhbody','STORAGE_ADM.tt_buhbody','bodyisn','bodyisn',10,'x_st_buhbody_body',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(2,'STORAGES.st_bodydebcre','storage_adm.v_tt_bodydebcre','STORAGE_ADM.tt_bodydebcre','baseisn,db','baseisn',20,'x_st_bodydebcre_base',0,'','',''); 
-insert into storage_adm.ss_process_dest_tables values(3,'STORAGES.st_docsumbody','storage_adm.v_tt_docsumbody','STORAGE_ADM.tt_docsumbody','BODYISN,DSISN','BODYISN',null,'X_ST_DOCSUMBODY_DS',1,'DATEEND','DATEBEG','');
-insert into storage_adm.ss_process_dest_tables values(4,'STORAGES.ST_BUH_TURN','storage_adm.v_tt_BUH_TURN','STORAGE_ADM.tt_BUH_TURN','PRM_KEY,coalesce(SUBKINDISN,-1),coalesce(OPRISN,-1),coalesce(CURRISN,-1),CODE,coalesce(DEB,timestamp ''1900-01-01 00:00:00'')','PRM_KEY',null,'X_ST_BUH_TURN_UNIC',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(5,'STORAGES.st_buhbody_reins','storage_adm.v_tt_buhbody_reins','STORAGE_ADM.tt_buhbody_reins','bodyisn','bodyisn',null,'x_st_buhbody_reins_body',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(6,'STORAGES.ST_REP_SUBJECT','storage_adm.V_REP_SUBJECT','STORAGE_ADM.tt_REP_SUBJECT','SubjIsn','SubjIsn',null,'x_REP_SUBJECT_subj',0,'','',''); 
-insert into storage_adm.ss_process_dest_tables values(7,'STORAGES.st_buh_turn_corr','storage_adm.v_tt_buh_turn_corr','STORAGE_ADM.tt_buh_turn_corr','PRM_KEY,coalesce(SubKindISn,-1),coalesce(OPRISN,-1),CorCode','PRM_KEY',null,'x_st_buh_turn_Corr_unic',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(8,'STORAGES.ST_BUH_TURN_CONTR','storage_adm.V_TT_BUH_TURN_CONTR','STORAGE_ADM.TT_BUH_TURN_CONTR','PRM_KEY,coalesce(OPRISN,-1),coalesce(Resident,''A''),coalesce(branchisn,0),coalesce(CURRISN,-1),coalesce(JURIDICAL,''A'')','PRM_KEY',null,'x_st_buh_turn_Contr_unic',0,'','','');   
-insert into storage_adm.ss_process_dest_tables values(12,'STORAGE_SOURCE.REPREFUND','storage_adm.V_REPREFUND','STORAGE_ADM.tt_reprefund','REFUNDISN,coalesce(AGREXTISN,0)','CLAIMISN',null,'X_REPREFUND_REF_EXT',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.REP_AGRCARGO','storage_adm.V_REPAGRCARGO','STORAGE_ADM.tt_REP_AGRCARGO','AgrIsn','AgrIsn',null,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.rep_agrext','storage_adm.v_rep_agrext','STORAGE_ADM.tt_rep_agrext','AgrIsn','AgrIsn',null,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.REP_AGRTUR','storage_adm.V_REPAGRTUR','STORAGE_ADM.tt_REP_AGRTUR','Agrisn','AgrIsn',null,'',0,'','',''); 
-insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.rep_longagraddendum','storage_adm.v_longagraddendum','STORAGE_ADM.tt_longagraddendum','ADDISN','AgrIsn',null,'',0,'','',''); 
-insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.rep_objclass_domestic','storage_adm.v_rep_objclass_domestic','STORAGE_ADM.tt_rep_objclass_domestic','AgrIsn,ObjClassIsn,Parentobjclassisn','AgrIsn',null,'',0,'','','');  
-insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.REPAGR','storage_adm.V_REPAGR','STORAGE_ADM.tt_repagr','AgrIsn','AgrIsn',10,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.repagr_economic','storage_adm.V_repagr_economic','STORAGE_ADM.tt_repagr_economic','AgrIsn','AgrIsn',null,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.REPCOND','storage_adm.V_REPCOND','STORAGE_ADM.tt_repcond','CondIsn','AgrIsn',null,'X_REPCOND_COND',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.REPCRGDOC','storage_adm.v_repcrgdoc','STORAGE_ADM.tt_repcrgdoc','Agrisn,classisn','Agrisn',null,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(14,'storages.st_buhbody_nms','storage_adm.v_tt_buhbody_nms','STORAGE_ADM.tt_buhbody_nms','BODYISN','BODYISN',null,'X_buhbody_nms_BODY',0,'','','');  
-insert into storage_adm.ss_process_dest_tables values(15,'STORAGE_SOURCE.REPBUHBODY','storage_adm.V_REPBUHBODY','storage_adm.tt_repbuhbody','BODYISN,coalesce(DOCSUMISN,0),coalesce(factisn,0),coalesce(buhquitisn,0),coalesce(buhquitbodyisn,0),Dateval','HEADISN',10,'X_PREBUHBODY_ASPK',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(15,'STORAGE_SOURCE.REPBUHQUIT','storage_adm.v_repbuhquit','storage_adm.tt_repbuhquit','BodyIsn,buhquitbodyisn,buhquitisn,coalesce(quitbodyisn,0),Dateval','HeadIsn',20,'X_REPBUHQUIT_BODY',0,'','',''); 
-insert into storage_adm.ss_process_dest_tables values(19,'STORAGES.REP_AGR_SALERS','storage_adm.V_REP_AGR_SALERS','STORAGE_ADM.TT_REP_AGR_SALERS','AGRISN, SALERISN, coalesce(SALERCLASSISN, 0), AGRSALERCLASSISN, DATEBEG, DATEEND, DEPTISN','AGRISN',10,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(19,'STORAGES.REP_AGR_SALERS_LINE','storage_adm.V_REP_AGR_SALERS_LINE','STORAGE_ADM.TT_REP_AGR_SALERS_LINE','AGRISN, DATEBEG, DATEEND','AGRISN',20,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(20,'MOTOR.AGRAGENT_RANKS','storage_adm.V_AGRAGENT_RANKS','STORAGE_ADM.TT_AGRAGENT_RANKS','AGRISN, AGENTISN, CLASSISN, AGENT_RANK, SHAREPC, AGRRANK_RANK, ARCLASSISN','AGRISN',20,'',0,'','','');   
-insert into storage_adm.ss_process_dest_tables values(20,'STORAGES.REP_AGENT_RANKS','storage_adm.V_REP_AGENT_RANKS','STORAGE_ADM.TT_REP_AGENT_RANKS','AGRISN, ADDISN, AGENTISN, ORDERNO','AGRISN',10,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(27,'STORAGE_SOURCE.REPAGRROLEAGR','storage_adm.V_REPAGRROLEAGR','STORAGE_ADM.TT_REPAGRROLEAGR','AGRISN','AGRISN',10,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(52,'STORAGE_SOURCE.SUBJECT_ATTRIB','storage_adm.V_SUBJECT_ATTRIB','STORAGE_ADM.TT_SUBJECT_ATTRIB','SUBJISN','SUBJISN',null,'',0,'','',''); 
+insert into storage_adm.ss_process_dest_tables values(1,'STORAGES.st_buhbody','storage_adm.v_tt_buhbody','STORAGE_ADM.tt_buhbody','bodyisn','bodyisn',10,'x_st_buhbody_body',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(2,'STORAGES.st_bodydebcre','storage_adm.v_tt_bodydebcre','STORAGE_ADM.tt_bodydebcre','baseisn,db','baseisn',20,'x_st_bodydebcre_base',0,'','','','','');insert into storage_adm.ss_process_dest_tables values(3,'STORAGES.st_docsumbody','storage_adm.v_tt_docsumbody','STORAGE_ADM.tt_docsumbody','BODYISN,DSISN','BODYISN',null,'X_ST_DOCSUMBODY_DS',1,'DATEEND','DATEBEG','','select shared_system.gcc2_load();','','');
+insert into storage_adm.ss_process_dest_tables values(4,'STORAGES.ST_BUH_TURN','storage_adm.v_tt_BUH_TURN','STORAGE_ADM.tt_BUH_TURN','PRM_KEY,coalesce(SUBKINDISN,-1),coalesce(OPRISN,-1),coalesce(CURRISN,-1),CODE,coalesce(DEB,timestamp ''1900-01-01 00:00:00'')','PRM_KEY',null,'X_ST_BUH_TURN_UNIC',0,'','','','','','PRM_KEY,coalesce(SUBKINDISN,-1) SUBKINDISN,coalesce(OPRISN,-1) OPRISN,coalesce(CURRISN,-1) CURRISN,CODE,coalesce(DEB,timestamp ''1900-01-01 00:00:00'') DEB');
+insert into storage_adm.ss_process_dest_tables values(5,'STORAGES.st_buhbody_reins','storage_adm.v_tt_buhbody_reins','STORAGE_ADM.tt_buhbody_reins','bodyisn','bodyisn',null,'x_st_buhbody_reins_body',0,'','','','select shared_system.gcc2_load();','');
+insert into storage_adm.ss_process_dest_tables values(6,'STORAGES.ST_REP_SUBJECT','storage_adm.V_REP_SUBJECT','STORAGE_ADM.tt_REP_SUBJECT','SubjIsn','SubjIsn',null,'x_REP_SUBJECT_subj',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(7,'STORAGES.st_buh_turn_corr','storage_adm.v_tt_buh_turn_corr','STORAGE_ADM.tt_buh_turn_corr','PRM_KEY,coalesce(SubKindISn,-1),coalesce(OPRISN,-1),CorCode','PRM_KEY',null,'x_st_buh_turn_Corr_unic',0,'','','','','','PRM_KEY,coalesce(SubKindISn,-1) subkindisn,coalesce(OPRISN,-1) oprisn,CorCode');
+insert into storage_adm.ss_process_dest_tables values(8,'STORAGES.ST_BUH_TURN_CONTR','storage_adm.V_TT_BUH_TURN_CONTR','STORAGE_ADM.TT_BUH_TURN_CONTR','PRM_KEY,coalesce(OPRISN,-1),coalesce(Resident,''A''),coalesce(branchisn,0),coalesce(CURRISN,-1),coalesce(JURIDICAL,''A'')','PRM_KEY',null,'x_st_buh_turn_Contr_unic',0,'','','','select shared_system.gcc2_load();','','PRM_KEY,coalesce(OPRISN,-1) OPRISN,coalesce(Resident,''A'') Resident,coalesce(branchisn,0) branchisn,coalesce(CURRISN,-1) CURRISN,coalesce(JURIDICAL,''A'') JURIDICAL');
+insert into storage_adm.ss_process_dest_tables values(12,'STORAGE_SOURCE.REPREFUND','storage_adm.V_REPREFUND','STORAGE_ADM.tt_reprefund','REFUNDISN,coalesce(AGREXTISN,0)','CLAIMISN',null,'X_REPREFUND_REF_EXT',0,'','','','select shared_system.gcc2_load();','');
+insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.REP_AGRCARGO','storage_adm.V_REPAGRCARGO','STORAGE_ADM.tt_REP_AGRCARGO','AgrIsn','AgrIsn',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.rep_agrext','storage_adm.v_rep_agrext','STORAGE_ADM.tt_rep_agrext','AgrIsn','AgrIsn',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.REP_AGRTUR','storage_adm.V_REPAGRTUR','STORAGE_ADM.tt_REP_AGRTUR','Agrisn','AgrIsn',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.rep_longagraddendum','storage_adm.v_longagraddendum','STORAGE_ADM.tt_longagraddendum','ADDISN','AgrIsn',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.rep_objclass_domestic','storage_adm.v_rep_objclass_domestic','STORAGE_ADM.tt_rep_objclass_domestic','AgrIsn,ObjClassIsn,Parentobjclassisn','AgrIsn',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.REPAGR','storage_adm.V_REPAGR','STORAGE_ADM.tt_repagr','AgrIsn','AgrIsn',10,'',0,'','','','select shared_system.gcc2_load();','');
+insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.repagr_economic','storage_adm.V_repagr_economic','STORAGE_ADM.tt_repagr_economic','AgrIsn','AgrIsn',null,'',0,'','','','select shared_system.gcc2_load();','');
+insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.REPCOND','storage_adm.V_REPCOND','STORAGE_ADM.tt_repcond','CondIsn','AgrIsn',null,'X_REPCOND_COND',0,'','','','select shared_system.gcc2_load();','');
+insert into storage_adm.ss_process_dest_tables values(13,'STORAGE_SOURCE.REPCRGDOC','storage_adm.v_repcrgdoc','STORAGE_ADM.tt_repcrgdoc','Agrisn,classisn','Agrisn',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(14,'storages.st_buhbody_nms','storage_adm.v_tt_buhbody_nms','STORAGE_ADM.tt_buhbody_nms','BODYISN','BODYISN',null,'X_buhbody_nms_BODY',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(15,'STORAGE_SOURCE.REPBUHBODY','storage_adm.V_REPBUHBODY','storage_adm.tt_repbuhbody','BODYISN,coalesce(DOCSUMISN,0),coalesce(factisn,0),coalesce(buhquitisn,0),coalesce(buhquitbodyisn,0),Dateval','HEADISN',10,'X_PREBUHBODY_ASPK',0,'','','','select shared_system.gcc2_load();','');
+insert into storage_adm.ss_process_dest_tables values(15,'STORAGE_SOURCE.REPBUHQUIT','storage_adm.v_repbuhquit','storage_adm.tt_repbuhquit','BodyIsn,buhquitbodyisn,buhquitisn,coalesce(quitbodyisn,0),Dateval','HeadIsn',20,'X_REPBUHQUIT_BODY',0,'','','','select shared_system.gcc2_load();','');
+insert into storage_adm.ss_process_dest_tables values(19,'STORAGES.REP_AGR_SALERS','storage_adm.V_REP_AGR_SALERS','STORAGE_ADM.TT_REP_AGR_SALERS','AGRISN, SALERISN, coalesce(SALERCLASSISN, 0), AGRSALERCLASSISN, DATEBEG, DATEEND, DEPTISN','AGRISN',10,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(19,'STORAGES.REP_AGR_SALERS_LINE','storage_adm.V_REP_AGR_SALERS_LINE','STORAGE_ADM.TT_REP_AGR_SALERS_LINE','AGRISN, DATEBEG, DATEEND','AGRISN',20,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(20,'MOTOR.AGRAGENT_RANKS','storage_adm.V_AGRAGENT_RANKS','STORAGE_ADM.TT_AGRAGENT_RANKS','AGRISN, AGENTISN, CLASSISN, AGENT_RANK, SHAREPC, AGRRANK_RANK, ARCLASSISN','AGRISN',20,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(20,'STORAGES.REP_AGENT_RANKS','storage_adm.V_REP_AGENT_RANKS','STORAGE_ADM.TT_REP_AGENT_RANKS','AGRISN, ADDISN, AGENTISN, ORDERNO','AGRISN',10,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(27,'STORAGE_SOURCE.REPAGRROLEAGR','storage_adm.V_REPAGRROLEAGR','STORAGE_ADM.TT_REPAGRROLEAGR','AGRISN','AGRISN',10,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(52,'STORAGE_SOURCE.SUBJECT_ATTRIB','storage_adm.V_SUBJECT_ATTRIB','STORAGE_ADM.TT_SUBJECT_ATTRIB','SUBJISN','SUBJISN',null,'',0,'','','','','');
 -- later stages
-insert into storage_adm.ss_process_dest_tables values(9,'STORAGES.ST_REPAGR','STORAGES.V_TT_REPAGR','STORAGES.TT_REPAGR','AGRISN','AGRISN',null,'X_REPAGR',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(10,'STORAGES.ST_JuorAgrOSAGO','STORAGES.v_tt_JuorAgrOSAGO','STORAGES.tt_JuorAgrOSAGO','AGRISN','AGRISN',null,'X_ST_JOURAGROSAGO_AGR',1,'DTEND','DTBEG','');  
-insert into storage_adm.ss_process_dest_tables values(11,'STORAGES.ST_JuorClaimOSAGO','storage_adm.v_tt_JuorClaimOSAGO','STORAGE_ADM.tt_JuorClaimOSAGO','AGRISN, DISCR','AGRISN',null,'X_ST_JuorClaimOSAGO_AGR',1,'DTEND','DTBEG','');   
-insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDAGENTAGR','storage_adm.V_MEDAGENTAGR','STORAGE_ADM.TT_MEDAGENTAGR','AGRISN','AGRISN',40,'',0,'','',''); 
-insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDAGREEMENT','storage_adm.V_MEDAGREEMENT','STORAGE_ADM.TT_MEDAGREEMENT','AGRISN','AGRISN',50,'',0,'','','');   
-insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDAGRROLE','storage_adm.V_MEDAGRROLE','STORAGE_ADM.TT_MEDAGRROLE','ROLEISN','AGRISN',20,'X_MEDAGRROLE_ROLEISN',0,'','','');   
-insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDAGRROLEAGR','storage_adm.V_MEDAGRROLEAGR','STORAGE_ADM.TT_MEDAGRROLEAGR','AGRISN','AGRISN',30,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDCOND','storage_adm.V_MEDCOND','STORAGE_ADM.TT_MEDCOND','CONDISN','AGRISN',70,'X_MEDCOND',0,'','','');   
-insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDCONDAGRDE','storage_adm.V_MEDCOND','STORAGE_ADM.TT_MEDCOND','CONDISN','AGRISN',80,'X_ST_MEDCONDAGRDE',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDOBJECT','storage_adm.V_MEDOBJECT','STORAGE_ADM.TT_MEDOBJECT','OBJISN','AGRISN',60,'',0,'','','');  
-insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDREPAGR','storage_adm.V_MEDREPAGR','STORAGE_ADM.TT_MEDREPAGR','AGRISN','AGRISN',10,'',0,'','','');  
-insert into storage_adm.ss_process_dest_tables values(17,'MEDIC.ST_MEDREFUND','storage_adm.V_MEDREFUND','STORAGE_ADM.TT_MEDREFUND','REFUNDISN,coalesce(EXTISN,0)','CLAIMISN',null,'X_MEDREFUND_PK',0,'','',''); 
-insert into storage_adm.ss_process_dest_tables values(18,'MEDIC.ST_MEDSUM','storage_adm.V_MEDSUM','STORAGE_ADM.TT_MEDSUM','DOCSUMISN','DOCSUMISN',null,'',0,'','','');  
-insert into storage_adm.ss_process_dest_tables values(21,'MOTOR.CARREPAGR','storage_adm.V_CARREPAGR','STORAGE_ADM.TT_CARREPAGR','AGRISN','AGRISN',10,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(22,'MOTOR.REP_DOCS_DOCSUM_CLMINV','storage_adm.V_REP_DOCS_DOCSUM_CLMINV','STORAGE_ADM.TT_REP_DOCS_DOCSUM_CLMINV','DOC_SIGNED, DOCSUM_ISN','CLMINV_ISN',10,'X_DOCSUMCLMINV_DOCSUM',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(23,'STORAGE_SOURCE.SUBJ_BEST_ADDR','storage_adm.V_SUBJ_BEST_ADDR','STORAGE_ADM.TT_SUBJ_BEST_ADDR','SUBJISN','SUBJISN',10,'X_SUBADDR_SUBJ',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(24,'MOTOR.REP_DOCS_DOCSUM_CLMINV_LINE','storage_adm.V_REP_DOCS_DOCSUM_CLMINV_LINE','STORAGE_ADM.TT_REP_DOCS_DOCSUM_CLMINV_LINE','CLMINVL_ISN, CLMINV_ISN, REFUNDISN, DOCSUM_ISN, DOC_ISN','CLMINV_ISN',10,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(25,'MOTOR.REP_DOCS_DOCSUM','storage_adm.V_REP_DOCS_DOCSUM','STORAGE_ADM.TT_REP_DOCS_DOCSUM','DOCSUM_ISN','AGRISN',10,'',0,'','','');   
-insert into storage_adm.ss_process_dest_tables values(26,'MOTOR.REP_CLMINV_LINE','storage_adm.V_REP_CLMINV_LINE','STORAGE_ADM.TT_REP_CLMINV_LINE','CLMINVL_ISN, CLMINV_ISN, REFUNDISN','CLMINV_ISN',10,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(27,'STORAGE_SOURCE.REPAGRROLEAGR','storage_adm.V_REPAGRROLEAGR','STORAGE_ADM.TT_REPAGRROLEAGR','AGRISN','AGRISN',10,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(29,'MOTOR.TARIFF_KOEFF','storage_adm.V_TARIFF_KOEFF','STORAGE_ADM.TT_TARIFF_KOEFF','AGRISN','AGRISN',30,'',0,'','',''); 
-insert into storage_adm.ss_process_dest_tables values(29,'MOTOR.TARIFF_KOEFF_OBJ','storage_adm.V_TARIFF_KOEFF_OBJ','STORAGE_ADM.TT_TARIFF_KOEFF_OBJ','AGRISN, PARENTOBJISN, RPTCLASS, RPTCLASSISN','AGRISN',10,'',0,'','','');  
-insert into storage_adm.ss_process_dest_tables values(29,'MOTOR.TARIFF_KOEFF_RPT','storage_adm.V_TARIFF_KOEFF_RPT','STORAGE_ADM.TT_TARIFF_KOEFF_RPT','AGRISN, RPTCLASS, RPTCLASSISN','AGRISN',20,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(30,'MOTOR.CARCOND','storage_adm.V_CARCOND','STORAGE_ADM.TT_CARCOND','AGRISN, PARENTOBJISN, OBJISN, RPTCLASS, RPTCLASSISN','AGRISN',10,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(32,'MOTOR.REPAGROBJECTEXT','storage_adm.v_REPAGROBJECTEXT','STORAGE_ADM.TT_REPAGROBJECTEXT','OBJISN','OBJISN',10,'X_REPAGROBJECTEXT_OBJ',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(33,'MOTOR.CARCOND_OBJ_SUM','storage_adm.V_CARCOND_OBJ_SUM','STORAGE_ADM.TT_CARCOND_OBJ_SUM','AGRISN, PARENTOBJISN, RPTCLASS, RPTCLASSISN','PARENTOBJISN',null,'',0,'','',''); 
-insert into storage_adm.ss_process_dest_tables values(33,'MOTOR.CARCOND_OBJ_SUM_DO','storage_adm.V_CARCOND_OBJ_SUM_DO','STORAGE_ADM.TT_CARCOND_OBJ_SUM_DO','AGRISN, PARENTOBJISN, RPTCLASS, RPTCLASSISN','PARENTOBJISN',null,'',0,'','','');  
-insert into storage_adm.ss_process_dest_tables values(35,'MOTOR.CAR_CUBE','storage_adm.V_CAR_CUBE','STORAGE_ADM.TT_CAR_CUBE','AGRISN, PARENTOBJISN, RPTCLASS, RPTCLASSISN, COND_DATEBEG, COND_DATEEND','PARENTOBJISN',null,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(36,'MOTOR.CARSUM','storage_adm.V_CARSUM','STORAGE_ADM.TT_CARSUM','CARSUMISN','CARSUMISN',null,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(37,'MOTOR.MTPL_POLICIES','storage_adm.V_MTPL_POLICIES','STORAGE_ADM.TT_MTPL_POLICIES','AGRISN','AGRISN',null,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(38,'MOTOR.MTPL_SUMMARIZED','storage_adm.V_MTPL_SUMMARIZED','STORAGE_ADM.TT_MTPL_SUMMARIZED','AGRISN','AGRISN',null,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(39,'MOTOR.PVUFIXSUM','storage_adm.V_PVUFIXSUM','STORAGE_ADM.TT_PVUFIXSUM','BUHBODYISN','BUHBODYISN',null,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(40,'MOTOR.TT_RISK2RPTCLASS','storage_adm.V_RISK2RPTCLASS','STORAGE_ADM.TT_RISK2RPTCLASS','XRPTCLASSISN','XRPTCLASSISN',null,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(41,'MOTOR.CARREFUND','storage_adm.V_CARREFUND','STORAGE_ADM.TT_CARREFUND','REFUNDISN','REFUNDISN',null,'',0,'','',''); 
-insert into storage_adm.ss_process_dest_tables values(42,'MOTOR.CARDOCSUMINVOICELINE','storage_adm.V_CARDOCSUMINVOICELINE','STORAGE_ADM.TT_CARDOCSUMINVOICELINE','DOCISN','DOCISN',null,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(43,'MOTOR.CAR_ATTRIB','storage_adm.V_CAR_ATTRIB','STORAGE_ADM.TT_CAR_ATTRIB','OBJISN','OBJISN',null,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(44,'MOTOR.CARDRIVER','storage_adm.V_CARDRIVER','STORAGE_ADM.TT_CARDRIVER','AGRISN','AGRISN',null,'',0,'','','');  
-insert into storage_adm.ss_process_dest_tables values(45,'MOTOR.DOPUSLUGI_SUMS','storage_adm.V_DOPUSLUGI_SUMS','STORAGE_ADM.TT_DOPUSLUGI_SUMS','AGRISN','AGRISN',null,'',0,'','','');  
-insert into storage_adm.ss_process_dest_tables values(46,'MOTOR.REP_PRESALE','storage_adm.V_REP_PRESALE','STORAGE_ADM.TT_REP_PRESALE','PRESALEISN','PRESALEISN',null,'',0,'','','');   
-insert into storage_adm.ss_process_dest_tables values(47,'MOTOR.REPAGR_AGENT','storage_adm.V_REPAGR_AGENT','STORAGE_ADM.TT_REPAGR_AGENT','ISN','ISN',null,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(48,'MOTOR.CAR_DEALERS','storage_adm.V_CAR_DEALERS','STORAGE_ADM.TT_CAR_DEALERS','CARDEALERISN','CARDEALERISN',null,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(49,'MOTOR.T_AGR_DRIVERS','storage_adm.V_AGR_DRIVERS','STORAGE_ADM.TT_AGR_DRIVERS','AGRISN','AGRISN',null,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(50,'MOTOR.REP_QUEUE_MAIL','storage_adm.V_REP_QUEUE_MAIL','STORAGE_ADM.TT_REP_QUEUE_MAIL','ISN','ISN',null,'',0,'','','');   
-insert into storage_adm.ss_process_dest_tables values(51,'MEDIC.ST_MED_AGRCONDBUH','storage_adm.V_MED_AGRCONDBUH','TT_MED_AGRCONDBUH','AGRISN, coalesce(SUBACCISN, 0), coalesce(RULEISN, 0), coalesce(MONTHDATEVAL, timestamp ''1900-01-01 00:00:00''), coalesce(MAXDATEVAL, timestamp ''1900-01-01 00:00:00''), coalesce(RISKRULEISN, 0), coalesce(STATCODE, 0)','AGRISN',null,'X_MED_AGRCONDBUH_AGR',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(53,'STORAGES.CLIENTDIRECTIVITY','storage_adm.v_clientdirectivity','STORAGE_ADM.TT_CLIENTDIRECTIVITY','Agrisn','Agrisn',null,'',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(-1,'STORAGE_SOURCE.REP_AGRCLAUSE','storage_adm.v_REP_AGRCLAUSE','tt_REP_AGRCLAUSE','AgrIsn,Classisn','AgrIsn',null,'',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(-1,'STORAGES.ST_PREM_BY_DEPT','STORAGES.V_TT_PREM_BY_DEPT','STORAGES.TT_PREM_BY_DEPT','PRM_KEY,coalesce(DEPTISN,-1),coalesce(repr_deptisn,-1)','PRM_KEY',null,'X_ST_PREM_UNIC',0,'','','');
-insert into storage_adm.ss_process_dest_tables values(-4,'STORAGES.ST_BUH_TURN_NFS','storage_adm.V_TT_BUHTURN_NFS','TT_BUHTURN_NFS','PRM_KEY,coalesce(OPRISN,-1),coalesce(OSCLASS,-1),coalesce(OSKIND,-1),coalesce(OSSTATUS,-1) ,coalesce(OKOFCODE,''-''),coalesce(ISBULDING,-1),CODE','PRM_KEY',null,'X_ST_BUH_TURN_NFS_UNIC',0,'','','');    
-insert into storage_adm.ss_process_dest_tables values(-13,'STORAGE_SOURCE.zeropremiumsumaddendum','storage_adm.v_zeropremiumsumaddendum','tt_zeropremiumsumaddendum','ADDISN','AgrIsn',null,'',0,'','','');
+insert into storage_adm.ss_process_dest_tables values(9,'STORAGES.ST_REPAGR','STORAGES.V_TT_REPAGR','STORAGES.TT_REPAGR','AGRISN','AGRISN',null,'X_REPAGR',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(10,'STORAGES.ST_JuorAgrOSAGO','STORAGES.v_tt_JuorAgrOSAGO','STORAGES.tt_JuorAgrOSAGO','AGRISN','AGRISN',null,'X_ST_JOURAGROSAGO_AGR',1,'DTEND','DTBEG','','','');
+insert into storage_adm.ss_process_dest_tables values(11,'STORAGES.ST_JuorClaimOSAGO','storage_adm.v_tt_JuorClaimOSAGO','STORAGE_ADM.tt_JuorClaimOSAGO','AGRISN, DISCR','AGRISN',null,'X_ST_JuorClaimOSAGO_AGR',1,'DTEND','DTBEG','','','');
+insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDAGENTAGR','storage_adm.V_MEDAGENTAGR','STORAGE_ADM.TT_MEDAGENTAGR','AGRISN','AGRISN',40,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDAGREEMENT','storage_adm.V_MEDAGREEMENT','STORAGE_ADM.TT_MEDAGREEMENT','AGRISN','AGRISN',50,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDAGRROLE','storage_adm.V_MEDAGRROLE','STORAGE_ADM.TT_MEDAGRROLE','ROLEISN','AGRISN',20,'X_MEDAGRROLE_ROLEISN',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDAGRROLEAGR','storage_adm.V_MEDAGRROLEAGR','STORAGE_ADM.TT_MEDAGRROLEAGR','AGRISN','AGRISN',30,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDCOND','storage_adm.V_MEDCOND','STORAGE_ADM.TT_MEDCOND','CONDISN','AGRISN',70,'X_MEDCOND',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDCONDAGRDE','storage_adm.V_MEDCOND','STORAGE_ADM.TT_MEDCOND','CONDISN','AGRISN',80,'X_ST_MEDCONDAGRDE',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDOBJECT','storage_adm.V_MEDOBJECT','STORAGE_ADM.TT_MEDOBJECT','OBJISN','AGRISN',60,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(16,'MEDIC.ST_MEDREPAGR','storage_adm.V_MEDREPAGR','STORAGE_ADM.TT_MEDREPAGR','AGRISN','AGRISN',10,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(17,'MEDIC.ST_MEDREFUND','storage_adm.V_MEDREFUND','STORAGE_ADM.TT_MEDREFUND','REFUNDISN,coalesce(EXTISN,0)','CLAIMISN',null,'X_MEDREFUND_PK',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(18,'MEDIC.ST_MEDSUM','storage_adm.V_MEDSUM','STORAGE_ADM.TT_MEDSUM','DOCSUMISN','DOCSUMISN',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(21,'MOTOR.CARREPAGR','storage_adm.V_CARREPAGR','STORAGE_ADM.TT_CARREPAGR','AGRISN','AGRISN',10,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(22,'MOTOR.REP_DOCS_DOCSUM_CLMINV','storage_adm.V_REP_DOCS_DOCSUM_CLMINV','STORAGE_ADM.TT_REP_DOCS_DOCSUM_CLMINV','DOC_SIGNED, DOCSUM_ISN','CLMINV_ISN',10,'X_DOCSUMCLMINV_DOCSUM',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(23,'STORAGE_SOURCE.SUBJ_BEST_ADDR','storage_adm.V_SUBJ_BEST_ADDR','STORAGE_ADM.TT_SUBJ_BEST_ADDR','SUBJISN','SUBJISN',10,'X_SUBADDR_SUBJ',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(24,'MOTOR.REP_DOCS_DOCSUM_CLMINV_LINE','storage_adm.V_REP_DOCS_DOCSUM_CLMINV_LINE','STORAGE_ADM.TT_REP_DOCS_DOCSUM_CLMINV_LINE','CLMINVL_ISN, CLMINV_ISN, REFUNDISN, DOCSUM_ISN, DOC_ISN','CLMINV_ISN',10,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(25,'MOTOR.REP_DOCS_DOCSUM','storage_adm.V_REP_DOCS_DOCSUM','STORAGE_ADM.TT_REP_DOCS_DOCSUM','DOCSUM_ISN','AGRISN',10,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(26,'MOTOR.REP_CLMINV_LINE','storage_adm.V_REP_CLMINV_LINE','STORAGE_ADM.TT_REP_CLMINV_LINE','CLMINVL_ISN, CLMINV_ISN, REFUNDISN','CLMINV_ISN',10,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(27,'STORAGE_SOURCE.REPAGRROLEAGR','storage_adm.V_REPAGRROLEAGR','STORAGE_ADM.TT_REPAGRROLEAGR','AGRISN','AGRISN',10,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(29,'MOTOR.TARIFF_KOEFF','storage_adm.V_TARIFF_KOEFF','STORAGE_ADM.TT_TARIFF_KOEFF','AGRISN','AGRISN',30,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(29,'MOTOR.TARIFF_KOEFF_OBJ','storage_adm.V_TARIFF_KOEFF_OBJ','STORAGE_ADM.TT_TARIFF_KOEFF_OBJ','AGRISN, PARENTOBJISN, RPTCLASS, RPTCLASSISN','AGRISN',10,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(29,'MOTOR.TARIFF_KOEFF_RPT','storage_adm.V_TARIFF_KOEFF_RPT','STORAGE_ADM.TT_TARIFF_KOEFF_RPT','AGRISN, RPTCLASS, RPTCLASSISN','AGRISN',20,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(30,'MOTOR.CARCOND','storage_adm.V_CARCOND','STORAGE_ADM.TT_CARCOND','AGRISN, PARENTOBJISN, OBJISN, RPTCLASS, RPTCLASSISN','AGRISN',10,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(32,'MOTOR.REPAGROBJECTEXT','storage_adm.v_REPAGROBJECTEXT','STORAGE_ADM.TT_REPAGROBJECTEXT','OBJISN','OBJISN',10,'X_REPAGROBJECTEXT_OBJ',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(33,'MOTOR.CARCOND_OBJ_SUM','storage_adm.V_CARCOND_OBJ_SUM','STORAGE_ADM.TT_CARCOND_OBJ_SUM','AGRISN, PARENTOBJISN, RPTCLASS, RPTCLASSISN','PARENTOBJISN',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(33,'MOTOR.CARCOND_OBJ_SUM_DO','storage_adm.V_CARCOND_OBJ_SUM_DO','STORAGE_ADM.TT_CARCOND_OBJ_SUM_DO','AGRISN, PARENTOBJISN, RPTCLASS, RPTCLASSISN','PARENTOBJISN',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(35,'MOTOR.CAR_CUBE','storage_adm.V_CAR_CUBE','STORAGE_ADM.TT_CAR_CUBE','AGRISN, PARENTOBJISN, RPTCLASS, RPTCLASSISN, COND_DATEBEG, COND_DATEEND','PARENTOBJISN',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(36,'MOTOR.CARSUM','storage_adm.V_CARSUM','STORAGE_ADM.TT_CARSUM','CARSUMISN','CARSUMISN',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(37,'MOTOR.MTPL_POLICIES','storage_adm.V_MTPL_POLICIES','STORAGE_ADM.TT_MTPL_POLICIES','AGRISN','AGRISN',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(38,'MOTOR.MTPL_SUMMARIZED','storage_adm.V_MTPL_SUMMARIZED','STORAGE_ADM.TT_MTPL_SUMMARIZED','AGRISN','AGRISN',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(39,'MOTOR.PVUFIXSUM','storage_adm.V_PVUFIXSUM','STORAGE_ADM.TT_PVUFIXSUM','BUHBODYISN','BUHBODYISN',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(40,'MOTOR.TT_RISK2RPTCLASS','storage_adm.V_RISK2RPTCLASS','STORAGE_ADM.TT_RISK2RPTCLASS','XRPTCLASSISN','XRPTCLASSISN',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(41,'MOTOR.CARREFUND','storage_adm.V_CARREFUND','STORAGE_ADM.TT_CARREFUND','REFUNDISN','REFUNDISN',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(42,'MOTOR.CARDOCSUMINVOICELINE','storage_adm.V_CARDOCSUMINVOICELINE','STORAGE_ADM.TT_CARDOCSUMINVOICELINE','DOCISN','DOCISN',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(43,'MOTOR.CAR_ATTRIB','storage_adm.V_CAR_ATTRIB','STORAGE_ADM.TT_CAR_ATTRIB','OBJISN','OBJISN',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(44,'MOTOR.CARDRIVER','storage_adm.V_CARDRIVER','STORAGE_ADM.TT_CARDRIVER','AGRISN','AGRISN',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(45,'MOTOR.DOPUSLUGI_SUMS','storage_adm.V_DOPUSLUGI_SUMS','STORAGE_ADM.TT_DOPUSLUGI_SUMS','AGRISN','AGRISN',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(46,'MOTOR.REP_PRESALE','storage_adm.V_REP_PRESALE','STORAGE_ADM.TT_REP_PRESALE','PRESALEISN','PRESALEISN',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(47,'MOTOR.REPAGR_AGENT','storage_adm.V_REPAGR_AGENT','STORAGE_ADM.TT_REPAGR_AGENT','ISN','ISN',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(48,'MOTOR.CAR_DEALERS','storage_adm.V_CAR_DEALERS','STORAGE_ADM.TT_CAR_DEALERS','CARDEALERISN','CARDEALERISN',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(49,'MOTOR.T_AGR_DRIVERS','storage_adm.V_AGR_DRIVERS','STORAGE_ADM.TT_AGR_DRIVERS','AGRISN','AGRISN',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(50,'MOTOR.REP_QUEUE_MAIL','storage_adm.V_REP_QUEUE_MAIL','STORAGE_ADM.TT_REP_QUEUE_MAIL','ISN','ISN',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(51,'MEDIC.ST_MED_AGRCONDBUH','storage_adm.V_MED_AGRCONDBUH','TT_MED_AGRCONDBUH','AGRISN, coalesce(SUBACCISN, 0), coalesce(RULEISN, 0), coalesce(MONTHDATEVAL, timestamp ''1900-01-01 00:00:00''), coalesce(MAXDATEVAL, timestamp ''1900-01-01 00:00:00''), coalesce(RISKRULEISN, 0), coalesce(STATCODE, 0)','AGRISN',null,'X_MED_AGRCONDBUH_AGR',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(53,'STORAGES.CLIENTDIRECTIVITY','storage_adm.v_clientdirectivity','STORAGE_ADM.TT_CLIENTDIRECTIVITY','Agrisn','Agrisn',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(-1,'STORAGE_SOURCE.REP_AGRCLAUSE','storage_adm.v_REP_AGRCLAUSE','tt_REP_AGRCLAUSE','AgrIsn,Classisn','AgrIsn',null,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(-1,'STORAGES.ST_PREM_BY_DEPT','STORAGES.V_TT_PREM_BY_DEPT','STORAGES.TT_PREM_BY_DEPT','PRM_KEY,coalesce(DEPTISN,-1),coalesce(repr_deptisn,-1)','PRM_KEY',null,'X_ST_PREM_UNIC',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(-4,'STORAGES.ST_BUH_TURN_NFS','storage_adm.V_TT_BUHTURN_NFS','TT_BUHTURN_NFS','PRM_KEY,coalesce(OPRISN,-1),coalesce(OSCLASS,-1),coalesce(OSKIND,-1),coalesce(OSSTATUS,-1) ,coalesce(OKOFCODE,''-''),coalesce(ISBULDING,-1),CODE','PRM_KEY',null,'X_ST_BUH_TURN_NFS_UNIC',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(-13,'STORAGE_SOURCE.zeropremiumsumaddendum','storage_adm.v_zeropremiumsumaddendum','tt_zeropremiumsumaddendum','ADDISN','AgrIsn',null,'',0,'','','','','');
 
 
 
@@ -544,10 +543,10 @@ and (b.Code Like ''77%'' or b.Code Like''78%'' or b.Code Like ''7619%'' or Code 
 and b.dateval>=timestamp ''01-jan-2002''
 and b.dateval<>coalesce(b.Datequit,timestamp ''1-jan-3000'')
 and coalesce(B.Damountrub,0)-coalesce(B.camountrub,0)<>0',0);    
-insert into storage_adm.ss_process_source_tables values(2,2,'AIS','','Case
+insert into storage_adm.ss_process_source_tables values(2,2,'AIS','BUHBODY_T','Case
  When s.Parentisn Is null  Then  S.Isn 
  When (Select coalesce(Max(d.parentisn),759033300)
- from dicti d
+ from ais.dicti d
  where  s.oprisn=d.isn)= 759033300 /*идем вверх только по проводкам операций "автоматические" */
  and s.Parentisn<>s.Isn /*бывают проводки, ссылающиеся сами на себя*/
   Then
@@ -558,7 +557,7 @@ insert into storage_adm.ss_process_source_tables values(2,2,'AIS','','Case
  
    Else
     coalesce(S.ParentIsn,S.Isn)
-   End',null,'(SELECT DISTINCT FINDISN FROM SS_HISTLOG WHERE PROCISN=2 AND LOADISN=GetLoadIsn())','select /*+ Full(b) Parallel (b,12) */
+   End',null,'(SELECT DISTINCT FINDISN FROM storage_adm.SS_HISTLOG WHERE PROCISN=2)','select /*+ Full(b) Parallel (b,12) */
 distinct b.Baseisn 
 from STORAGES.ST_BUHBODY b 
 where b.baseisn is not null',0);
@@ -593,7 +592,7 @@ insert into storage_adm.ss_process_source_tables values(5,5,'AIS','BUHBODY_T','i
   and  b.status = ''А''
   and coalesce(b.dateval,timestamp ''01-jan-3000'')>=timestamp ''01-jan-2002''
   and coalesce(B.Damountrub,0)-coalesce(B.camountrub,0)<>0',0);  
-insert into storage_adm.ss_process_source_tables values(6,6,'AIS','SUBJECT_T','ISN',null,'V_SS_LOAD_SUBJECT','SELECT /*+ FULL(S) PARALLEL(S,24) */ ISN FROM AIS.SUBJECT_T S',0);
+insert into storage_adm.ss_process_source_tables values(6,6,'AIS','SUBJECT_T','ISN',null,'storage_adm.V_SS_LOAD_SUBJECT','SELECT /*+ FULL(S) PARALLEL(S,24) */ ISN FROM AIS.SUBJECT_T S',0);
 insert into storage_adm.ss_process_source_tables values(7,6,'AIS','SUBADDR_T','SUBJISN',null,'','',0);
 insert into storage_adm.ss_process_source_tables values(8,6,'AIS','SUBDOC','SUBJISN',null,'','',0);   
 insert into storage_adm.ss_process_source_tables values(9,6,'AIS','OBJ_ATTRIB','DECODE(DISCR,''C'',OBJISN,NULL)',null,'','',0);
@@ -601,12 +600,12 @@ insert into storage_adm.ss_process_source_tables values(10,6,'AIS','SUBBANK','IS
 insert into storage_adm.ss_process_source_tables values(12,3,'AIS','DOCSUM','CREDITISN',null,'','select /*+ Full(b) Parallel (b 12) */
 distinct b.Baseisn 
 from STORAGES.ST_BUHBODY b',0);
-insert into storage_adm.ss_process_source_tables values(13,4,'AIS','','ISN',null,'V_SS_LAST_PERIODS','',0);
+insert into storage_adm.ss_process_source_tables values(13,4,'AIS','','ISN',null,'storage_adm.V_SS_LAST_PERIODS','',0);
 insert into storage_adm.ss_process_source_tables values(14,7,'AIS','','ISN',null,'Select *
 from
- V_SS_LAST_PERIODS
+ storage_adm.V_SS_LAST_PERIODS
 Where substr(prm_key,9) In
-(Select Isn from buhsubacc Bs
+(Select Isn from ais.buhsubacc Bs
 Where Bs.id Like ''009%''
 or Bs.id Like ''01%''
 or Bs.id Like ''02%''
@@ -637,7 +636,7 @@ WHERE k.month  between timestamp ''01-oct-1996''
 and date_trunc(''month'',current_timestamp)- interval ''1 day''
 
  )K,
-buhsubacc bs
+ais.buhsubacc bs
 Where Bs.id Like ''009%''
 or Bs.id Like ''01%''
 or Bs.id Like ''02%''
@@ -662,10 +661,10 @@ or Bs.id Like ''Н81%''
 or Bs.id Like ''Н91%''',0);    
 insert into storage_adm.ss_process_source_tables values(15,8,'AIS','','ISN',null,'select *
 from 
- V_SS_LAST_PERIODS
+ storage_adm.V_SS_LAST_PERIODS
 Where substr(prm_key,9) In
 (
-Select Isn from buhsubacc Bs
+Select Isn from ais.buhsubacc Bs
 Where 
 Bs.id Like ''50%''
 or Bs.id Like ''55%''
@@ -678,10 +677,12 @@ OR Bs.Id like ''60%''
    or Bs.Id like ''69%''
    or Bs.Id like ''70%''
    or Bs.Id like ''71%''
-   or regexp_like(Bs.Id, ''^761[0-8]'')
+   --or regexp_like(Bs.Id, ''^761[0-8]'')
+   or (Bs.Id like ''761%'' and not Bs.Id like ''7619%'')
    or Bs.Id=''76190''
-   or regexp_like(Bs.Id, ''^76[2-5]'')
-   or regexp_like(Bs.Id, ''^76[7-9]'')
+   --or regexp_like(Bs.Id, ''^76[2-5]'')
+   --or regexp_like(Bs.Id, ''^76[7-9]'')
+   or (Bs.Id like ''76%'' and not Bs.Id like ''760%'' and not Bs.Id like ''761%'' and not Bs.Id like ''766%'')
    or Bs.Id=''86001''
    or Bs.Id=''96009'' or Bs.Id=''96010''
 )','  select cast(to_char(k.month,''YYYYMMDD'')||BS.ISN as numeric)
@@ -692,7 +693,7 @@ WHERE k.month  between timestamp ''01-oct-1996''
 and date_trunc(''month'',current_timestamp)-interval ''1 day'' 
 
  )K,
-buhsubacc bs
+ais.buhsubacc bs
 Where Bs.id Like ''50%''
 or Bs.id Like ''55%''
 or Bs.id Like ''57%''
@@ -710,16 +711,16 @@ OR Bs.Id like ''60%''
    or regexp_like(Bs.Id, ''^76[7-9]'')
    or Bs.Id=''86001''
    or Bs.Id=''96009'' or Bs.Id=''96010''',0);   
-insert into storage_adm.ss_process_source_tables values(16,9,'AIS','AGREEMENT','ISN',null,'','SELECT ISN FROM AGREEMENT',0);   
+insert into storage_adm.ss_process_source_tables values(16,9,'AIS','AGREEMENT','ISN',null,'','SELECT ISN FROM ais.AGREEMENT',0);   
 insert into storage_adm.ss_process_source_tables values(17,9,'AIS','AGRROLE','AGRISN',null,'','',0);  
-insert into storage_adm.ss_process_source_tables values(18,9,'AIS','','ISN',null,'(SELECT DISTINCT AGRISN FROM AGRROLE WHERE SUBJISN IN (
-SELECT FINDISN FROM SS_HISTLOG WHERE PROCISN=9 AND TABLE_NAME=''SUBJECT_T'' AND LOADISN=GetLoadIsn()))','',0);    
+insert into storage_adm.ss_process_source_tables values(18,9,'AIS','','ISN',null,'(SELECT DISTINCT AGRISN FROM ais.AGRROLE WHERE SUBJISN IN (
+SELECT FINDISN FROM storage_adm.SS_HISTLOG WHERE PROCISN=9 AND TABLE_NAME=''SUBJECT_T'' AND LOADISN=GetLoadIsn()))','',0);    
 insert into storage_adm.ss_process_source_tables values(19,10,'AIS','AGREEMENT','ISN',null,'storages.V_SS_LOAD_AGROSAGO_AGREEM','select isn as agrisn from agreement where datesign between timestamp ''01-jan-2011'' and date_trunc(''day'', current_timestamp)',0);
 insert into storage_adm.ss_process_source_tables values(20,10,'AIS','BSO_AGRID','ISN',null,'storages.V_SS_LOAD_AGROSAGO_BSO_AGRID','',0);
 insert into storage_adm.ss_process_source_tables values(21,10,'AIS','DOCSUM','ISN',null,'storages.V_SS_LOAD_AGROSAGO_DOCSUM','',0); 
 insert into storage_adm.ss_process_source_tables values(22,11,'AIS','AGREEMENT','ISN',null,'V_SS_LOAD_CLAIMOSAGO_AGREEM','-- убытки ПВУ
 select a.isn as agrisn 
-from ais.agrclaim ac, agreement a
+from ais.agrclaim ac, ais.agreement a
 where ac.datereg between timestamp ''01.01.2011'' and timestamp ''10.01.2011''
   and ac.agrisn = a.isn
   and a.ruleisn = shared_system.get(''AGRMOTORCOMPULSORY'')
@@ -728,7 +729,7 @@ union
 -- т.е.отбор аддендумов на прекращение договоров ОСАГО
 select --+ordered Index(ad) Index(a)
   a.isn as agrisn  
-from agreement ad, agreement a
+from ais.agreement ad, ais.agreement a
 where ad.datesign between timestamp ''01.01.2011'' and timestamp ''10.01.2011''
   and ad.discr = ''А''
   and ad.ruleisn = shared_system.get(''ADDCANCEL'')
@@ -744,20 +745,20 @@ insert into storage_adm.ss_process_source_tables values(29,11,'AIS','DOCS','ISN'
 insert into storage_adm.ss_process_source_tables values(30,11,'AIS','AGRCLAIM','ISN',null,'V_SS_LOAD_CLAIMOSAGO_AGRCLAIM','',0);    
 insert into storage_adm.ss_process_source_tables values(31,11,'AIS','AGRREFUND','ISN',null,'V_SS_LOAD_CLAIMOSAGO_AGRREFUND','',0);  
 insert into storage_adm.ss_process_source_tables values(32,6,'AIS','SUBOWNER','SUBJISN',null,'','',null);  
-insert into storage_adm.ss_process_source_tables values(33,12,'AIS','AGRCLAIM','ISN',null,'','Select /*+ Full(a) Parallel(a,32)*/ Isn from agrclaim a',null);
+insert into storage_adm.ss_process_source_tables values(33,12,'AIS','AGRCLAIM','ISN',null,'','Select /*+ Full(a) Parallel(a,32)*/ Isn from ais.agrclaim a',null);
 insert into storage_adm.ss_process_source_tables values(34,12,'AIS','AGRREFUND','CLAIMISN',null,'','',null); 
 insert into storage_adm.ss_process_source_tables values(35,12,'AIS','AGRREFUNDEXT','CLAIMISN',null,'','',null);
 insert into storage_adm.ss_process_source_tables values(36,12,'AIS','CLAIMREFUNDCAR','ISN',null,'(SELECT DISTINCT CLAIMISN 
-FROM  SS_HISTLOG S,AGRREFUND AR
+FROM  STORAGE_ADM.SS_HISTLOG S,ais.AGRREFUND AR
 WHERE PROCISN=12 
-  AND LOADISN=GetLoadIsn() 
+  AND LOADISN=storage_adm.GetLoadIsn() 
   AND TABLE_NAME=''CLAIMREFUNDCAR''
   AND FINDISN=AR.ISN
 )','',null); 
 insert into storage_adm.ss_process_source_tables values(37,12,'AIS','AGRROLE','REFUNDISN',null,'(SELECT DISTINCT CLAIMISN 
-FROM  SS_HISTLOG S,AGRREFUND AR
+FROM  STORAGE_ADM.SS_HISTLOG S,ais.AGRREFUND AR
 WHERE PROCISN=12 
-AND LOADISN=GetLoadIsn() 
+AND LOADISN=storage_adm.GetLoadIsn() 
 AND TABLE_NAME=''AGRROLE''
 AND FINDISN=AR.ISN
 )','',null);
@@ -768,10 +769,10 @@ insert into storage_adm.ss_process_source_tables values(41,13,'AIS','AGREXT','AG
 insert into storage_adm.ss_process_source_tables values(42,13,'AIS','AGRADDR','AGRISN',null,'','',null);   
 insert into storage_adm.ss_process_source_tables values(43,13,'AIS','SUBJECT_T','ISN',null,'(SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AGRISN
-FROM  SS_HISTLOG S,
+FROM  STORAGE_ADM.SS_HISTLOG S,
 AIS.AGRROLE  AR
 WHERE PROCISN=13 
-  AND LOADISN=GetLoadIsn() 
+  AND LOADISN=storage_adm.GetLoadIsn() 
   AND TABLE_NAME=''SUBJECT_T''
   AND FINDISN=AR.SUBJISN
   )','',null);  
@@ -796,22 +797,18 @@ ELSE B.HEADISN
   ELSE NULL
   END
   
-    
- 
-
-FROM SS_HISTLOG T,
-  AIS.BUHBODY_T B,
-  AIS.BUHBODY_T BP, /* HEADISN ПАПЫ  ПРОВОДКИ */
-  (SELECT * FROM   DICTI D
+FROM STORAGE_ADM.SS_HISTLOG T 
+  left join AIS.BUHBODY_T B  on T.FINDISN=B.ISN
+  left join AIS.BUHBODY_T BP on B.PARENTISN=BP.ISN /*ПАПА ПРОВОДКИ*/ /* HEADISN ПАПЫ  ПРОВОДКИ */
+  left join (SELECT * FROM   ais.DICTI D
 WHERE D.PARENTISN=759033300 AND CODE IN(''200'',''02'',''03'') -- НЕОБХОДИМО ОГРАНИЧЕНИЕ ПО ОПЕРАЦИЯМ 200 02 03
-) D /* СПИСОК "АВТОМАТИЧЕСКИХ" ОПЕРАЦИЙ , ПО КОТОРЫМ НУЖНА ДОПОЛНИТЕЛЬНАЯ РАСШИФРОВКА - ПАПЫ БЕРЕМ */   
+) D on B.OPRISN=D.ISN /* ОПЕРАЦИЯ ПРОВОДКИ */ /* СПИСОК "АВТОМАТИЧЕСКИХ" ОПЕРАЦИЙ , ПО КОТОРЫМ НУЖНА ДОПОЛНИТЕЛЬНАЯ РАСШИФРОВКА - ПАПЫ БЕРЕМ */   
 WHERE T.PROCISN=15
-AND T.LOADISN=GetLoadIsn()
-AND FINDISN=B.ISN(+) 
-AND B.OPRISN=D.ISN(+) /* ОПЕРАЦИЯ ПРОВОДКИ */
-AND B.PARENTISN=BP.ISN(+) /*ПАПА ПРОВОДКИ*/','Select /*+ FULL(b) PARALLEL (b,32 )  */
+AND T.LOADISN=storage_adm.GetLoadIsn()
+',
+'Select /*+ FULL(b) PARALLEL (b,32 )  */
 distinct Headisn
-from subacc4dept sa,
+from ais.subacc4dept sa,
   Ais.BuhBody_T b
 Where 
 sa.statcode is not null
@@ -823,7 +820,7 @@ insert into storage_adm.ss_process_source_tables values(50,15,'AIS','DOCSUM','CR
 insert into storage_adm.ss_process_source_tables values(51,16,'AIS','AGREEMENT','ISN',null,'','Select /*+ Full(a) Parallel(a,32)*/ Isn from agreement a',null);   
 insert into storage_adm.ss_process_source_tables values(52,16,'AIS','SUBJECT_T','ISN',null,'(SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AGRISN
-FROM  SS_HISTLOG S,
+FROM  STORAGE_ADM.SS_HISTLOG S,
 AIS.AGRROLE  AR
 WHERE PROCISN=16 
 AND LOADISN=GetLoadIsn() 
@@ -836,7 +833,7 @@ insert into storage_adm.ss_process_source_tables values(55,16,'AIS','AGREXT','AG
 insert into storage_adm.ss_process_source_tables values(56,16,'AIS','AGROBJECT','AGRISN',null,'','',null); 
 insert into storage_adm.ss_process_source_tables values(57,16,'AIS','AGROBJEXT','ISN',null,'(SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AGRISN
-FROM  SS_HISTLOG S,
+FROM  STORAGE_ADM.SS_HISTLOG S,
  AIS.AGROBJECT  A
    WHERE PROCISN=16 
 AND LOADISN=GetLoadIsn() 
@@ -851,7 +848,7 @@ insert into storage_adm.ss_process_source_tables values(62,17,'AIS','AGRREFUND',
 insert into storage_adm.ss_process_source_tables values(63,17,'AIS','AGRREFUNDEXT','CLAIMISN',null,'','',null);
 insert into storage_adm.ss_process_source_tables values(64,16,'AIS','SUBDEPT_T','ISN',null,'   (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AGRISN
-FROM  SS_HISTLOG S,
+FROM  STORAGE_ADM.SS_HISTLOG S,
  AIS.AGRROLE  AR
    WHERE PROCISN=16 
 AND LOADISN=GetLoadIsn() 
@@ -860,7 +857,7 @@ AND FINDISN=AR.SUBJISN
   )','',null); 
 insert into storage_adm.ss_process_source_tables values(65,16,'AIS','SUBHUMAN_T','ISN',null,'   (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AGRISN
-FROM  SS_HISTLOG S,
+FROM  STORAGE_ADM.SS_HISTLOG S,
  AIS.AGRROLE  AR
    WHERE PROCISN=16 
 AND LOADISN=GetLoadIsn() 
@@ -869,7 +866,7 @@ AND FINDISN=AR.SUBJISN
   )','',null);    
 insert into storage_adm.ss_process_source_tables values(66,16,'AIS','AGROBJGROUPITEM','GROUPISN',null,'(SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AGRISN
-FROM  SS_HISTLOG S,
+FROM  STORAGE_ADM.SS_HISTLOG S,
  AIS.AGROBJGROUP A
    WHERE PROCISN=16 
 AND LOADISN=GetLoadIsn() 
@@ -880,7 +877,7 @@ insert into storage_adm.ss_process_source_tables values(67,16,'AIS','AGENT_COND'
 insert into storage_adm.ss_process_source_tables values(68,18,'AIS','DOCSUM','ISN',null,'','',null);  
 insert into storage_adm.ss_process_source_tables values(69,18,'AIS','DOCS_T','ISN',null,'(SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT DS.ISN
-FROM  SS_HISTLOG S,
+FROM  STORAGE_ADM.SS_HISTLOG S,
  AIS.DOCSUM DS
    WHERE PROCISN=18 
 AND LOADISN=GetLoadIsn() 
@@ -888,7 +885,7 @@ AND TABLE_NAME=''DOCS_T''
 AND FINDISN=DS.DOCISN AND DS.DISCR = ''F'')','',null);
 insert into storage_adm.ss_process_source_tables values(70,17,'AIS','AGRRISK','ISN',null,' (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT CLAIMISN
-FROM  SS_HISTLOG S,
+FROM  STORAGE_ADM.SS_HISTLOG S,
  AIS.AGRREFUND  AR
    WHERE PROCISN=17 
 AND LOADISN=GetLoadIsn() 
@@ -897,7 +894,7 @@ AND FINDISN=AR.RISKISN
   )','',null);   
 insert into storage_adm.ss_process_source_tables values(71,17,'AIS','AGRSERVICE','AGRISN',null,' (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT CLAIMISN
-FROM  SS_HISTLOG S,
+FROM  STORAGE_ADM.SS_HISTLOG S,
  AIS.AGRREFUND  AR
    WHERE PROCISN=17 
 AND LOADISN=GetLoadIsn() 
@@ -928,7 +925,7 @@ insert into storage_adm.ss_process_source_tables values(77,19,'AIS','OBJ_ATTRIB'
     and DISCR = ''C'' 
     and coalesce(oracompat.add_months(DATEBEG, -1), timestamp ''01-01-3000'' >= current_timestamp
   then ISN
-end',null,'V_SS_LOAD_AGR_SALERS_OBJ_ATTR','',0);
+end',null,'storage_adm.V_SS_LOAD_AGR_SALERS_OBJ_ATTR','',0);
 insert into storage_adm.ss_process_source_tables values(78,20,'AIS','AGRROLE','AGRISN',null,'','select /*+ parallel(AR 32) full(AR) */
 distinct
   AR.AgrISN
@@ -955,7 +952,7 @@ from AIS.CLAIMINVOICE d',null);
 insert into storage_adm.ss_process_source_tables values(88,22,'AIS','DOCSUM','INDOCISN',null,'','',null);  
 insert into storage_adm.ss_process_source_tables values(89,22,'AIS','DOCS_T','ISN',null,'(SELECT --+ FULL(S) PARALLEL(S, 12)
   DISTINCT INDOCISN
-FROM  SS_HISTLOG S, DOCSUM DS
+FROM  STORAGE_ADM.SS_HISTLOG S, DOCSUM DS
 WHERE PROCISN=22
 AND LOADISN=GetLoadIsn()
 AND TABLE_NAME=''DOCS_T''
@@ -981,7 +978,7 @@ from AIS.CLAIMINVOICE d',null);
 insert into storage_adm.ss_process_source_tables values(95,24,'AIS','DOCSUM','case when DISCR in (''P'', ''F'') then INDOCISN end',null,'','',null);    
 insert into storage_adm.ss_process_source_tables values(96,24,'AIS','DOCS_T','ISN',null,'(SELECT --+ FULL(S) PARALLEL(S, 12)
   DISTINCT INDOCISN
-FROM  SS_HISTLOG S, DOCSUM DS
+FROM  STORAGE_ADM.SS_HISTLOG S, DOCSUM DS
 WHERE PROCISN=24
 AND LOADISN=GetLoadIsn()
 AND TABLE_NAME=''DOCS_T''
@@ -989,14 +986,14 @@ AND FINDISN=DS.DOCISN)','',null);
 insert into storage_adm.ss_process_source_tables values(97,24,'AIS','CLAIMINVOICELINE','INVOICEISN',null,'','',null);
 insert into storage_adm.ss_process_source_tables values(98,24,'AIS','AGRREFUND','ISN',null,'(SELECT --+ FULL(S) PARALLEL(S, 12)
   DISTINCT CIL.INVOICEISN
-FROM  SS_HISTLOG S, AIS.CLAIMINVOICELINE CIL
+FROM  STORAGE_ADM.SS_HISTLOG S, AIS.CLAIMINVOICELINE CIL
 WHERE S.PROCISN=24
 AND S.LOADISN=GetLoadIsn()
 AND S.TABLE_NAME=''AGRREFUND''
 AND S.FINDISN=CIL.REFUNDISN)','',null);  
 insert into storage_adm.ss_process_source_tables values(99,24,'AIS','AGRCLAIM','ISN',null,'(SELECT --+ FULL(S) PARALLEL(S, 12) ORDERED USE_NL(S R CIL)
   DISTINCT CIL.INVOICEISN
-FROM  SS_HISTLOG S, AIS.AGRREFUND R, AIS.CLAIMINVOICELINE CIL
+FROM  STORAGE_ADM.SS_HISTLOG S, AIS.AGRREFUND R, AIS.CLAIMINVOICELINE CIL
 WHERE S.PROCISN=24
 AND S.LOADISN=GetLoadIsn()
 AND S.TABLE_NAME=''AGRCLAIM''
@@ -1009,14 +1006,14 @@ insert into storage_adm.ss_process_source_tables values(101,26,'AIS','DOCSUM','c
 insert into storage_adm.ss_process_source_tables values(103,26,'AIS','CLAIMINVOICELINE','INVOICEISN',null,'','',null);
 insert into storage_adm.ss_process_source_tables values(104,26,'AIS','AGRREFUND','ISN',null,'(SELECT --+ FULL(S) PARALLEL(S, 12)
   DISTINCT CIL.INVOICEISN
-FROM  SS_HISTLOG S, AIS.CLAIMINVOICELINE CIL
+FROM  STORAGE_ADM.SS_HISTLOG S, AIS.CLAIMINVOICELINE CIL
 WHERE S.PROCISN=26
 AND S.LOADISN=GetLoadIsn()
 AND S.TABLE_NAME=''AGRREFUND''
 AND S.FINDISN=CIL.REFUNDISN)','',null); 
 insert into storage_adm.ss_process_source_tables values(105,26,'AIS','AGRCLAIM','ISN',null,'(SELECT --+ FULL(S) PARALLEL(S, 12) ORDERED USE_NL(S R CIL)
   DISTINCT CIL.INVOICEISN
-FROM  SS_HISTLOG S, AIS.AGRREFUND R, AIS.CLAIMINVOICELINE CIL
+FROM  STORAGE_ADM.SS_HISTLOG S, AIS.AGRREFUND R, AIS.CLAIMINVOICELINE CIL
 WHERE S.PROCISN=26
 AND S.LOADISN=GetLoadIsn()
 AND S.TABLE_NAME=''AGRCLAIM''
@@ -1027,8 +1024,8 @@ insert into storage_adm.ss_process_source_tables values(107,25,'AIS','DOCSUM','c
 from MOTOR.CARREPAGR ra',null); 
 insert into storage_adm.ss_process_source_tables values(108,25,'AIS','DOCS_T','AGRISN',null,'','',null);   
 insert into storage_adm.ss_process_source_tables values(109,27,'AIS','AGRROLE','AGRISN',null,'','SELECT /*+ FULL(A) PARALLEL(a 32)*/ ISN FROM AIS.AGREEMENT A',0);
-insert into storage_adm.ss_process_source_tables values(110,27,'AIS','SUBJECT_T','ISN',null,'V_SS_LOAD_AGRROLE_BY_SUBJECT','',null);
-insert into storage_adm.ss_process_source_tables values(111,27,'AIS','SUBHUMAN_T','ISN',null,'V_SS_LOAD_AGRROLE_BY_SUBHUMAN','',null);   
+insert into storage_adm.ss_process_source_tables values(110,27,'AIS','SUBJECT_T','ISN',null,'storage_adm.V_SS_LOAD_AGRROLE_BY_SUBJECT','',null);
+insert into storage_adm.ss_process_source_tables values(111,27,'AIS','SUBHUMAN_T','ISN',null,'storage_adm.V_SS_LOAD_AGRROLE_BY_SUBHUMAN','',null);   
 insert into storage_adm.ss_process_source_tables values(112,28,'AIS','QUEUE','case when classisn in (select isn from MOTOR.D_REP_CLIENT_QUEUE_CALLS) then ISN end',null,'V_SS_LOAD_PROC_28_QUEUE','SELECT /*+ FULL(S) PARALLEL(S,24) */ ISN FROM AIS.SUBJECT_T S',null);   
 insert into storage_adm.ss_process_source_tables values(113,28,'AIS','QUEPHONE','SUBJISN',null,'','',null);
 insert into storage_adm.ss_process_source_tables values(114,28,'AIS','AGREEMENT','CLIENTISN',null,'','',null);
@@ -1076,7 +1073,7 @@ insert into storage_adm.ss_process_source_tables values(139,33,'AIS','BUHBODY_T'
 insert into storage_adm.ss_process_source_tables values(148,36,'AIS','','FINDISN',null,'(WITH LI as (SELECT /*+ materialize */ LOAD_STORAGE.GETLOADISN AS LOADISN FROM DUAL)
 SELECT --+ FULL(S) PARALLEL(S,32)
    DISTINCT FINDISN
-   FROM SS_HISTLOG S, 
+   FROM STORAGE_ADM.SS_HISTLOG S, 
    LI
   WHERE S.PROCISN = 36 
     AND S.LOADISN = LI.LOADISN 
@@ -1159,7 +1156,7 @@ SELECT DISTINCT C.OBJISN
   FROM AIS.AGRCOND C,   
 (SELECT --+ FULL(S) PARALLEL(S,32)
    DISTINCT FINDISN
-   FROM SS_HISTLOG S, 
+   FROM STORAGE_ADM.SS_HISTLOG S, 
    MOTOR.CARREPAGR RA,
    LI
   WHERE S.PROCISN = 33 
@@ -1183,7 +1180,7 @@ insert into storage_adm.ss_process_source_tables values(186,33,'AIS','SUBJECT_T'
 WITH LI as (SELECT /*+ materialize */ LOAD_STORAGE.GETLOADISN AS LOADISN FROM DUAL)
 SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT C.OBJISN
-FROM  SS_HISTLOG S,
+FROM  STORAGE_ADM.SS_HISTLOG S,
  MOTOR.CARREPAGR RA,
  AIS.AGRROLE AR,
  AIS.AGRCOND C,
@@ -1201,7 +1198,7 @@ insert into storage_adm.ss_process_source_tables values(190,33,'AIS','BSO_AGRID'
 insert into storage_adm.ss_process_source_tables values(191,36,'AIS','CLAIMREFUNDCAR','ISN',null,'(WITH LI as (SELECT /*+ materialize */ LOAD_STORAGE.GETLOADISN AS LOADISN FROM DUAL)
   SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT C.AGRISN
- FROM SS_HISTLOG S, AIS.DOCSUM C, LI
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.DOCSUM C, LI
 WHERE S.PROCISN = 36 
   AND S.LOADISN = LI.LOADISN
   AND S.TABLE_NAME = ''CLAIMREFUNDCAR''
@@ -1216,7 +1213,7 @@ insert into storage_adm.ss_process_source_tables values(213,33,'AIS','OBJCAR','I
 WITH LI as (SELECT /*+ materialize */ LOAD_STORAGE.GETLOADISN AS LOADISN FROM DUAL)
 SELECT --+ FULL(S) PARALLEL(S,32)
   DISTINCT AO.ISN
-   FROM SS_HISTLOG S,
+   FROM STORAGE_ADM.SS_HISTLOG S,
    MOTOR.CARREPAGR RA, 
    AIS.AGROBJECT AO,
    LI
@@ -1228,7 +1225,7 @@ SELECT --+ FULL(S) PARALLEL(S,32)
 insert into storage_adm.ss_process_source_tables values(228,35,'AIS','','FINDISN',null,'(WITH LI AS (SELECT /*+ materialize */ LOAD_STORAGE.GETLOADISN AS LOADISN FROM DUAL)
 SELECT /*+ FULL(SS) PARALLEL(SS,32) */ 
  DISTINCT SS.FINDISN 
- FROM SS_HISTLOG SS, LI 
+ FROM STORAGE_ADM.SS_HISTLOG SS, LI 
 WHERE SS.PROCISN = 35 
   AND SS.LOADISN = LI.LOADISN)','select /*+ parallel(c 32) full(c) */
  parentobjisn
@@ -1255,7 +1252,7 @@ insert into storage_adm.ss_process_source_tables values(238,37,'AIS','OBJCAR','I
 WITH LI as (SELECT /*+ materialize */ LOAD_STORAGE.GETLOADISN AS LOADISN FROM DUAL)
 SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AO.AGRISN
- FROM SS_HISTLOG S, AIS.AGROBJECT  AO, LI
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGROBJECT  AO, LI
 WHERE S.PROCISN = 37 
   AND S.LOADISN = LI.LOADISN
   AND S.TABLE_NAME = ''OBJCAR''
@@ -1270,7 +1267,7 @@ insert into storage_adm.ss_process_source_tables values(243,666,'AIS','AGRCOND',
 insert into storage_adm.ss_process_source_tables values(244,666,'AIS','AGRROLE','AGRISN',null,'','',null); 
 insert into storage_adm.ss_process_source_tables values(245,666,'AIS','OBJCAR','ISN',null,'(SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AO.AGRISN
- FROM SS_HISTLOG S, AIS.AGROBJECT  AO
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGROBJECT  AO
 WHERE PROCISN = 38 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''OBJCAR''
@@ -1286,7 +1283,7 @@ insert into storage_adm.ss_process_source_tables values(253,38,'AIS','AGRREFUNDE
 insert into storage_adm.ss_process_source_tables values(254,666,'AIS','AGRRISK','AGRISN',null,'','',null); 
 insert into storage_adm.ss_process_source_tables values(255,39,'AIS','AGRCLAIM','ISN',null,'(SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AR.ISN
- FROM SS_HISTLOG S, AIS.AGRREFUND  AR
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGRREFUND  AR
 WHERE PROCISN = 39 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''AGRCLAIM''
@@ -1303,56 +1300,56 @@ insert into storage_adm.ss_process_source_tables values(261,45,'AIS','AGRCOND','
     MOTOR.CARCOND C',null);    
 insert into storage_adm.ss_process_source_tables values(262,45,'AIS','AGRRISK','ISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AC.AGRISN
- FROM SS_HISTLOG S, AIS.AGRCOND  AC
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGRCOND  AC
 WHERE PROCISN = 45 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''AGRRISK''
   AND FINDISN = AC.RISKISN)','',null);  
 insert into storage_adm.ss_process_source_tables values(263,45,'AIS','AGROBJECT','ISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AC.AGRISN
- FROM SS_HISTLOG S, AIS.AGRCOND  AC
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGRCOND  AC
 WHERE PROCISN = 45 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''AGROBJECT''
   AND FINDISN = AC.OBJISN)','',null);    
 insert into storage_adm.ss_process_source_tables values(264,45,'AIS','AGRLIMIT','ISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AC.AGRISN
- FROM SS_HISTLOG S, AIS.AGRCOND  AC
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGRCOND  AC
 WHERE PROCISN = 45 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''AGRLIMIT''
   AND FINDISN = AC.LIMITISN)','',null);    
 insert into storage_adm.ss_process_source_tables values(265,45,'AIS','AGRLIMITEM','LIMISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AC.AGRISN
- FROM SS_HISTLOG S, AIS.AGRCOND  AC
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGRCOND  AC
 WHERE PROCISN = 45 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''AGRLIMITEM''
   AND FINDISN = AC.LIMITISN)','',null);  
 insert into storage_adm.ss_process_source_tables values(266,43,'AIS','AGREEMENT','ISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AO.ISN
- FROM SS_HISTLOG S, AIS.AGROBJECT  AO
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGROBJECT  AO
 WHERE PROCISN = 43 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''AGREEMENT''
   AND FINDISN = AO.AGRISN)','',null);
 insert into storage_adm.ss_process_source_tables values(267,43,'AIS','OBJAGR','ISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AO.ISN
- FROM SS_HISTLOG S, AIS.AGROBJECT  AO
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGROBJECT  AO
 WHERE PROCISN = 43 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''OBJAGR''
   AND FINDISN = AO.DESCISN)','',null);
 insert into storage_adm.ss_process_source_tables values(268,43,'AIS','OBJCAR','ISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AO.ISN
- FROM SS_HISTLOG S, AIS.AGROBJECT  AO
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGROBJECT  AO
 WHERE PROCISN = 43 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''OBJCAR''
   AND FINDISN = AO.DESCISN)','',null);
 insert into storage_adm.ss_process_source_tables values(269,43,'AIS','CARTARIF','ISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AO.ISN
- FROM SS_HISTLOG S, AIS.AGROBJECT AO, AIS.OBJCAR OC
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGROBJECT AO, AIS.OBJCAR OC
 WHERE PROCISN = 43 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''CARTARIF''
@@ -1360,7 +1357,7 @@ WHERE PROCISN = 43
   AND FINDISN = OC.TARIFISN)','',null);
 insert into storage_adm.ss_process_source_tables values(270,43,'AIS','CARMODEL','ISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AO.ISN
- FROM SS_HISTLOG S, AIS.AGROBJECT AO, AIS.OBJCAR OC, CARTARIF T
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGROBJECT AO, AIS.OBJCAR OC, CARTARIF T
 WHERE PROCISN = 43 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''CARMODEL''
@@ -1369,7 +1366,7 @@ WHERE PROCISN = 43
   AND FINDISN = T.MODELISN)','',null);   
 insert into storage_adm.ss_process_source_tables values(271,43,'AIS','AGRRISK','ISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AO.ISN
- FROM SS_HISTLOG S, AIS.AGROBJECT AO, AIS.AGRCOND AC
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGROBJECT AO, AIS.AGRCOND AC
 WHERE PROCISN = 43 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''AGRRISK''
@@ -1377,56 +1374,56 @@ WHERE PROCISN = 43
   AND FINDISN = AC.RISKISN)','',null);
 insert into storage_adm.ss_process_source_tables values(272,43,'AIS','AGRTARIFF','CONDISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AC.OBJISN
- FROM SS_HISTLOG S, AIS.AGRCOND AC
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGRCOND AC
 WHERE PROCISN = 43 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''AGRTARIFF''
   AND FINDISN = AC.ISN)','',null);    
 insert into storage_adm.ss_process_source_tables values(273,43,'AIS','AGREEMENT','PARENTISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT AO.ISN
- FROM SS_HISTLOG S, AIS.AGROBJECT  AO
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGROBJECT  AO
 WHERE PROCISN = 43 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''AGREEMENT''
   AND FINDISN = AO.AGRISN)','',null);    
 insert into storage_adm.ss_process_source_tables values(274,42,'AIS','CLAIMINVOICE','ISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT H.DOCISN
- FROM SS_HISTLOG S, AIS.DOCSUM  H
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.DOCSUM  H
 WHERE PROCISN = 42 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''CLAIMINVOICE''
   AND FINDISN = H.INDOCISN)','',null);
 insert into storage_adm.ss_process_source_tables values(275,42,'AIS','CLAIMINVOICELINE','INVOICEISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT H.DOCISN
- FROM SS_HISTLOG S, AIS.DOCSUM H
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.DOCSUM H
 WHERE PROCISN = 42 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''CLAIMINVOICELINE''
   AND FINDISN = H.INDOCISN)','',null); 
 insert into storage_adm.ss_process_source_tables values(276,41,'AIS','AGRCLAIM','ISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT R.ISN
- FROM SS_HISTLOG S, AIS.AGRREFUND R
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGRREFUND R
 WHERE PROCISN = 41 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''AGRCLAIM''
   AND FINDISN = R.CLAIMISN)','',null);    
 insert into storage_adm.ss_process_source_tables values(277,41,'AIS','AGRRISK','ISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT R.ISN
- FROM SS_HISTLOG S, AIS.AGRREFUND R
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGRREFUND R
 WHERE PROCISN = 41 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''AGRRISK''
   AND FINDISN = R.RISKISN)','',null);  
 insert into storage_adm.ss_process_source_tables values(278,41,'AIS','AGROBJECT','ISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT R.ISN
- FROM SS_HISTLOG S, AIS.AGRREFUND R
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGRREFUND R
 WHERE PROCISN = 41 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''AGROBJECT''
   AND FINDISN = R.OBJISN)','',null);    
 insert into storage_adm.ss_process_source_tables values(279,41,'AIS','OBJCAR','ISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT R.ISN
- FROM SS_HISTLOG S, AIS.AGRREFUND R, AIS.AGROBJECT O
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGRREFUND R, AIS.AGROBJECT O
 WHERE PROCISN = 41 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''OBJCAR''
@@ -1434,7 +1431,7 @@ WHERE PROCISN = 41
   AND FINDISN = O.DESCISN)','',null);    
 insert into storage_adm.ss_process_source_tables values(280,41,'AIS','OBJAGR','ISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT R.ISN
- FROM SS_HISTLOG S, AIS.AGRREFUND R, AIS.AGROBJECT O
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGRREFUND R, AIS.AGROBJECT O
 WHERE PROCISN = 41 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''OBJAGR''
@@ -1442,7 +1439,7 @@ WHERE PROCISN = 41
   AND FINDISN = O.DESCISN)','',null);    
 insert into storage_adm.ss_process_source_tables values(281,41,'AIS','CARTARIF','ISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT R.ISN
- FROM SS_HISTLOG S, 
+ FROM STORAGE_ADM.SS_HISTLOG S, 
  AIS.AGRREFUND R, 
  AIS.AGROBJECT O,
  AIS.OBJCAR OC
@@ -1454,7 +1451,7 @@ WHERE PROCISN = 41
   AND FINDISN = OC.TARIFISN)','',null);   
 insert into storage_adm.ss_process_source_tables values(282,41,'AIS','AGREEMENT','ISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT R.ISN
- FROM SS_HISTLOG S, AIS.AGRREFUND R, AIS.AGRCLAIM L
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.AGRREFUND R, AIS.AGRCLAIM L
 WHERE PROCISN = 41 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''AGREEMENT''
@@ -1462,7 +1459,7 @@ WHERE PROCISN = 41
   AND FINDISN = L.AGRISN)','',null);
 insert into storage_adm.ss_process_source_tables values(283,46,'AIS','QTASK','ISN',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT QO.OBJISN
- FROM SS_HISTLOG S, AIS.QTASKXOBJ QO
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.QTASKXOBJ QO
 WHERE PROCISN = 46 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''QTASK''
@@ -1475,7 +1472,7 @@ insert into storage_adm.ss_process_source_tables values(284,46,'AIS','QUEUE',' c
 3736480703   -- ПОВТОРНАЯ ВСТРЕЧА
    ) then isn end',null,'  (SELECT --+ FULL(S) PARALLEL(S,32)
 DISTINCT QO.OBJISN
- FROM SS_HISTLOG S, AIS.QTASKXOBJ QO
+ FROM STORAGE_ADM.SS_HISTLOG S, AIS.QTASKXOBJ QO
 WHERE PROCISN = 46 
   AND LOADISN=GetLoadIsn() 
   AND TABLE_NAME = ''QUEUE''
@@ -1492,7 +1489,7 @@ insert into storage_adm.ss_process_source_tables values(290,51,'AIS','BUHBODY','
 insert into storage_adm.ss_process_source_tables values(291,38,'AIS','','FINDISN',null,'(WITH LI AS (SELECT /*+ materialize */ LOAD_STORAGE.GETLOADISN AS LOADISN FROM DUAL)
 SELECT /*+ FULL(SS) PARALLEL(SS,32) */ 
  DISTINCT SS.FINDISN 
- FROM SS_HISTLOG SS, LI 
+ FROM STORAGE_ADM.SS_HISTLOG SS, LI 
 WHERE SS.PROCISN = 38 
   AND SS.LOADISN = LI.LOADISN)','select /*+ parallel(m 32) full(m) */
 distinct m.agrisn

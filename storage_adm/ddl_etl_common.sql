@@ -136,7 +136,10 @@ CREATE TABLE storage_adm.ss_process_dest_tables (
     is_histtable                     smallint DEFAULT 0::smallint,
     end_date_fld                     VARCHAR(150),
     beg_date_fld                     VARCHAR(150),
-    after_script                     TEXT
+    after_script                     TEXT,
+    before_script                    TEXT,
+    tt_function_name                 VARCHAR(150),
+    KEYFIELD_NAMED                   VARCHAR(250)
 )
 distributed by (procisn);
 --WARNING: No primary key defined for storage_adm.ss_process_dest_tables
@@ -155,6 +158,7 @@ COMMENT ON COLUMN storage_adm.ss_process_dest_tables.is_histtable IS 'Призн
 COMMENT ON COLUMN storage_adm.ss_process_dest_tables.end_date_fld IS 'Поле для Update в HISTTABLE';
 COMMENT ON COLUMN storage_adm.ss_process_dest_tables.beg_date_fld IS 'Поля даты начала действия записи';
 COMMENT ON COLUMN storage_adm.ss_process_dest_tables.after_script IS 'Скрипт, запускается после наполнения TT_TABLE';
+COMMENT ON COLUMN storage_adm.ss_process_dest_tables.after_script IS 'Скрипт, запускается перед наполнением TT_TABLE';
 
 
 CREATE TABLE storage_adm.ss_process_source_tables (

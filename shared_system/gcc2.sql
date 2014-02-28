@@ -1,4 +1,5 @@
-CREATE OR REPLACE FUNCTION shared_system.gcc2_prepare_rep_currate(pDateStart timestamp) returns void as $$
+-- Creates table with rates for each day starting from pDateStart
+CREATE OR REPLACE FUNCTION shared_system.gcc2_fill_rep_currate(pDateStart timestamp) returns void as $$
 begin
     truncate table storages.rep_currate;
     insert into storages.rep_currate(cin, cout, cdate, crate)
@@ -24,7 +25,7 @@ end;
 $$ LANGUAGE plpgsql
 volatile;
 
-
+-- Get rates from storages.rep_currate and place them into hash. Runs on master
 CREATE OR REPLACE FUNCTION shared_system.gcc2_load_pl() RETURNS void AS $$
     my $rv = spi_exec_query("select crate, to_char(cdate, 'yyyymmdd') cdate, cin, cout from storages.rep_currate order by  cin, cout, cdate");
     foreach my $rn (0 .. $rv->{processed} - 1) {
@@ -93,19 +94,22 @@ volatile;
 
 
 
-CREATE OR REPLACE FUNCTION shared_system.GetRateExact(pCurIn numeric, pCurOut numeric, pStrDate varchar(8)) RETURNS numeric AS $$    
-    return $_SHARED{"$_[0]|$_[1]"}{$_[2]};    
+CREATE OR REPLACE FUNCTION shared_system.gcc2_GetRateExact(pCurIn numeric, pCurOut numeric, pStrDate varchar(8)) RETURNS numeric AS $$    
+    if (exists $_SHARED{"$_[0]|$_[1]"}){
+        return  $_SHARED{"$_[0]|$_[1]"}{$_[2]};
+    }
+    return undef;
 $$ LANGUAGE plperl
 volatile;
 
 
-CREATE OR REPLACE FUNCTION shared_system.GetRate(pCurIn numeric, pCurOut numeric, pDate timestamp) RETURNS numeric AS $$
+CREATE OR REPLACE FUNCTION shared_system.gcc2_GetRate(pCurIn numeric, pCurOut numeric, pDate timestamp) RETURNS numeric AS $$
 declare 
     vRate numeric;
 begin
-    vRate = shared_system.GetRateExact(pCurIn, pCurOut, to_char(pDate,'YYYYMMDD'));
+    vRate = shared_system.gcc2_GetRateExact(pCurIn, pCurOut, to_char(pDate,'YYYYMMDD'));
     if vRate is null then
-        vRate = 1/shared_system.GetRateExact(pCurOut, pCurIn, to_char(pDate,'YYYYMMDD'));
+        vRate = 1/shared_system.gcc2_GetRateExact(pCurOut, pCurIn, to_char(pDate,'YYYYMMDD'));
     end if;
     return vRate;
 end;
@@ -120,9 +124,9 @@ begin
     if coalesce(round(pAmount,4),0)=0 then return pAmount; end if;
     if pCurIn = pCurOut then return pAmount;end if;
     if pCurIn is null or pCurOut is null or pDate is null then return null; end if;
-    vRate = shared_system.GetRateExact(pCurIn, pCurOut, to_char(pDate,'YYYYMMDD'));
+    vRate = shared_system.gcc2_GetRateExact(pCurIn, pCurOut, to_char(pDate,'YYYYMMDD'));
     if vRate is null then
-        vRate = 1/shared_system.GetRateExact(pCurOut, pCurIn, to_char(pDate,'YYYYMMDD'));
+        vRate = 1/shared_system.gcc2_GetRateExact(pCurOut, pCurIn, to_char(pDate,'YYYYMMDD'));
     end if;
     return pAmount*vRate;
 end;

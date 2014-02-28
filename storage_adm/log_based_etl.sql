@@ -3,7 +3,7 @@ declare
     v_max_dttm      timestamp;
     v_min_dttm      timestamp;
     v_proc_tbl      varchar(32);
-    v_proc_tbl_key  varchar(50);
+    v_proc_tbl_key  varchar(1000);
     v_skiphist      varchar(1);
     vRc             bigint;
     vChunkRows      bigint;
@@ -83,6 +83,7 @@ begin
         for v_proc_tbl_key in (select distinct LOG_TABLE_ISNFLD 
                                 from storage_adm.v_active_process_source_tables
                                 where log_table_name = v_proc_tbl) loop
+            RAISE NOTICE 'processing for table %, key %', v_proc_tbl,v_proc_tbl_key;
             if v_proc_tbl_key = 'ISN' then
                 --if key is isn
                 --just take isn
@@ -97,9 +98,9 @@ begin
                 --take specified field or expression from ais table
                 vsql = '
                 insert into storage_adm.tt_input(table_name, findisn, recisn)
-                    select '''||v_proc_tbl||''', t.'||v_proc_tbl_key||' findisn, t.isn
+                    select '''||v_proc_tbl||''', t.findisn, t.isn
                         from storage_adm.tt_histlog h inner join 
-                            ais.'||v_proc_tbl||' t
+                            (select isn, '||v_proc_tbl_key||' findisn from ais.'||v_proc_tbl||' )t
                             on h.recisn = t.isn
                         where h.table_name='''||v_proc_tbl||'''';
                 execute vsql;
@@ -244,7 +245,8 @@ Begin
                 (select oid from pg_class where relname = lower(vTable) and relnamespace = 
                     (select oid from pg_namespace where nspname = lower(vSchema))) 
                 and a.attnum > 2
-                and not attisdropped) Loop
+                and not attisdropped
+            order by a.attnum) Loop
 
         if (Cur_Col.attname <> lower(pEND_DATE_FLD)) Then
             vSql = vSql||','||Cur_Col.attname;
@@ -493,10 +495,15 @@ begin
     for v_dest_tbl In (Select * from storage_adm.ss_process_dest_tables Where Procisn = pProcIsn order by PRIORITY Asc) loop
         if pFull = 0 then
             --incremental load
+            v_step = 'Execute before_script';
+            if length(v_dest_tbl.before_script) > 1 then
+                execute v_dest_tbl.before_script;
+            end if;
+
             v_step = v_dest_tbl.TABLE_NAME||' Fill tt table from view';
             --perform storage_adm.RepLog_i (pLoadIsn, 'Load '||pProcIsn||' By_tt_RowId', v_step,  'Begin');
             execute '  truncate table '||v_dest_tbl.TT_TABLE_NAME;
-            if v_dest_tbl.TT_FUNCTION_NAME is not null then
+            if coalesce(v_dest_tbl.TT_FUNCTION_NAME,'') <> '' then
                 vSql = 'perform '||v_dest_tbl.TT_FUNCTION_NAME;
             else
                 vSql = 'Insert into '||v_dest_tbl.TT_TABLE_NAME||' select v.* from '||v_dest_tbl.VIEW_NAME||' v';
@@ -636,7 +643,7 @@ begin
 
                 vsql = '
                     Insert Into '||v_dest_tbl.TABLE_NAME||'
-                        SELECT Seq_SS.NEXTVAL ISN,S.*
+                        SELECT nextval(''storage_adm.ss_seq'') ISN,S.*
                             FROM(
                                 Select '||vsql||' 
                                     from  '||v_dest_tbl.TABLE_NAME||'
@@ -692,7 +699,7 @@ begin
                         (' ||storage_adm.Get_Minus_slq(
                                           v_dest_tbl.TT_TABLE_NAME,
                                           v_dest_tbl.TABLE_NAME,
-                                          v_dest_tbl.KeyField,
+                                          v_dest_tbl.KeyField_named,
                                           '',
                                           'Where   ('||v_dest_tbl.KeyField||') in (
                                                 Select '||v_dest_tbl.KeyField||' from '||v_dest_tbl.TT_TABLE_NAME||' ) '||vHistAdd
