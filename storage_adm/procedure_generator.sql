@@ -175,7 +175,7 @@ language plpgsql;
 
 
 --default call
---select coalesce(storage_adm.GenerateComplexProcedure(663, null, 0, null, null, null) ,'null');
+--select coalesce(storage_adm.GenerateComplexProcedure(663, false, null, 0, null, null, null) ,'null');
 
 create or replace function storage_adm.GenerateComplexProcedure(
         pParentIsn        numeric ,

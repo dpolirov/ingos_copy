@@ -3,6 +3,7 @@
 --   storage_adm.sa_params
 --
 --------------------------------------------------------------------------------------------------
+--truncate table sa_params;
 INSERT INTO sa_params (isn, name, cvalue) VALUES (1, 'comlex:auto:bottom_banner', '
     perform storage_adm.Set_Rep_NextRun(vTaskIsn ,null);
     perform storage_adm.SetLoadToTask(vTaskIsn, 0);
@@ -86,7 +87,13 @@ INSERT INTO sa_params (isn, name, cvalue) VALUES (4, 'comlex:core:failed:stop', 
 ');
 INSERT INTO sa_params (isn, name, cvalue) VALUES (5, 'comlex:user:bottom_banner', NULL);
 INSERT INTO sa_params (isn, name, cvalue) VALUES (6, 'comlex:user:top_banner', NULL);
-INSERT INTO sa_params (isn, name, cvalue) VALUES (7, 'sole:auto:bottom_banner', 'end;');
+INSERT INTO sa_params (isn, name, cvalue) VALUES (7, 'sole:auto:bottom_banner', '
+    EXCEPTION
+        WHEN OTHERS THEN
+        BEGIN
+            raise exception ''% : % : %'', v_function_name, v_step, sqlerrm;
+        END;
+end;');
 INSERT INTO sa_params (isn, name, cvalue) VALUES (8, 'sole:auto:top_banner', 'declare
     vTaskIsn        numeric;
     vProcessShortname varchar;
@@ -112,20 +119,8 @@ INSERT INTO sa_params (isn, name, cvalue) VALUES (9, 'sole:core:bottom_banner', 
 INSERT INTO sa_params (isn, name, cvalue) VALUES (10, 'sole:core:top_banner', NULL);
 INSERT INTO sa_params (isn, name, cvalue) VALUES (11, 'sole:user:bottom_banner', NULL);
 INSERT INTO sa_params (isn, name, cvalue) VALUES (12, 'sole:user:top_banner', NULL);
-INSERT INTO sa_params (isn, name, cvalue) VALUES (13, 'sole:core:failed:stop', '
-    EXCEPTION
-        WHEN OTHERS THEN
-        BEGIN            
-            raise exception ''% : % : %'', v_function_name, v_step, sqlerrm;
-        END;
-');
-INSERT INTO sa_params (isn, name, cvalue) VALUES (14, 'sole:core:failed:continue', '
-    EXCEPTION
-        WHEN OTHERS THEN
-        BEGIN
-            raise exception ''% : % : %'', v_function_name, v_step, sqlerrm;
-        END;
-');
+INSERT INTO sa_params (isn, name, cvalue) VALUES (13, 'sole:core:failed:stop', '');
+INSERT INTO sa_params (isn, name, cvalue) VALUES (14, 'sole:core:failed:continue', '');
 
 
 --------------------------------------------------------------------------------------------------
@@ -190,7 +185,7 @@ insert into sa_complex_ref(parentisn, childisn, childrownum) values (1471,970,13
 -- psql -c "select 'insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values ('||taskisn||','||atomrownum||','''||replace(atomsource,'''','''''')||''','''||atomname||''');' from storage_adm.sa_sole_ref order by taskisn,atomrownum;"|sed 's/ *$//g'|sed 's/^ //g'>sa_sole_ref_stage2.sql
 --
 --------------------------------------------------------------------------------------------------
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (704,12,'perform REPORT_BUH_STORAGE_NEW.LoadBuh2Cond(LoadIsn); ','LoadBuh2Cond');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (704,12,'perform STORAGES.LoadBuh2Cond(vLoadIsn); ','LoadBuh2Cond');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (719,5, 'perform STORAGE_ADM.LoadStorage(27, 0);','RepAgrRoleAgr');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (719,10,'perform storage_adm.LoadStorage(13, 0);','RepAgr');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (721,1,' perform storage_adm.LoadStorage(12, 0);','RepRefund');
@@ -222,29 +217,29 @@ insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (726,7
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (727,10,'perform LOAD_STORAGE_ADDS.insertdict();','LoadStruncBefore');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (727,20,'perform LOAD_STORAGE_ADDS.LoadAgrDetails();','LoadAgrDetails');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (727,30,'perform COGNOS.MAKE_DIC_TABLES();','Справочники для Cognos');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (839,2,' perform  REPORT_BUH_STORAGE_NEW.Create_Agr_Analitiks();','Agr_analytics');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (839,3,' perform  report_budget.load_budget_body_agrs();','Budget_body_agr');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (968,1,'Declare 
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (839,2,' perform  STORAGES.Create_Agr_Analitiks();','Agr_analytics');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (839,3,' perform  storages.report_budget_load_budget_body_agrs();','Budget_body_agr');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (968,1,'
 vDaterep = date_Trunc(''month'', current_timestamp)-1;
 
 --LoadIsn =storage_adm.createload(pProcType=>12,pDaterep=>vDaterep,pclassisn=>1);
 vLoadIsn =storage_adm.createload(12);
 Update
-   Sa_Processes
+   storage_adm.Sa_Processes
 Set
   LASTRUNISN=vLoadIsn
  Where Isn=12;
 
 -- сделали загрузку актуальной
-Update Repload Set
+Update storage_adm.repload Set
 classisn = null
 where PROCISN=12  and Daterep=vDaterep and isn<>vLoadIsn;
 
-perform REPORT_RZU.LoadReserve(vLoadIsn,vDaterep );  
+perform STORAGES.REPORT_RZU_LOADRESERVE(vLoadIsn,vDaterep );  
 
 
 Update
-   Sa_Processes
+   storage_adm.sa_processes
 Set
   LASTRUNISN=0
  Where Isn=12;
@@ -255,19 +250,18 @@ insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (970,1
 vLoadIsn=REPORT_STORAGE.createload(21);
 
  Update 
-    Sa_Processes
+    storage_adm.sa_processes
  Set
    LASTRUNISN=vLoadIsn
     Where Isn=21;
-Commit;
 
-perform rep_stat.full_repbuhsummary(vloadisn);
+perform STORAGES.REP_STAT_FULL_REPBUHSUMMARY(vloadisn);
 
 
 ','prem,ubytki, com');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (971,1,'
     vDaterep = date_Trunc(''month'', current_timestamp)-1;
-    perform REPORT_RNP_NEW.make_rnp_all;  
+    perform STORAGES.REPORT_RNP_NEW_MAKE_RNP_ALL(vDaterep);
 ','rnp 2 in 1');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1015,1,'perform storage_adm.LoadStorage(1, 0);','ST_BuhBody');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1015,2,'perform storage_adm.LoadStorage(2, 0);','BuhBaseBody');
@@ -294,22 +288,22 @@ vDaterep = date_Trunc(''month'', current_timestamp)-1 + interval ''1 month'';
 vLoadIsn=storage_adm.createload(12);
 
 Update
-   Sa_Processes
+   storage_adm.sa_processes
 Set
   LASTRUNISN=vLoadIsn
  Where Isn=12;
 
 -- сделали загрузку актуальной
-Update Repload Set
+Update storage_adm.repload Set
 classisn = null
 where PROCISN=12  and Daterep=vDaterep and isn<>vLoadIsn;
 
-perform REPORT_RZU.LoadReserve(vLoadIsn,vDaterep );  
+perform STORAGES.REPORT_RZU_LOADRESERVE(vLoadIsn,vDaterep, null,null,null);  
 
  
  
 Update
-   Sa_Processes
+   storage_adm.sa_processes
 Set
   LASTRUNISN=0
  Where Isn=12;
@@ -318,7 +312,7 @@ Set
 ','rzu');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1289,1,'
 vDaterep = date_Trunc(''month'', current_timestamp)-1 + interval ''1 month'';
-  perform REPORT_RNP_NEW.make_rnp_all(vDaterep);  
+  perform STORAGES.REPORT_RNP_NEW_MAKE_RNP_ALL(vDaterep);  
 ','rnp 2 in 1');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1291,1,'
   vDaterep =current_timestamp+1; 
@@ -326,45 +320,82 @@ insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1291,
 vLoadIsn=storage_adm.createload(21);
 
  Update 
-    Sa_Processes
+    storage_adm.sa_processes
  Set
    LASTRUNISN=vLoadIsn
     Where Isn=21;
 
-perform rep_stat.full_repbuhsummary(vloadisn, vDaterep);
+perform STORAGES.REP_STAT_FULL_REPBUHSUMMARY(vloadisn, vDaterep);
 
 
 ','prem, ubytok, commission');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1306,1,' 
-  vloadisn = report_rnp_new.GetActiveLoad(trunc(sysdate,''mm'')-1 + interval ''1 month'');
-  perform INSERT_AGRRE(0);
-  perform report_rnp_new.make_rnp_re_rsbu(vloadisn);
-  perform report_rnp_new.make_rnp_re_msfo(vloadisn);
-  perform report_rnp_new.make_rnp_re_subject(vloadisn);
+  vloadisn = STORAGES.REPORT_RNP_NEW_GETACTIVELOAD(trunc(sysdate,''mm'')-1 + interval ''1 month'');
+  perform STORAGES.INSERT_AGRRE(0, null);
+  perform STORAGES.report_rnp_new_make_rnp_re_rsbu(vloadisn);
+  perform STORAGES.report_rnp_new_make_rnp_re_msfo(vloadisn);
+  perform STORAGES.report_rnp_new_make_rnp_re_subject(vloadisn);
 ','re');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1346,0,'-- грузим repbuh2obj с начала года по текущий месяц включительно
-perform storages.rep_motivation.load_repbuh2obj(date_trunc(''month'', current_timestamp-interval ''12 month''), date_trunc(''month'', current_timestamp) - interval ''1 month'');','repbuh2obj');
+perform STORAGES.REP_MOTIVATION_LOAD_REPBUH2OBJ(date_trunc(''month'', current_timestamp-interval ''12 month''), date_trunc(''month'', current_timestamp) - interval ''1 month'');','repbuh2obj');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1366,0,'perform storages.INSERT_AGRRE(0);
-perform storages.make_repbuhre2resection;
-perform storages.make_repbuh2resection;
-perform storages.make_repbuhre2directanalytics;
-perform storages.MAKE_AGRXINSUREDSUM4REFUND;','Вызов');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1406,0,'perform shared_system.GET_STORAGE_STAT ;','Stat');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1407,10,'perform storage_adm.load_storage.LoadStorage(19, 0);','rep_agr_salers');
+perform storages.make_repbuhre2resection();
+perform storages.make_repbuh2resection();
+perform storages.make_repbuhre2directanalytics();
+perform storages.MAKE_AGRXINSUREDSUM4REFUND();','Вызов');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1406,0,'perform shared_system.GET_STORAGE_STAT() ;','Stat');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1407,10,'perform storage_adm.LoadStorage(19, 0);','rep_agr_salers');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1408,10,'-- грузим repbuh2obj с начала года по текущий месяц включительно
-perform storages.rep_motivation.load_repbuh2obj(oracompat.runc(oracompat.ADD_MONTHS(current_timestamp,-12),''MM''), oracompat.add_months(oracompat.trunc(current_timestamp, ''mm''), 1));
+perform STORAGES.REP_MOTIVATION_LOAD_REPBUH2OBJ(oracompat.trunc(oracompat.ADD_MONTHS(current_timestamp,-12),''MM''), oracompat.add_months(oracompat.trunc(current_timestamp, ''mm''), 1));
 
 ','RepBuh2Obj');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1409,10,'perform storage_adm.LoadStorage(20,0);','Rep_Agent_Ranks');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1410,10,'perform COGNOS.MAKE_DIC_TABLES(''Y'');','Обновление справочников Cognos');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1430,10,'perform PKG_MAKE_DICTI_TABLES.MAKE_MOTOR_DICTI_TABLES;','Формирование справочников');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1452,10,'perform LOAD_STORAGE_ADDS.AgrGrpAdds(loadisn);  ','LoadAgrAdds');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1452,11,'perform LOAD_STORAGE_ADDS.BuhBodyGrpAdds(Loadisn);','LoadBuhAdds');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1452,10,'perform LOAD_STORAGE_ADDS.AgrGrpAdds(vloadisn);  ','LoadAgrAdds');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1452,11,'perform LOAD_STORAGE_ADDS.BuhBodyGrpAdds(vLoadisn);','LoadBuhAdds');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1452,12,'/* доля перестрах в убытках*/
-perform LOAD_STORAGE_ADDS.refundgrpadds(loadisn);','LoadRefundAdds');
+perform LOAD_STORAGE_ADDS.refundgrpadds(vloadisn);','LoadRefundAdds');
 insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1452,13,'perform LOAD_STORAGE_ADDS.LoadAgrRuleExt(vloadisn);','LoadAgrRuleExt');
-insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1470,0,'perform REPORT_BUH_STORAGE_NEW.LoadBuh2Cond_BY_DATE(vLoadIsn,''01-sep-2013'');','repbuh2cond');
+insert into sa_sole_ref(taskisn, atomrownum, atomsource, atomname) values (1470,0,'perform STORAGES.REPORT_BUH_STORAGE_NEW_LOADBUH2COND_BY_DATE(vLoadIsn,''01-sep-2013'');','repbuh2cond');
 
+
+--recreate sole procedures
+select coalesce(storage_adm.GenerateSoleProcedure(704, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(719, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(721, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(723, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(726, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(727, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(839, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(968, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(970, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(971, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(1015, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(1026, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(1205, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(1288, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(1289, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(1291, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(1306, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(1346, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(1366, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(1406, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(1407, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(1408, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(1409, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(1410, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(1430, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(1452, true, 0, null, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateSoleProcedure(1470, true, 0, null, null, null, null) ,'null');
+
+select coalesce(storage_adm.GenerateComplexProcedure(663, true, null, 0, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateComplexProcedure(667, true, null, 0, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateComplexProcedure(678, true, null, 0, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateComplexProcedure(965, true, null, 0, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateComplexProcedure(1265, true, null, 0, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateComplexProcedure(1292, true, null, 0, null, null, null) ,'null');
+select coalesce(storage_adm.GenerateComplexProcedure(1471, true, null, 0, null, null, null) ,'null');
 
 --------------------------------------------------------------------------------------------------
 --
@@ -473,6 +504,7 @@ insert into storage_adm.ss_process_dest_tables values(19,'STORAGES.REP_AGR_SALER
 insert into storage_adm.ss_process_dest_tables values(19,'STORAGES.REP_AGR_SALERS_LINE','storage_adm.V_REP_AGR_SALERS_LINE','STORAGE_ADM.TT_REP_AGR_SALERS_LINE','AGRISN, DATEBEG, DATEEND','AGRISN',20,'',0,'','','','','');
 insert into storage_adm.ss_process_dest_tables values(20,'MOTOR.AGRAGENT_RANKS','storage_adm.V_AGRAGENT_RANKS','STORAGE_ADM.TT_AGRAGENT_RANKS','AGRISN, AGENTISN, CLASSISN, AGENT_RANK, SHAREPC, AGRRANK_RANK, ARCLASSISN','AGRISN',20,'',0,'','','','','');
 insert into storage_adm.ss_process_dest_tables values(20,'STORAGES.REP_AGENT_RANKS','storage_adm.V_REP_AGENT_RANKS','STORAGE_ADM.TT_REP_AGENT_RANKS','AGRISN, ADDISN, AGENTISN, ORDERNO','AGRISN',10,'',0,'','','','','');
+insert into storage_adm.ss_process_dest_tables values(23,'STORAGE_SOURCE.SUBJ_BEST_ADDR','storage_adm.V_SUBJ_BEST_ADDR','STORAGE_ADM.TT_SUBJ_BEST_ADDR','SUBJISN','SUBJISN',10,'X_SUBADDR_SUBJ',0,'','','','','');
 insert into storage_adm.ss_process_dest_tables values(27,'STORAGE_SOURCE.REPAGRROLEAGR','storage_adm.V_REPAGRROLEAGR','STORAGE_ADM.TT_REPAGRROLEAGR','AGRISN','AGRISN',10,'',0,'','','','','');
 insert into storage_adm.ss_process_dest_tables values(52,'STORAGE_SOURCE.SUBJECT_ATTRIB','storage_adm.V_SUBJECT_ATTRIB','STORAGE_ADM.TT_SUBJECT_ATTRIB','SUBJISN','SUBJISN',null,'',0,'','','','','');
 -- later stages
@@ -491,7 +523,6 @@ insert into storage_adm.ss_process_dest_tables values(17,'MEDIC.ST_MEDREFUND','s
 insert into storage_adm.ss_process_dest_tables values(18,'MEDIC.ST_MEDSUM','storage_adm.V_MEDSUM','STORAGE_ADM.TT_MEDSUM','DOCSUMISN','DOCSUMISN',null,'',0,'','','','','');
 insert into storage_adm.ss_process_dest_tables values(21,'MOTOR.CARREPAGR','storage_adm.V_CARREPAGR','STORAGE_ADM.TT_CARREPAGR','AGRISN','AGRISN',10,'',0,'','','','','');
 insert into storage_adm.ss_process_dest_tables values(22,'MOTOR.REP_DOCS_DOCSUM_CLMINV','storage_adm.V_REP_DOCS_DOCSUM_CLMINV','STORAGE_ADM.TT_REP_DOCS_DOCSUM_CLMINV','DOC_SIGNED, DOCSUM_ISN','CLMINV_ISN',10,'X_DOCSUMCLMINV_DOCSUM',0,'','','','','');
-insert into storage_adm.ss_process_dest_tables values(23,'STORAGE_SOURCE.SUBJ_BEST_ADDR','storage_adm.V_SUBJ_BEST_ADDR','STORAGE_ADM.TT_SUBJ_BEST_ADDR','SUBJISN','SUBJISN',10,'X_SUBADDR_SUBJ',0,'','','','','');
 insert into storage_adm.ss_process_dest_tables values(24,'MOTOR.REP_DOCS_DOCSUM_CLMINV_LINE','storage_adm.V_REP_DOCS_DOCSUM_CLMINV_LINE','STORAGE_ADM.TT_REP_DOCS_DOCSUM_CLMINV_LINE','CLMINVL_ISN, CLMINV_ISN, REFUNDISN, DOCSUM_ISN, DOC_ISN','CLMINV_ISN',10,'',0,'','','','','');
 insert into storage_adm.ss_process_dest_tables values(25,'MOTOR.REP_DOCS_DOCSUM','storage_adm.V_REP_DOCS_DOCSUM','STORAGE_ADM.TT_REP_DOCS_DOCSUM','DOCSUM_ISN','AGRISN',10,'',0,'','','','','');
 insert into storage_adm.ss_process_dest_tables values(26,'MOTOR.REP_CLMINV_LINE','storage_adm.V_REP_CLMINV_LINE','STORAGE_ADM.TT_REP_CLMINV_LINE','CLMINVL_ISN, CLMINV_ISN, REFUNDISN','CLMINV_ISN',10,'',0,'','','','','');
@@ -546,15 +577,15 @@ and coalesce(B.Damountrub,0)-coalesce(B.camountrub,0)<>0',0);
 insert into storage_adm.ss_process_source_tables values(2,2,'AIS','BUHBODY_T','Case
  When s.Parentisn Is null  Then  S.Isn 
  When (Select coalesce(Max(d.parentisn),759033300)
- from ais.dicti d
- where  s.oprisn=d.isn)= 759033300 /*идем вверх только по проводкам операций "автоматические" */
- and s.Parentisn<>s.Isn /*бывают проводки, ссылающиеся сами на себя*/
-  Then
-   ( select coalesce(Max(b1.Isn) KEEP ( dense_rank FIRST ORDER BY decode(b1.subaccisn,s.subaccisn,0,1),Level desc ),S.Isn)
-   from ais.buhbody_t b1
-  Start with b1.isn=s.isn
-    connect by NOCYCLE  prior b1.parentisn= b1.isn )   
- 
+           from ais.dicti d
+           where  s.oprisn=d.isn)= 759033300 /*идем вверх только по проводкам операций "автоматические" */
+           and s.Parentisn<>s.Isn /*бывают проводки, ссылающиеся сами на себя*/
+            Then
+             ( select coalesce(first_value (b1.Isn) over (partition by null ORDER BY decode(b1.subaccisn,s.subaccisn,0,1), shared_system.get_level(__hier) desc) ,S.Isn)
+                  from ais.buhbody_nh b1
+                  where shared_system.is_subtree(__hier, s.isn)
+                 )   
+           
    Else
     coalesce(S.ParentIsn,S.Isn)
    End',null,'(SELECT DISTINCT FINDISN FROM storage_adm.SS_HISTLOG WHERE PROCISN=2)','select /*+ Full(b) Parallel (b,12) */
@@ -780,7 +811,7 @@ insert into storage_adm.ss_process_source_tables values(44,13,'AIS','AGRRISK','A
 insert into storage_adm.ss_process_source_tables values(45,13,'AIS','AGROBJECT','AGRISN',null,'','',null); 
 insert into storage_adm.ss_process_source_tables values(46,13,'AIS','AGRLIMIT','AGRISN',null,'','',null);  
 insert into storage_adm.ss_process_source_tables values(47,14,'AIS','BUHBODY_T','ISN',null,'','Select /*+ Full(a) Parallel(a,32)*/ Isn from AIS.buhbody_T a',0);  
-insert into storage_adm.ss_process_source_tables values(48,15,'AIS','BUHBODY_T','ISN',null,'SELECT /*+ FULL(T) PARALLEL (T)  ORDERED USE_NL(B BP) */
+insert into storage_adm.ss_process_source_tables values(48,15,'AIS','BUHBODY_T','ISN',null,'(SELECT /*+ FULL(T) PARALLEL (T)  ORDERED USE_NL(B BP) */
 CASE 
  WHEN T.TABLE_NAME<>''BUHBODY_T'' AND B.ISN IS NOT NULL THEN B.HEADISN /*ЕСЛИ ДОКСУММА - ТО HEADISN ЕЕ ПРОВОДКИ И ВСЕ*/
  WHEN T.TABLE_NAME=''BUHBODY_T'' AND B.ISN IS NOT NULL  THEN/* ПРОВОДКА, НЕ УДАЛЕНА*/
@@ -804,7 +835,7 @@ FROM STORAGE_ADM.SS_HISTLOG T
 WHERE D.PARENTISN=759033300 AND CODE IN(''200'',''02'',''03'') -- НЕОБХОДИМО ОГРАНИЧЕНИЕ ПО ОПЕРАЦИЯМ 200 02 03
 ) D on B.OPRISN=D.ISN /* ОПЕРАЦИЯ ПРОВОДКИ */ /* СПИСОК "АВТОМАТИЧЕСКИХ" ОПЕРАЦИЙ , ПО КОТОРЫМ НУЖНА ДОПОЛНИТЕЛЬНАЯ РАСШИФРОВКА - ПАПЫ БЕРЕМ */   
 WHERE T.PROCISN=15
-AND T.LOADISN=storage_adm.GetLoadIsn()
+AND T.LOADISN=storage_adm.GetLoadIsn())
 ',
 'Select /*+ FULL(b) PARALLEL (b,32 )  */
 distinct Headisn
@@ -923,7 +954,7 @@ insert into storage_adm.ss_process_source_tables values(77,19,'AIS','OBJ_ATTRIB'
   when 
     CLASSISN = 1428587803
     and DISCR = ''C'' 
-    and coalesce(oracompat.add_months(DATEBEG, -1), timestamp ''01-01-3000'' >= current_timestamp
+    and coalesce(oracompat.add_months(DATEBEG::date, -1), timestamp ''01-01-3000'') >= current_timestamp
   then ISN
 end',null,'storage_adm.V_SS_LOAD_AGR_SALERS_OBJ_ATTR','',0);
 insert into storage_adm.ss_process_source_tables values(78,20,'AIS','AGRROLE','AGRISN',null,'','select /*+ parallel(AR 32) full(AR) */
@@ -1051,7 +1082,7 @@ insert into storage_adm.ss_process_source_tables values(131,21,'AIS','OBJ_ATTRIB
   when 
     CLASSISN in (2647785103, 3028738303, 2638580803)
     and DISCR = ''C'' 
-    and coalesce(oracompat.add_months(DATEBEG, -1), timestamp ''01-01-3000'') >= current_timestamp
+    and coalesce(oracompat.add_months(DATEBEG::date, -1), timestamp ''01-01-3000'') >= current_timestamp
   then ObjISN
 end',null,'V_SS_LOAD_AGR_CLIENT_OBJ_ATTR','',0);    
 insert into storage_adm.ss_process_source_tables values(132,26,'AIS','OBJ_ATTRIB','case 
@@ -1498,7 +1529,7 @@ insert into storage_adm.ss_process_source_tables values(292,52,'AIS','SUBJECT_T'
 insert into storage_adm.ss_process_source_tables values(293,52,'AIS','SUBHUMAN_T','ISN',null,'','',null);  
 insert into storage_adm.ss_process_source_tables values(294,52,'AIS','SUBPHONE_T','SUBJISN',null,'','',null);
 insert into storage_adm.ss_process_source_tables values(295,52,'AIS','SUBADDR_T','SUBJISN',null,'','',null); 
-insert into storage_adm.ss_process_source_tables values(296,52,'AIS','QUEUE','CASE WHENCLASSISN = 1175052903  
+insert into storage_adm.ss_process_source_tables values(296,52,'AIS','QUEUE','CASE WHEN CLASSISN = 1175052903  
 AND ObjISN2 is null
 AND FormISN = 33024916  
 AND Status = ''W''   

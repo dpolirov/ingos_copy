@@ -1,4 +1,4 @@
-create or replace view v_tt_docsumbody (
+create or replace view storage_adm.v_tt_docsumbody (
    bodyisn,
    bamount,
    agrisn,
@@ -22,6 +22,7 @@ create or replace view v_tt_docsumbody (
    agrdatebeg )
 as
 (
+    
     select --+ ordered use_nl(ar)
         s.bodyisn,bamount,s.agrisn,
         s.subjisn,amountrub,datepaylast,
@@ -38,7 +39,7 @@ as
                     d2.agrkoef, 
                     d2.kfbase/sum(d2.kfbase) over(partition by d2.bodyisn,d2.agrisn) as dskoef,
                     d2.agrkoef*d2.kfbase/sum(d2.kfbase) over(partition by d2.bodyisn,d2.agrisn) as agrdskoef,
-                    greatest(storage_adm.load_storage.gethistdb,bodystatbeg) db, 
+                    greatest(shared_system.load_storage_gethistdb(),bodystatbeg) db, 
                     bodystatend as de,
                     d2.remainder,
                     reaccisn
@@ -49,24 +50,41 @@ as
                             from
                             (
                                 select d.*,
-                                        decode(oracompat.trunc(sum(remainder) over(partition by bodyisn)),0,
+                                        decode(trunc(sum(remainder) over(partition by bodyisn)),0,
                                         sum( sgn*amountrub) over(partition by bodyisn,agrisn),
                                         sum( sgn*remainder) over(partition by bodyisn,agrisn)) c_agr,
-                                        decode(oracompat.trunc(sum(remainder) over(partition by bodyisn)),0,amountrub,remainder) kfbase
+                                        decode(trunc(sum(remainder) over(partition by bodyisn)),0,amountrub,remainder) kfbase
                                     from
-                                    (
+                                    (with b as  (
+                                                /*С‚РѕР»СЊРєРѕ РёРЅС‚РµСЂРµСЃСѓСЋС‰РёРµ РЅР°СЃ РґРѕРєСЃСѓРјРјС‹*/
+                                                select --+ ordered use_nl(b b1)
+                                                      b.baseisn bodyisn,
+                                                      max(b.baseamountrub) baseamountrub,
+                                                      max(b.subaccisn) subaccisn,
+                                                      max(b.basedateval) dateval,
+                                                      max(b.de) bodystatend,
+                                                      min(b.db) bodystatbeg,
+                                                      max(b.code) code,
+                                                      max(basedamountrub) damountrub,
+                                                      max(basecamountrub) camountrub
+                                                    from storage_adm.tt_rowid t,storages.st_bodydebcre b
+                                                    where
+                                                      t.isn = b.baseisn
+                                                group by b.baseisn
+                                                having max(b.baseamountrub) <> 0
+                                            )
                                         select --+ ordered use_nl(b pc pd)
                                                 b.bodyisn,
                                                 b.baseamountrub bamount,
                                                 ds.agrisn,
                                                 ds.subjisn,
-                                                case /* если знак remainder и amountrub совпадают или remainder=0*/
-                                                    when sign(ds.amountrub) = sign(ds.remainder) then gcc2.gcc2(ds.remainder, ds.currisn, 35, b.dateval)
-                                                    when sign(oracompat.nvl(ds.remainder,-1)) = 0 then 0
+                                                case /* РµСЃР»Рё Р·РЅР°Рє remainder Рё amountrub СЃРѕРІРїР°РґР°СЋС‚ РёР»Рё remainder=0*/
+                                                    when sign(ds.amountrub) = sign(ds.remainder) then shared_system.gcc2(ds.remainder, ds.currisn, 35, b.dateval)
+                                                    when sign(oracompat.nvl(ds.remainder,-1 :: numeric)) = 0 then 0
                                                 else
-                                                    gcc2.gcc2(ds.amount,ds.currisn,35, b.dateval)
+                                                    shared_system.gcc2(ds.amount,ds.currisn,35, b.dateval)
                                                 end remainder,
-                                                gcc2.gcc2(ds.amount,ds.currisn,35,b.dateval) amountrub,
+                                                shared_system.gcc2(ds.amount,ds.currisn,35,b.dateval) amountrub,
                                                 oracompat.nvl(oracompat.nvl(ds.datepaylast,ds.datepay), ds.docdate) datepaylast,
                                                 ds.classisn dsclassisn,
                                                 ds.isn dsisn,
@@ -82,38 +100,56 @@ as
                                                 code,
                                                 damountrub,
                                                 camountrub
-                                            from
-                                            (
-                                                /*только интересующие нас доксуммы*/
-                                                select --+ ordered use_nl(b b1)
-                                                      b.baseisn bodyisn,
-                                                      max(b.baseamountrub) baseamountrub,
-                                                      max(b.subaccisn) subaccisn,
-                                                      max(b.basedateval) dateval,
-                                                      max(b.de) bodystatend,
-                                                      min(b.db) bodystatbeg,
-                                                      max(b.code) code,
-                                                      max(basedamountrub) damountrub,
-                                                      max(basecamountrub) camountrub
-                                                    from tt_rowid t,storages.st_bodydebcre b
-                                                    where
-                                                      t.isn = b.baseisn
-                                                group by b.baseisn
-                                                having max(b.baseamountrub) <> 0
-                                            )b,
+                                            from                                            
+                                             b inner join 
                                             ais.docsum ds
-                                            where b.bodyisn in (ds.debetisn,ds.creditisn)
-                                                and ds.discr in ('f','p')
+                                            on b.bodyisn = ds.debetisn
+                                                and ds.discr in ('F','P')
+                                                and ds.amountrub <> 0
+                                            union all
+                                            select --+ ordered use_nl(b pc pd)
+                                                b.bodyisn,
+                                                b.baseamountrub bamount,
+                                                ds.agrisn,
+                                                ds.subjisn,
+                                                case /* РµСЃР»Рё Р·РЅР°Рє remainder Рё amountrub СЃРѕРІРїР°РґР°СЋС‚ РёР»Рё remainder=0*/
+                                                    when sign(ds.amountrub) = sign(ds.remainder) then shared_system.gcc2(ds.remainder, ds.currisn, 35, b.dateval)
+                                                    when sign(oracompat.nvl(ds.remainder,-1 :: numeric)) = 0 then 0
+                                                else
+                                                    shared_system.gcc2(ds.amount,ds.currisn,35, b.dateval)
+                                                end remainder,
+                                                shared_system.gcc2(ds.amount,ds.currisn,35,b.dateval) amountrub,
+                                                oracompat.nvl(oracompat.nvl(ds.datepaylast,ds.datepay), ds.docdate) datepaylast,
+                                                ds.classisn dsclassisn,
+                                                ds.isn dsisn,
+                                                ds.discr discr,
+                                                ds.reaccisn reaccisn,
+                                                b.subaccisn,
+                                                ds.splitisn splitisn,
+                                                decode(sign(baseamountrub),sign(sum(ds.amount) over (partition by bodyisn,discr)),-1,1) sgn,
+                                                bodystatend,
+                                                bodystatbeg,
+                                                max(ds.discr) over (partition by bodyisn) maxdiscr,
+                                                min(ds.discr) over (partition by bodyisn) mindiscr,
+                                                code,
+                                                damountrub,
+                                                camountrub
+                                            from                                            
+                                             b inner join 
+                                            ais.docsum ds
+                                            on b.bodyisn = ds.creditisn
+                                                and ds.creditisn <> ds.debetisn
+                                                and ds.discr in ('F','P')
                                                 and ds.amountrub <> 0
                                     ) d
                                     where
-                                    /* дебильная врезка - для счета 76197 надо отдавать предпочтение фактическим доксуммам, чтобу получить страховщика причинителя вреда по пву*/
+                                    /* РґРµР±РёР»СЊРЅР°СЏ РІСЂРµР·РєР° - РґР»СЏ СЃС‡РµС‚Р° 76197 РЅР°РґРѕ РѕС‚РґР°РІР°С‚СЊ РїСЂРµРґРїРѕС‡С‚РµРЅРёРµ С„Р°РєС‚РёС‡РµСЃРєРёРј РґРѕРєСЃСѓРјРјР°Рј, С‡С‚РѕР±Сѓ РїРѕР»СѓС‡РёС‚СЊ СЃС‚СЂР°С…РѕРІС‰РёРєР° РїСЂРёС‡РёРЅРёС‚РµР»СЏ РІСЂРµРґР° РїРѕ РїРІСѓ*/
                                     /*(code='76197' and camountrub is not null and discr=mindiscr) or
                                     ((code<>'76197' or damountrub is not null) and discr=maxdiscr) */
                                     discr = maxdiscr
                             )d
                             where
-                            sign(d.c_agr) <> sign(bamount) and c_agr <> 0 -- заменить на > 0
+                            sign(d.c_agr) <> sign(bamount) and c_agr <> 0 -- Р·Р°РјРµРЅРёС‚СЊ РЅР° > 0
                         ) d2
                     where sign(d2.amountrub*sgn) <> sign(d2.bamount)
         ) s 

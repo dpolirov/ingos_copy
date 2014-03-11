@@ -59,10 +59,7 @@ create or replace view storage_adm.v_subject_attrib (
    clientisarrested,
    deny_info_post,
    deny_info_call,
-   monitoringisn,
-   monitoringbeg,
-   monitoringend,
-   monitoringupd )
+   monitoringisn )
 as
 (
     with tt as (select isn from storage_adm.tt_rowid)
@@ -127,10 +124,7 @@ as
           q.clientisarrested,  -- признак клиента под арестом
           decode(sj.classisn, 497, 'N', deny_info_post) as deny_info_post,     -- запрет на информационное оповещение в виде бумажной почтовой рассылки
           decode(sj.classisn, 497, 'N', deny_info_call) as deny_info_call,     -- запрет на информационное оповещение в виде звонка
-          s.monitoringisn,
-          s.monitoringbeg,
-          s.monitoringend,
-          s.monitoringupd
+          s.monitoringisn
     from (
           select
                 coalesce(o.o_subjisn, adr.adr_subjisn, ph.ph_subjisn, vip.vip_subjisn, sh.sh_subjisn) as subjisn,
@@ -157,10 +151,7 @@ as
                 ph.*,
                 vip.*,
                 sh.birthday,
-                o.monitoringisn,
-                o.monitoringbeg,
-                o.monitoringend,
-                o.monitoringupd
+                o.monitoringisn
               from
                     tt
                         left join (select --+ ordered use_nl(tt oa) use_hash(d)
@@ -184,10 +175,7 @@ as
                                             max(decode(d.isn, 2896523903, decode(oa.valn, 3546162503, 'N', 'Y'))) as deny_promo_email,
                                             max(decode(d.isn, 3096320703, decode(oa.valn, 3546162303, 'Y', 'N'))) as deny_info_post,
                                             max(decode(d.isn, 3096320703, decode(oa.valn, 3546162103, 'Y', 'N'))) as deny_info_call,
-                                            max(decode(d.isn, 3002827403, oa.valn)) as monitoringisn,
-                                            max(decode(d.isn, 3002827403, oa.datebeg)) as monitoringbeg,
-                                            max(decode(d.isn, 3002827403, oa.dateend)) as monitoringend,
-                                            max(decode(d.isn, 3002827403, oa.updatedby)) as monitoringupd
+                                            max(decode(d.isn, 3002827403, oa.valn)) as monitoringisn
                                       from
                                             tt
                                                 inner join ais.obj_attrib oa
@@ -299,7 +287,7 @@ as
                                                   first_value(decode(p.classisn, 25152816, p.phone)) over (partition by p.subjisn order by decode(p.classisn, 25152816, 0, 1), p.updated desc,decode(p.classisn, 25152816, p.phone) desc) as mobilephone,
                                                   first_value(decode(p.classisn, 420, p.phone)) over (partition by p.subjisn order by decode(p.classisn, 420, 0, 1), p.updated desc, decode(p.classisn, 420, p.phone) desc) as phone,
                                                   first_value(decode(p.classisn, 29155416, p.phone)) over (partition by p.subjisn order by decode(p.classisn, 29155416, 0, 1), p.updated desc, decode(p.classisn, 29155416, p.phone) desc) as home_phone,
-                                                  first_value(oracompat.nvl2(dx.classisn1, (p.remark || p.phone)::numeric, null::numeric)) over (partition by p.subjisn order by oracompat.nvl2(dx.classisn1, 0::numeric, 1::numeric), dx.classisn2, p.updated desc, oracompat.nvl2(dx.classisn1, (p.remark || p.phone)::numeric, null::numeric) desc) as smsphone
+                                                  first_value(oracompat.nvl2(dx.classisn1::varchar, (p.remark || p.phone)::varchar, null::varchar)) over (partition by p.subjisn order by oracompat.nvl2(dx.classisn1, 0::numeric, 1::numeric), dx.classisn2, p.updated desc, oracompat.nvl2(dx.classisn1::varchar, (p.remark || p.phone)::varchar, null::varchar) desc) as smsphone
                                                 from
                                                       tt
                                                         inner join ais.subphone_t p

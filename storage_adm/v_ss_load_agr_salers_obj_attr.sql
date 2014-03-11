@@ -1,4 +1,4 @@
-CREATE OR REPLACE VIEW v_ss_load_agr_salers_obj_attr (
+CREATE OR REPLACE VIEW storage_adm.v_ss_load_agr_salers_obj_attr (
    agrisn )
 AS
 select 
@@ -21,7 +21,7 @@ from
 ) D,
 ( select --+ ordered use_nl(S OA) index(OA X_ATTRIB)
     OA.ObjISN as SubjISN,
-    coalesce(oracompat.add_months(max(OA.DATEBEG)::DATE, -1), DATE '01-jan-1900') as DATE_BEG_LAST  -- отбираем последнюю дату минус месяц
+    coalesce(oracompat.add_months(max(OA.DATEBEG)::date, -1), timestamp '01-jan-1900') as DATE_BEG_LAST  -- отбираем последнюю дату минус месяц
   from 
    (select --+ full(s) parallel(s 32) cardinality (s 1000000) 
     distinct 
@@ -38,7 +38,7 @@ from
     and OA.classisn = 1428587803    
     and OA.discr = 'C' 
   group by OA.ObjISN  
-  having coalesce(oracompat.add_months(max(OA.DATEBEG)::DATE, -1), date '01-jan-3000') >= current_timestamp
+  having coalesce(oracompat.add_months(max(OA.DATEBEG)::date, -1), timestamp '01-jan-3000') >= current_timestamp
 ) OA,
   ais.AGREEMENT A
 where
@@ -46,7 +46,3 @@ where
   and AR.CLASSISN = D.ISN
   and AR.AGRISN = A.ISN
   and A.DATEEND >= OA.DATE_BEG_LAST
-
-
-
--- End of DDL Script for View STORAGE_ADM.V_SS_LOAD_AGR_SALERS_OBJ_ATTR
