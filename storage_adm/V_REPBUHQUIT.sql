@@ -1,4 +1,4 @@
-create or replace view v_repbuhquit (
+create or replace view storage_adm.v_repbuhquit (
    deptisn,
    statcode,
    classisn,
@@ -33,7 +33,8 @@ create or replace view v_repbuhquit (
    repcursdiff )
 as
 (
-    select --+ use_nl (bbq) ordered no_merge ( b )
+
+select --+ use_nl (bbq) ordered no_merge ( b )
            b.deptisn, 
            b.statcode, 
            b.classisn, 
@@ -53,9 +54,9 @@ as
            b.buhquitbodyisn, 
            b.buhquitbodycnt,
            b.sagroup,
-           b.buhpc,-- коэф. частичной квитовки
-           b.buhquitpc, -- коэф. корреспонденции
-           b.buhquitdate,-- дата операции квитовки
+           b.buhpc,-- РєРѕСЌС„. С‡Р°СЃС‚РёС‡РЅРѕР№ РєРІРёС‚РѕРІРєРё
+           b.buhquitpc, -- РєРѕСЌС„. РєРѕСЂСЂРµСЃРїРѕРЅРґРµРЅС†РёРё
+           b.buhquitdate,-- РґР°С‚Р° РѕРїРµСЂР°С†РёРё РєРІРёС‚РѕРІРєРё
            b.groupisn,
            b.buhquitisn, 
            b.queisn, 
@@ -63,44 +64,44 @@ as
            sum(b.quitsum) quitsum,
            sum( b.quitpc) quitpc,
            b.fact,
-           max(b.quitbodyisn) quitbodyisn ,/*kgs 04.10.11 чтобы было много места*/
-           bbq.dateval quitdateval,-- дата начисления проводки, с которой квитовали
+           max(b.quitbodyisn) quitbodyisn ,/*kgs 04.10.11 С‡С‚РѕР±С‹ Р±С‹Р»Рѕ РјРЅРѕРіРѕ РјРµСЃС‚Р°*/
+           bbq.dateval quitdateval,-- РґР°С‚Р° РЅР°С‡РёСЃР»РµРЅРёСЏ РїСЂРѕРІРѕРґРєРё, СЃ РєРѕС‚РѕСЂРѕР№ РєРІРёС‚РѕРІР°Р»Рё
            case when b.currisn = 35 then 0
            else
              sum
                  (
-                   oracompat.nvl(( - gcc2.gcc2(oracompat.nvl(b.quitsum,0)*b.buhquitsumpc,b.currisn,35,oracompat.nvl(b.buhquitdate, b.dateval))+ -- валютируем зачет на дату начисления
-                         gcc2.gcc2(oracompat.nvl(b.quitsum,0)*b.buhquitsumpc,b.currisn,35, decode(b.fact,'y',bbq.dateval,oracompat.nvl(b.buhquitdate,b.dateval))) -- валютируем поступление на дату оплаты
-                   ),0)+
-                    oracompat.nvl(( -b.buhamountrub*buhpc*quitpc*buhquitpc +  -- сумма в рублях
-                         gcc2.gcc2(b.buhamount*buhpc*quitpc*buhquitpc,b.currisn,35, oracompat.nvl(b.buhquitdate,b.dateval))
-                      ) ,0)   -- разница валютирования даты начисления и даты квитовки
+                   oracompat.nvl(( - shared_system.gcc2(oracompat.nvl(b.quitsum,0::numeric)*b.buhquitsumpc,b.currisn,35,oracompat.nvl(b.buhquitdate, b.dateval))+ -- РІР°Р»СЋС‚РёСЂСѓРµРј Р·Р°С‡РµС‚ РЅР° РґР°С‚Сѓ РЅР°С‡РёСЃР»РµРЅРёСЏ
+                         shared_system.gcc2(oracompat.nvl(b.quitsum,0::numeric)*b.buhquitsumpc,b.currisn,35, decode(b.fact,'y',bbq.dateval,oracompat.nvl(b.buhquitdate,b.dateval))) -- РІР°Р»СЋС‚РёСЂСѓРµРј РїРѕСЃС‚СѓРїР»РµРЅРёРµ РЅР° РґР°С‚Сѓ РѕРїР»Р°С‚С‹
+                   ),0::numeric)+
+                    oracompat.nvl(( -b.buhamountrub*buhpc*quitpc*buhquitpc +  -- СЃСѓРјРјР° РІ СЂСѓР±Р»СЏС…
+                         shared_system.gcc2(b.buhamount*buhpc*quitpc*buhquitpc,b.currisn,35, oracompat.nvl(b.buhquitdate,b.dateval))
+                      ) ,0::numeric)   -- СЂР°Р·РЅРёС†Р° РІР°Р»СЋС‚РёСЂРѕРІР°РЅРёСЏ РґР°С‚С‹ РЅР°С‡РёСЃР»РµРЅРёСЏ Рё РґР°С‚С‹ РєРІРёС‚РѕРІРєРё
                   )
-           end repcursdiff /* курсовая разница (в руб) валютирования не рублевого поступления в зависимости от типа потом ее к сквитованной сумме прибавлять просто надо*/
+           end repcursdiff /* РєСѓСЂСЃРѕРІР°СЏ СЂР°Р·РЅРёС†Р° (РІ СЂСѓР±) РІР°Р»СЋС‚РёСЂРѕРІР°РЅРёСЏ РЅРµ СЂСѓР±Р»РµРІРѕРіРѕ РїРѕСЃС‚СѓРїР»РµРЅРёСЏ РІ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё РѕС‚ С‚РёРїР° РїРѕС‚РѕРј РµРµ Рє СЃРєРІРёС‚РѕРІР°РЅРЅРѕР№ СЃСѓРјРјРµ РїСЂРёР±Р°РІР»СЏС‚СЊ РїСЂРѕСЃС‚Рѕ РЅР°РґРѕ*/
         from
             (
                 select --+ use_nl (qd1  qd2) ordered no_merge ( b ) index (qd1 x_quedecode_objisn ) index ( qd2 x_quedecode_refisn ) index (bb) index (bb1 x_buhbody_parent)
                         b.*,
-                        oracompat.nvl(oracompat.nvl(qd1.objparam2,-qd2.refparam2),0) quitsum,
-                        oracompat.nvl(oracompat.nvl(qd1.objparam2,-qd2.refparam2),1)/decode(oracompat.nvl((sum(oracompat.nvl(qd1.objparam2,-qd2.refparam2)) over (partition by bodyisn,buhquitisn)),1),0,1,
-                        oracompat.nvl((sum(oracompat.nvl(qd1.objparam2,-qd2.refparam2)) over (partition by bodyisn,buhquitisn)),1)) quitpc,
+                        oracompat.nvl(oracompat.nvl(qd1.objparam2,-qd2.refparam2),0::numeric) quitsum,
+                        oracompat.nvl(oracompat.nvl(qd1.objparam2,-qd2.refparam2),1::numeric)/decode(oracompat.nvl((sum(oracompat.nvl(qd1.objparam2,-qd2.refparam2)) over (partition by bodyisn,buhquitisn)),1::numeric),0,1,
+                        oracompat.nvl((sum(oracompat.nvl(qd1.objparam2,-qd2.refparam2)) over (partition by bodyisn,buhquitisn)),1::numeric)) quitpc,
                         decode(oracompat.nvl(qd1.refisn,qd2.objisn),null,null,
-                        (select oracompat.nvl(max('y'),'n') from docsum where  b.buhquitisn in (debetisn,creditisn)/*(creditisn=oracompat.nvl(qd1.refisn,qd2.objisn) or debetisn=oracompat.nvl(qd1.refisn,qd2.objisn)) */and discr='f'  )) fact,
+                        (select oracompat.nvl(max('Y'),'N') from ais.docsum where  b.buhquitisn in (debetisn,creditisn)/*(creditisn=oracompat.nvl(qd1.refisn,qd2.objisn) or debetisn=oracompat.nvl(qd1.refisn,qd2.objisn)) */and discr='f'  )) fact,
                         oracompat.nvl(qd1.refisn,qd2.objisn) quitbodyisn
                     from(
-                         select --+ use_nl (r bb bb1 dg) ordered
+                                                              select --+ use_nl (r bb bb1 dg) ordered
                                   b.*,
                                   decode( oracompat.nvl (bb1.damount,-bb1.camount),0,1,oracompat.nvl (bb1.damount,-bb1.camount)/ oracompat.nvl (bb.damount,-bb.camount)) buhpc,
                                         /*decode(oracompat.nvl (bb.damount,-bb.camount),0,1,buhamount/oracompat.nvl (bb.damount,-bb.camount))*/
                                   case
                                       when oracompat.nvl (bb.damount,-bb.camount)=0 then 1
-                                      when abs(buhamount/oracompat.nvl (bb.damount,-bb.camount))>1 then 1 -- если сумма корресп проводки меньше нашей - то 1, иначе - коэффициент
+                                      when abs(buhamount/oracompat.nvl (bb.damount,-bb.camount))>1 then 1 -- РµСЃР»Рё СЃСѓРјРјР° РєРѕСЂСЂРµСЃРї РїСЂРѕРІРѕРґРєРё РјРµРЅСЊС€Рµ РЅР°С€РµР№ - С‚Рѕ 1, РёРЅР°С‡Рµ - РєРѕСЌС„С„РёС†РёРµРЅС‚
                                       else
                                          abs(buhamount/oracompat.nvl (bb.damount,-bb.camount))
                                   end buhquitsumpc,
                                   case
                                       when oracompat.nvl (bb.damount,-bb.camount)=0 then 1
-                                      when abs(buhamount/oracompat.nvl (bb.damount,-bb.camount))<1 then 1 -- если сумма корресп проводки больше нашей - то 1, иначе - коэффициент
+                                      when abs(buhamount/oracompat.nvl (bb.damount,-bb.camount))<1 then 1 -- РµСЃР»Рё СЃСѓРјРјР° РєРѕСЂСЂРµСЃРї РїСЂРѕРІРѕРґРєРё Р±РѕР»СЊС€Рµ РЅР°С€РµР№ - С‚Рѕ 1, РёРЅР°С‡Рµ - РєРѕСЌС„С„РёС†РёРµРЅС‚
                                       else
                                          oracompat.nvl (bb.damount,-bb.camount)/buhamount
                                   end buhquitpc,
@@ -112,11 +113,11 @@ as
                              from
                                  (
                                      select --+ use_nl (r b pc pd h) ordered index (b) index (cb)
-                                            --поля из report_body_list
+                                            --РїРѕР»СЏ РёР· report_body_list
                                              r.deptisn, 
                                              r.statcode, 
                                              r.classisn,
-                                            --поля проводки
+                                            --РїРѕР»СЏ РїСЂРѕРІРѕРґРєРё
                                              b.isn bodyisn, 
                                              b.dateval dateval,
                                              b.currisn currisn, 
@@ -129,31 +130,50 @@ as
                                              oracompat.nvl (b.camount, -b.damount) buhamount,
                                              oracompat.nvl (b.camountrub, -b.damountrub) buhamountrub,
                                              oracompat.nvl (b.camountusd, -b.damountusd) buhamountusd,
-                                             --поля аналитики
+                                             --РїРѕР»СЏ Р°РЅР°Р»РёС‚РёРєРё
                                              b.oprisn,
-                                             --поля корреспонденции
+                                             --РїРѕР»СЏ РєРѕСЂСЂРµСЃРїРѕРЅРґРµРЅС†РёРё
                                         /*     (select max (isn)
                                               from ais.buhbody_t
                                               where headisn = b.headisn
-                                                and status = 'а'
+                                                and status = 'Р°'
                                                 and decode (b.damount,null,damount,camount) is not null)*/
                                              cb.isn buhquitbodyisn,
-                                             (select --+ index(bbb)
-                                                    count (*)
-                                                from ais.buhbody_t bbb
-                                                where bbb.headisn = b.headisn
-                                                    and bbb.status = 'а'
-                                                    and decode(b.damount,null,damount,camount) is not null) buhquitbodycnt,
-                                             r.sagroup
-                                        from vz_repbuhbody_list r, 
-                                              ais.buhbody_t b,  
-                                              ais.buhhead_t h, 
-                                              ais.buhbody_t cb
-                                        where r.bodyisn = b.isn
-                                            and b.headisn = h.isn 
-                                            and b.headisn = cb.headisn
-                                            and cb.status = 'а'
+                                             count (bbb.headisn) buhquitbodycnt,
+                                                r.sagroup
+                                        from storage_adm.vz_repbuhbody_list r
+                                        inner join ais.buhbody_t b on r.bodyisn = b.isn
+                                        inner join ais.buhhead_t h on b.headisn = h.isn 
+                                        inner join ais.buhbody_t cb on
+                                               b.headisn = cb.headisn
+                                            and cb.status = 'Рђ'
                                             and decode(b.damount,null,cb.damount,cb.camount) is not null
+                                        left join ais.buhbody_t bbb
+                                        on bbb.headisn = b.headisn
+                                                    and bbb.status = 'Рђ'
+                                                    and decode(b.damount,null,bbb.damount,bbb.camount) is not null
+                                                    group by
+
+                                                    r.deptisn, 
+                                             r.statcode, 
+                                             r.classisn,
+                                            
+                                             b.isn , 
+                                             b.dateval ,
+                                             b.currisn , 
+                                             h.fid ,
+                                             b.deptisn , 
+                                             b.subjisn,
+                                             b.subaccisn, 
+                                             b.parentisn,
+                                             h.isn ,
+                                             oracompat.nvl (b.camount, -b.damount),
+                                             oracompat.nvl (b.camountrub, -b.damountrub) ,
+                                             oracompat.nvl (b.camountusd, -b.damountusd) ,
+                                             
+                                             b.oprisn,
+                                             cb.isn ,
+                                             r.sagroup
                                 ) b 
                                     left join ais.buhbody_t bb
                                     on b.buhquitbodyisn = bb.isn,
@@ -161,10 +181,106 @@ as
                                     left join ais.docgrp dg
                                     on bb1.groupisn = dg.isn
                              where bb.isn = bb1.isn
-                                   or bb.isn = bb1.parentisn
-                                   and bb1.status = 'а'
-                                   and bb1.oprisn = c.get('opartquit')
-                                   and oracompat.nvl(bb1.camount,bb1.damount) <> 0 -- у операций частичной квитовки сумм 0 не рассматриваем
+                                   
+                        ---
+                        union 
+                        ---
+                        select --+ use_nl (r bb bb1 dg) ordered
+                                  b.*,
+                                  decode( oracompat.nvl (bb1.damount,-bb1.camount),0,1,oracompat.nvl (bb1.damount,-bb1.camount)/ oracompat.nvl (bb.damount,-bb.camount)) buhpc,
+                                        /*decode(oracompat.nvl (bb.damount,-bb.camount),0,1,buhamount/oracompat.nvl (bb.damount,-bb.camount))*/
+                                  case
+                                      when oracompat.nvl (bb.damount,-bb.camount)=0 then 1
+                                      when abs(buhamount/oracompat.nvl (bb.damount,-bb.camount))>1 then 1 -- РµСЃР»Рё СЃСѓРјРјР° РєРѕСЂСЂРµСЃРї РїСЂРѕРІРѕРґРєРё РјРµРЅСЊС€Рµ РЅР°С€РµР№ - С‚Рѕ 1, РёРЅР°С‡Рµ - РєРѕСЌС„С„РёС†РёРµРЅС‚
+                                      else
+                                         abs(buhamount/oracompat.nvl (bb.damount,-bb.camount))
+                                  end buhquitsumpc,
+                                  case
+                                      when oracompat.nvl (bb.damount,-bb.camount)=0 then 1
+                                      when abs(buhamount/oracompat.nvl (bb.damount,-bb.camount))<1 then 1 -- РµСЃР»Рё СЃСѓРјРјР° РєРѕСЂСЂРµСЃРї РїСЂРѕРІРѕРґРєРё Р±РѕР»СЊС€Рµ РЅР°С€РµР№ - С‚Рѕ 1, РёРЅР°С‡Рµ - РєРѕСЌС„С„РёС†РёРµРЅС‚
+                                      else
+                                         oracompat.nvl (bb.damount,-bb.camount)/buhamount
+                                  end buhquitpc,
+                                  bb1.datequit buhquitdate,
+                                  bb1.groupisn,
+                                  bb1.isn buhquitisn,
+                                  dg.queisn,
+                                  bb.subaccisn corsubaccisn
+                             from
+                                 (
+                                     select --+ use_nl (r b pc pd h) ordered index (b) index (cb)
+                                            --РїРѕР»СЏ РёР· report_body_list
+                                             r.deptisn, 
+                                             r.statcode, 
+                                             r.classisn,
+                                            --РїРѕР»СЏ РїСЂРѕРІРѕРґРєРё
+                                             b.isn bodyisn, 
+                                             b.dateval dateval,
+                                             b.currisn currisn, 
+                                             h.fid buhheadfid,
+                                             b.deptisn deptisnbuh, 
+                                             b.subjisn,
+                                             b.subaccisn, 
+                                             b.parentisn,
+                                             h.isn headisn,
+                                             oracompat.nvl (b.camount, -b.damount) buhamount,
+                                             oracompat.nvl (b.camountrub, -b.damountrub) buhamountrub,
+                                             oracompat.nvl (b.camountusd, -b.damountusd) buhamountusd,
+                                             --РїРѕР»СЏ Р°РЅР°Р»РёС‚РёРєРё
+                                             b.oprisn,
+                                             --РїРѕР»СЏ РєРѕСЂСЂРµСЃРїРѕРЅРґРµРЅС†РёРё
+                                        /*     (select max (isn)
+                                              from ais.buhbody_t
+                                              where headisn = b.headisn
+                                                and status = 'Р°'
+                                                and decode (b.damount,null,damount,camount) is not null)*/
+                                             cb.isn buhquitbodyisn,
+                                             count (bbb.headisn) buhquitbodycnt,
+                                                r.sagroup
+                                        from storage_adm.vz_repbuhbody_list r
+                                        inner join ais.buhbody_t b on r.bodyisn = b.isn
+                                        inner join ais.buhhead_t h on b.headisn = h.isn 
+                                        inner join ais.buhbody_t cb on
+                                               b.headisn = cb.headisn
+                                            and cb.status = 'Рђ'
+                                            and decode(b.damount,null,cb.damount,cb.camount) is not null
+                                        left join ais.buhbody_t bbb
+                                        on bbb.headisn = b.headisn
+                                                    and bbb.status = 'Рђ'
+                                                    and decode(b.damount,null,bbb.damount,bbb.camount) is not null
+                                                    group by
+
+                                                    r.deptisn, 
+                                             r.statcode, 
+                                             r.classisn,
+                                            
+                                             b.isn , 
+                                             b.dateval ,
+                                             b.currisn , 
+                                             h.fid ,
+                                             b.deptisn , 
+                                             b.subjisn,
+                                             b.subaccisn, 
+                                             b.parentisn,
+                                             h.isn ,
+                                             oracompat.nvl (b.camount, -b.damount),
+                                             oracompat.nvl (b.camountrub, -b.damountrub) ,
+                                             oracompat.nvl (b.camountusd, -b.damountusd) ,
+                                             
+                                             b.oprisn,
+                                             cb.isn ,
+                                             r.sagroup
+                                ) b 
+                                    left join ais.buhbody_t bb
+                                    on b.buhquitbodyisn = bb.isn,
+                                ais.buhbody_t bb1
+                                    left join ais.docgrp dg
+                                    on bb1.groupisn = dg.isn
+                             where bb.isn = bb1.parentisn
+                                   and bb1.status = 'Рђ'
+                                   and bb1.oprisn = shared_system.get('opartquit')
+                                   and oracompat.nvl(bb1.camount,bb1.damount) <> 0 -- Сѓ РѕРїРµСЂР°С†РёР№ С‡Р°СЃС‚РёС‡РЅРѕР№ РєРІРёС‚РѕРІРєРё СЃСѓРјРј 0 РЅРµ СЂР°СЃСЃРјР°С‚СЂРёРІР°РµРј
+                        
                         ) b
                             left join ais.quedecode qd1
                             on (b.queisn = qd1.queisn and b.buhquitisn = qd1.objisn)
@@ -173,7 +289,7 @@ as
             ) b
                 left join ais.buhbody_t bbq
                 on b.quitbodyisn = bbq.isn
-    /*kgs 04.10.11 чтобы было много места*/
+    /*kgs 04.10.11 С‡С‚РѕР±С‹ Р±С‹Р»Рѕ РјРЅРѕРіРѕ РјРµСЃС‚Р°*/
     group by
                b.deptisn, b.statcode, b.classisn, b.bodyisn,
                b.dateval, b.currisn, b.buhheadfid, b.deptisnbuh, 
@@ -182,4 +298,4 @@ as
                b.buhquitbodyisn, b.buhquitbodycnt,b.sagroup, b.buhpc, 
                b.buhquitpc,b.buhquitdate,b.groupisn, b.buhquitisn, 
                b.queisn, b.corsubaccisn, b.fact, bbq.dateval
-);
+			   );

@@ -1,4 +1,4 @@
-create or replace view v_reprefund (
+create or replace view storage_adm.v_reprefund (
    refundisn,
    agrisn,
    condisn,
@@ -69,7 +69,7 @@ create or replace view v_reprefund (
    refundid,
    agrclassisn )
 as
-(/* kgs 10.01.2013    repcond нельзя использовать - в нем теперь нет медиц кондов с 0 плановой премией*/
+(/* kgs 10.01.2013    repcond РЅРµР»СЊР·СЏ РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ - РІ РЅРµРј С‚РµРїРµСЂСЊ РЅРµС‚ РјРµРґРёС† РєРѕРЅРґРѕРІ СЃ 0 РїР»Р°РЅРѕРІРѕР№ РїСЂРµРјРёРµР№*/
     select --+ use_nl(s ac ar ao ) ordered push_subq index ( rc x_repcond_cond )
            s.isn refundisn,
            s.agrisn,
@@ -97,21 +97,33 @@ as
            case 
                 when ao.parentisn is null then ao.isn
                 else
-             (  select --+ rule
+             (  
+                --select max(t1.isn)
+                --    from (
+                --           select unnest(zz.__hier) unh,
+                --                   zz.isn
+                --                from ais.agrobject_nh zz
+                --                where zz.parentisn is null
+                --        ) t1
+                --        inner join (select a.parentisn
+                --                        from ais.agrobject a) t2
+                --        on t1.unh = t2.parentisn
+                select --+ rule
                         max(zz.isn)
-                    from agrobject zz
-                    where zz.parentisn is null
-                    start with zz.isn = ao.parentisn
-                    connect by nocycle prior zz.parentisn = zz.isn
+                    from ais.agrobject_nh zz
+                    where zz.parentisn is null and
+                        shared_system.is_subtree(zz.__hier, ao.parentisn)
+                    --start with zz.isn = ao.parentisn
+                    --connect by nocycle prior zz.parentisn = zz.isn
               )  
            end parentobjisn,
     --!!       oracompat.nvl(rc.parentobjisn,rc.objisn) parentobjisn,
-           null::numeric rptgroupisn, --поле заполняется после загрузки reprefund с помощью апдейта
+           null::numeric rptgroupisn, --РїРѕР»Рµ Р·Р°РїРѕР»РЅСЏРµС‚СЃСЏ РїРѕСЃР»Рµ Р·Р°РіСЂСѓР·РєРё reprefund СЃ РїРѕРјРѕС‰СЊСЋ Р°РїРґРµР№С‚Р°
            null::numeric conddeptisn,
-           null::numeric isrevaluation, --поля заполняются после загрузки reprefund с помощью апдейт
+           null::numeric isrevaluation, --РїРѕР»СЏ Р·Р°РїРѕР»РЅСЏСЋС‚СЃСЏ РїРѕСЃР»Рµ Р·Р°РіСЂСѓР·РєРё reprefund СЃ РїРѕРјРѕС‰СЊСЋ Р°РїРґРµР№С‚
            ac.franchcurrisn,
-           oracompat.nvl(decode(oracompat.nvl(ac.franchtype, 'б'), 'б', decode (ac.franchtariff, null, gcc2.gcc2(ac.franchsum, ac.franchcurrisn, s.currisn, oracompat.nvl(oracompat.nvl(dateloss, dateevent), datereg)))), 0) +
-           oracompat.nvl(s.claimsum * decode(oracompat.nvl(ac.franchtype, 'б'), 'б', ac.franchtariff), 0) / 100 franchdeducted,
+           oracompat.nvl(decode(oracompat.nvl(ac.franchtype, 'Р‘'), 'Р‘', decode (ac.franchtariff, null, shared_system.gcc2(ac.franchsum, ac.franchcurrisn, s.currisn, oracompat.nvl(oracompat.nvl(dateloss, dateevent), datereg)))), 0::numeric) +
+           oracompat.nvl(s.claimsum * decode(oracompat.nvl(ac.franchtype, 'Р‘'), 'Р‘', ac.franchtariff), 0::numeric) / 100 franchdeducted,
            s.classisn,
            s.refundsum,
            s.refundsumusd,
@@ -124,21 +136,33 @@ as
            s.ruleisnagr,
            s.ruleisn ruleisnclaim,
            s.nrzu,
-           null::numeric budgetgroupisn, --поле заполняется после загрузки reprefund с помощью апдейта
+           null::numeric budgetgroupisn, --РїРѕР»Рµ Р·Р°РїРѕР»РЅСЏРµС‚СЃСЏ РїРѕСЃР»Рµ Р·Р°РіСЂСѓР·РєРё reprefund СЃ РїРѕРјРѕС‰СЊСЋ Р°РїРґРµР№С‚Р°
            ao.classisn objclassisn,
            agrextisn,
-           --mserp 04.02.2011 дит-11-1-128014 {
+           --mserp 04.02.2011 РґРёС‚-11-1-128014 {
            --decode(allrefundsum, 0, 1 / allrefund, decode(oracompat.nvl(refundsum, 0), 0, oracompat.nvl(claimsum, 0), oracompat.nvl(refundsum, 0)) / allrefundsum) condpc,
-           decode(allrefundsum, 0, 1 / allrefund, decode(oracompat.nvl(s.refundsum, 0), 0, decode(agrextisn, null,oracompat.nvl(s.claimsum, 0),0)  , oracompat.nvl(s.refundsum, 0)) / allrefundsum) condpc,
-           --}дит-11-1-128014
+           decode(allrefundsum, 0, 1 / allrefund, decode(oracompat.nvl(s.refundsum, 0::numeric), 0, decode(agrextisn, null,oracompat.nvl(s.claimsum, 0::numeric),0)  , oracompat.nvl(s.refundsum, 0::numeric)) / allrefundsum) condpc,
+           --}РґРёС‚-11-1-128014
            case when ao.parentisn is null then null
                 else
-             (  select --+ rule
+             (  
+                 --select max(t1.classisn)
+                 --   from (
+                 --          select unnest(zz.__hier) unh,
+                 --                  zz.classisn
+                 --               from ais.agrobject_nh zz
+                 --               where zz.parentisn is null
+                 --       ) t1
+                 --       inner join (select a.parentisn
+                 --                       from ais.agrobject a) t2
+                 --       on t1.unh = t2.parentisn
+                select --+ rule
                      max(zz.classisn)
-                     from agrobject zz
-                     where zz.parentisn is null
-                     start with zz.isn = ao.parentisn
-                     connect by nocycle prior zz.parentisn = zz.isn
+                     from ais.agrobject_nh zz
+                     where zz.parentisn is null and
+                     --start with zz.isn = ao.parentisn
+                     --connect by nocycle prior zz.parentisn = zz.isn
+                        shared_system.is_subtree(zz.__hier, ao.parentisn)
               )  
            end parentobjclassisn,
            ragrisn,
@@ -147,34 +171,34 @@ as
            s.franchcurrisn rfranchcurrisn,
            s.franchsum rfranchsum,
            ( select max(subjisn)
-                   from agrrole ar
+                   from ais.agrrole ar
                    where ar.agrisn = s.agrisn
                         and ar.refundisn = s.isn
                         and ar.classisn = 1521585603 ) saleremplisn,
            ( select max(deptisn)
-                   from agrrole ar
+                   from ais.agrrole ar
                    where ar.agrisn = s.agrisn
                         and ar.refundisn = s.isn
                         and ar.classisn = 1521585603 ) salerdeptisn,
-           null::numeric motivgroupisn, --поле заполняется после заргузки reprefund процедурой set_refund_motivgroupisn
+           null::numeric motivgroupisn, --РїРѕР»Рµ Р·Р°РїРѕР»РЅСЏРµС‚СЃСЏ РїРѕСЃР»Рµ Р·Р°СЂРіСѓР·РєРё reprefund РїСЂРѕС†РµРґСѓСЂРѕР№ set_refund_motivgroupisn
            ar.ruleisn riskruleisn,
            ar.classisn riskclassisn,
            dateval rdateval,
-           oracompat.trunc(decode(agrextisn, null, oracompat.nvl(oracompat.nvl(dateloss, dateclaim), datereg), oracompat.nvl(oracompat.nvl(extdateevent, oracompat.nvl(dateloss, dateclaim)), datereg))) repdateloss,
+           oracompat.trunc(decode(agrextisn, null, oracompat.nvl(oracompat.nvl(dateloss, dateclaim), datereg), oracompat.nvl(oracompat.nvl(extdateevent, oracompat.nvl(dateloss, dateclaim)), datereg))::date) repdateloss,
            s.claimdatetotalloss,
-           s.claimcurrisn, -- egao 20.03.2009 дит-09-1-086869
+           s.claimcurrisn, -- egao 20.03.2009 РґРёС‚-09-1-086869
            s.refundsumrub,
            s.claimsumrub,
            s.regress,
-           s.claimclassisn, -- egao 27.10.2010 дит-10-4-121049
+           s.claimclassisn, -- egao 27.10.2010 РґРёС‚-10-4-121049
            s.created refcreated,-- od 01.07.2011
            s.parentisn,
            (select count(distinct subjisn) 
-                from agrrole rl  
+                from ais.agrrole rl  
                 where rl.agrisn = s.agrisn  
                     and rl.refundisn = s.isn 
-                    and rl.classisn = 971382125) as aggrievednumber, -- egao 20.03.2013 дит-12-4-176083
-           s.refundid,  -- egao 20.03.2013 дит-12-4-176083
+                    and rl.classisn = 971382125) as aggrievednumber, -- egao 20.03.2013 РґРёС‚-12-4-176083
+           s.refundid,  -- egao 20.03.2013 РґРёС‚-12-4-176083
            s.agrclassisn
       from ( select s.isn,
                     s.claimisn,
@@ -201,18 +225,18 @@ as
                     s.classisn,
                     s.refundsum,
                     s.objisn,
-                    gcc2.gcc2(s.refundsum, s.currisn, 53, oracompat.nvl(s.daterefund, s.dateevent)) refundsumusd,
-                    gcc2.gcc2(s.claimsum, s.currisn, 53, oracompat.nvl(s.dateloss, s.dateclaim)) claimsumusd,
-                    gcc2.gcc2(s.refundsum, s.currisn, 35, oracompat.nvl(s.daterefund, s.dateevent)) refundsumrub,
-                    gcc2.gcc2(s.claimsum, s.currisn, 35, oracompat.nvl(s.dateloss, s.dateclaim)) claimsumrub,
+                    shared_system.gcc2(s.refundsum, s.currisn, 53, oracompat.nvl(s.daterefund, s.dateevent)) refundsumusd,
+                    shared_system.gcc2(s.claimsum, s.currisn, 53, oracompat.nvl(s.dateloss, s.dateclaim)) claimsumusd,
+                    shared_system.gcc2(s.refundsum, s.currisn, 35, oracompat.nvl(s.daterefund, s.dateevent)) refundsumrub,
+                    shared_system.gcc2(s.claimsum, s.currisn, 35, oracompat.nvl(s.dateloss, s.dateclaim)) claimsumrub,
                     s.id,
                     s.ruleisn,
                     s.nrzu,
                     s.agrextisn,
-                    --mserp 04.02.2011 дит-11-1-128014 {
+                    --mserp 04.02.2011 РґРёС‚-11-1-128014 {
                     --sum(decode(oracompat.nvl(decode(ext.isn, null, r.refundsum, ext.refundsum), 0), 0, oracompat.nvl(decode(ext.isn, null, r.claimsum, ext.claimsum), 0), decode(ext.isn, null, r.refundsum, ext.refundsum)))over(partition by r.isn) allrefundsum,
-                    sum(decode(oracompat.nvl(s.refundsum, 0), 0, oracompat.nvl(decode(s.agrextisn, null, s.claimsum, s.refundsum), 0), s.refundsum)) over (partition by s.isn) allrefundsum,
-                    --} дит-11-1-128014
+                    sum(decode(oracompat.nvl(s.refundsum, 0::numeric), 0, oracompat.nvl(decode(s.agrextisn, null, s.claimsum, s.refundsum), 0::numeric), s.refundsum)) over (partition by s.isn) allrefundsum,
+                    --} РґРёС‚-11-1-128014
                     count(*) over (partition by s.isn) allrefund,
                     s.ragrisn,
                     s.extdateevent,
@@ -226,7 +250,7 @@ as
                     null::timestamp as claimdatetotalloss,
                     s.claimcurrisn,
                     s.regress,
-                    s.claimclassisn, -- egao 27.10.2010 дит-10-4-121049
+                    s.claimclassisn, -- egao 27.10.2010 РґРёС‚-10-4-121049
                     s.created, -- od 01.07.2011
                     s.firmisn, s.ruleisnagr,
                     s.parentisn,
@@ -273,13 +297,13 @@ as
                                       ext.isn agrextisn,
                                       cl.currisn as claimcurrisn,
                                       r.regress,
-                                      cl.classisn claimclassisn, -- egao 27.10.2010 дит-10-4-121049
+                                      cl.classisn claimclassisn, -- egao 27.10.2010 РґРёС‚-10-4-121049
                                       r.created, -- od 01.07.2011
                                       r.dateval,
                                       cr.totalloss,
                                       r.parentisn,
-                                      r.refundid -- egao 20.03.2013 дит-12-4-176083
-                                   from tt_rowid t
+                                      r.refundid -- egao 20.03.2013 РґРёС‚-12-4-176083
+                                   from storage_adm.tt_rowid t
                                             inner join ais.agrclaim cl
                                             on t.isn = cl.isn
                                             inner join ais.agrrefund r
@@ -290,19 +314,19 @@ as
                                             on r.isn = cr.isn
                                    where r.emplisn not in ( select --+ index (sb x_subject_class)
                                                                     isn
-                                                                from subject sb
-                                                                where classisn = 491 ) -- тестовый пользователь
-                                        and oracompat.nvl(cl.classisn, 0) <> 2835056703 -- акция "помощь друга" od 27.11.2009 12475086503
+                                                                from ais.subject sb
+                                                                where classisn = 491 ) -- С‚РµСЃС‚РѕРІС‹Р№ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ
+                                        and oracompat.nvl(cl.classisn, 0::numeric) <> 2835056703 -- Р°РєС†РёСЏ "РїРѕРјРѕС‰СЊ РґСЂСѓРіР°" od 27.11.2009 12475086503
                               ) s 
-                                left join repagr ag
+                                left join storage_source.repagr ag
                                 on s.agrisn = ag.agrisn
                     ) s
-               where oracompat.nvl(s.agrclassisn,0) <> 28470016
+               where oracompat.nvl(s.agrclassisn,0::numeric) <> 28470016
                ) s
-                left join agrcond ac
+                left join ais.agrcond ac
                 on s.condisn = ac.isn
-                left join agrrisk ar
+                left join ais.agrrisk ar
                 on ac.riskisn = ar.isn
-                left join agrobject ao
+                left join ais.agrobject ao
                 on ac.objisn = ao.isn
 );

@@ -40,24 +40,35 @@ create or replace view storage_adm.v_rep_agent_ranks (
 as
 (
     with agr as (
+
 	select --+ ordered use_nl(ra a)
-                        ra.agrisn,
-                        ra.agr_id,
-                        ra.agr_datebeg,
-                        ra.agr_dateend,
-                        ra.agr_datesign,
-                        ra.agr_ruleisn,
-                        oracompat.nvl(a.datebeg::timestamp, ra.agr_datebeg::timestamp) as datebeg,
-                        lead(a.datebeg, 1, ra.agr_dateend) over(partition by ra.agrisn order by a.datebeg,
-                                                                                                    case when a.datebeg is null
-                                                                                                            then 1 else 0
-                                                                                                    end desc) as dateend,
-                        decode(a.ruleisn, 37564716, 1, 0) as is_move_obj, -- перенос тс
-                        decode(a.ruleisn, 34710416, 1, 0) as is_add_cancel, -- прекращение договора
-                        oracompat.nvl(a.isn, ra.agrisn) as addisn,
-                        oracompat.nvl(a.id, ra.agr_id) as addid,
-                        oracompat.nvl(a.ruleisn, ra.agr_ruleisn) as ruleisn
+                        t.agrisn,
+                        t.agr_id,
+                        t.agr_datebeg,
+                        t.agr_dateend,
+                        t.agr_datesign,
+                        t.agr_ruleisn,
+                        oracompat.nvl(t.datebeg::timestamp, t.agr_datebeg::timestamp) as datebeg,
+                        lead(t.datebeg,1,t.agr_dateend) over (partition by t.agrisn order by t.datebeg, case when t.datebeg is null
+                                                                                            then 1 else 0 end desc) as dateend,
+                        decode(t.ruleisn, 37564716, 1, 0) as is_move_obj, -- перенос тс
+                        decode(t.ruleisn, 34710416, 1, 0) as is_add_cancel, -- прекращение договора
+                        oracompat.nvl(t.isn, t.agrisn) as addisn,
+                        oracompat.nvl(t.id, t.agr_id) as addid,
+                        oracompat.nvl(t.ruleisn, t.agr_ruleisn) as ruleisn
                       from
+                      (
+			select  ra.agrisn,
+				ra.agr_id,
+				ra.agr_datebeg,
+				ra.agr_dateend,
+				ra.agr_datesign,
+				ra.agr_ruleisn,
+				a.datebeg,
+				a.ruleisn,
+				a.isn,
+				a.id			
+                        from
                            (select --+ ordered use_nl(t ra) use_hash(carrules)
                                   t.isn as agrisn,
                                   -- атрибуты договора
@@ -77,12 +88,45 @@ as
                           ) ra,
                             ais.agreement a
                       where
-                        (
-                          (ra.agrisn = a.isn and a.discr = 'Д')  -- договор
-                          or
-                          (ra.parentisn = a.parentisn and a.discr = 'А')  -- аддендумы
-                        )
-),
+                          ra.agrisn = a.isn and a.discr = 'Д'  -- договор
+                                                                                                    
+
+                        ----
+                        union
+                        ----
+			select  ra.agrisn,
+				ra.agr_id,
+				ra.agr_datebeg,
+				ra.agr_dateend,
+				ra.agr_datesign,
+				ra.agr_ruleisn,
+				a.datebeg,
+				a.ruleisn,
+				a.isn,
+				a.id
+                      from
+                           (select --+ ordered use_nl(t ra) use_hash(carrules)
+                                  t.isn as agrisn,
+                                  -- атрибуты договора
+                                  ra.id as agr_id,
+                                  oracompat.trunc(ra.datebeg) as agr_datebeg,
+                                  oracompat.trunc(ra.dateend) as agr_dateend,
+                                  oracompat.trunc(ra.datesign) as agr_datesign,
+                                  ra.ruleisn as agr_ruleisn,
+                                  oracompat.nvl2(carrules.isn, ra.agrisn, null) as parentisn  -- будем искать аддендумы только для моторного страхования
+                                from
+                                      storage_adm.tt_rowid t
+                                        inner join storage_source.repagr ra
+                                        on t.isn = ra.agrisn
+                                        left join motor.v_dicti_rule carrules
+                                        on ra.ruleisn = carrules.isn
+                                where ra.status in ('В', 'Д', 'Щ')) ra,
+                            ais.agreement a
+                      where
+                        ra.parentisn = a.parentisn and a.discr = 'А'  -- аддендумы 
+                        ) t
+                        ) ,
+
 add_move as (
                   select
                         a.agrisn,
@@ -90,7 +134,7 @@ add_move as (
                         a.addid,
                         a.datebeg,
                         lead(a.datebeg, 1, a.agr_dateend) over (partition by a.agrisn order by a.datebeg) as dateend
-                      from storage_adm.agr a
+                      from agr a
                       where
                         a.is_move_obj = 1
             ),
@@ -119,6 +163,7 @@ add_move as (
                                         on t1.unh = t2.isn
                             ) ad
                 )
+          
     select --+ ordered use_nl(a s)
           a.agrisn,
           a.addisn,
@@ -216,10 +261,10 @@ add_move as (
                               from agr
                                         left join add_move
                                         on agr.agrisn = add_move.agrisn
+                                        and agr.datebeg >= add_move.datebeg
+					and agr.datebeg < add_move.dateend
                                         left join add_cancel
                                         on agr.addisn = add_cancel.root_isn
-                              where agr.datebeg >= add_move.datebeg
-                                and agr.datebeg < add_move.dateend
                         ) a 
                             inner join ais.agrrole ar
                             on a.agrisn = ar.agrisn

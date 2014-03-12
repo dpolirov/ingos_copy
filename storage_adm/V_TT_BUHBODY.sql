@@ -113,7 +113,7 @@ as
                                     select b1.isn, unnest(b1.__hier) as parent,
                                             b1.subaccisn, shared_system.get_level(b1.__hier) as b1_level
                                         from ais.buhbody_nh b1
-                                ) as q2 
+                            ) as q2 
                             on q.bodyisn = q2.parent
                     ) as q
                 group by q.bodyisn

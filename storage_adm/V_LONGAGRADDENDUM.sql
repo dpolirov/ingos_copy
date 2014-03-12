@@ -7,8 +7,7 @@ create or replace view storage_adm.v_longagraddendum (
    premiumsum,
    currisn )
 as
-(select /*+ all_rows ordered(a) use_nl(a) index(a) */
-       a.unisn as agrisn,
+(select a.unisn as agrisn,
        a.isn as addisn,
        a.discr,
        a.datebeg,
@@ -22,15 +21,17 @@ as
        a.currisn
     from (select   isn,  
                     unnest(__hier) as unisn, 
+                    previsn,
                     discr, 
                     datebeg, 
                     datesign, 
                     premiumsum, 
-                    currisn 
-                from ais.agreement_nh) as a
+                    currisn,
+                    shared_system.get_level(__hier) level
+                from ais.agreement_nh_prev) as a
             inner join (select --+ ordered use_nl ( t ag )
                                  distinct   t.isn
-                            from storage_adm.tt_rowid t, ais.agreement_nh ag
+                            from storage_adm.tt_rowid t, ais.agreement_nh_prev ag
                             where ag.isn=t.isn
                                 and sign(oracompat.months_between (ag.dateend::date,ag.datebeg::date)-13)=1
                                 and ag.discr in ('Д', 'Г')
@@ -39,7 +40,7 @@ as
                                                        where shared_system.is_subtree(__hier,34711216))
                         ) as t2 
             on a.unisn = t2.isn
-    where oracompat.nvl(a.discr,'Y') = 'А'
+    where (level > 1 and oracompat.nvl(a.discr,'Y') = 'А') or level = 1 
 );
 
 /*

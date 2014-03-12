@@ -49,9 +49,10 @@ create or replace view storage_adm.v_repagrroleagr (
    crossalerfdeptisn,
    agent_maxcomission_isn,
    contractorisn,
-   contrcomission,
-   contrcount,
-   agent_maxcomission_sharepc )
+   contractorcomission,
+   contractorcount,
+   agent_maxcomission_sharepc,
+   consultantisn)
 as
 (
 select distinct R.AGRISN,
@@ -126,10 +127,12 @@ select distinct R.AGRISN,
        first_value(case R.CLASSISN when 437 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 437 then 1 else 0 end desc, R.SHAREPC desc, R.DATEEND desc, R.datebeg desc, R.isn desc, case R.CLASSISN when 437 then R.SUBJISN end desc) as AGENT_MAXCOMISSION_ISN,         -- агент с максимальной комиссией
        -- kds (30.09.2013) task(???)
        first_value(case R.CLASSISN when 4207938903 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 4207938903 then 1 else 0 end desc, R.CALCFLG desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 4207938903 then R.SUBJISN end desc) as CONTRACTORISN, -- Подрядчик
-       avg(case R.CLASSISN when 4207938903 then R.SHAREPC end) over (partition by R.AGRISN) as CONTRCOMISSION, -- Процент подрядчика
-       count(case R.CLASSISN when 4207938903 then 1 else null end) over (partition by R.AGRISN) as CONTRCOUNT, -- Количество подрядчиков
+       avg(case R.CLASSISN when 4207938903 then R.SHAREPC end) over (partition by R.AGRISN) as CONTRACTORCOMISSION, -- Процент подрядчика
+       count(case R.CLASSISN when 4207938903 then 1 else null end) over (partition by R.AGRISN) as CONTRACTORCOUNT, -- Количество подрядчиков
        -- VAA 14.01.2014
-       first_value(case R.CLASSISN when 437 then R.SHAREPC end) over (partition by R.AGRISN order by case R.CLASSISN when 437 then 1 else 0 end desc, R.SHAREPC desc, R.DATEEND desc, r.datebeg desc, r.isn desc, case R.CLASSISN when 437 then R.SHAREPC end desc) as AGENT_MAXCOMISSION_SHAREPC
+       first_value(case R.CLASSISN when 437 then R.SHAREPC end) over (partition by R.AGRISN order by case R.CLASSISN when 437 then 1 else 0 end desc, R.SHAREPC desc, R.DATEEND desc, r.datebeg desc, r.isn desc, case R.CLASSISN when 437 then R.SHAREPC end desc) as AGENT_MAXCOMISSION_SHAREPC,
+	   --max(decode(R.CLASSISN, 4285595703, R.SUBJISN))keep(dense_rank last order by decode(R.CLASSISN, 4285595703, 1, 0), R.CALCFLG, R.DATEEND, R.ISN) CONSULTANTISN  -- страховой консультант
+	   first_value(case R.CLASSISN when 4285595703 then R.SUBJISN end) over (partition by R.AGRISN order by case R.CLASSISN when 4285595703 then 1 else 0 end desc, R.CALCFLG desc, R.DATEEND desc, R.ISN desc, case R.CLASSISN when 4285595703 then R.SUBJISN end desc) as CONSULTANTISN
   from ( select 
                 R.AGRISN,
                 R.CLASSISN,
@@ -170,5 +173,5 @@ select distinct R.AGRISN,
                 storage_source.rep_dept rdt -- EGAO 13.04.2012
                  on rdt.deptisn = R.deptisn
             ) as R
- where R.CLASSISN <> 430; -- страхователь
+ where R.CLASSISN <> 430 -- страхователь
 );

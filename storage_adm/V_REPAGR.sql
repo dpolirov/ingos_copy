@@ -80,7 +80,8 @@ create or replace view storage_adm.v_repagr (
    incomesumrub,
    discount,
    dateissue,
-   createdate )
+   createdate,
+   businesslineisn)
 as
 (select --+ ordered use_hash(sd  fil bfil) use_nl(ar)
        s.agrisn, s.id, s.datebeg, s.dateend, s.datesign, s.classisn, s.ruleisn, s.deptisn, oracompat.nvl(sd.dept0isn, 0::numeric) dept0isn,
@@ -109,7 +110,8 @@ as
        -- sts 06.11.2012 - скидка для туристов
        s.discount,
        s.dateissue, -- egao 08.05.2013
-       s.createdate
+       s.createdate,
+       s.businesslineisn
       from ( select --+ ordered use_nl(r a ar dr drp ad sd sdf sdf1 arc clnt) use_hash(agnt gm)
                     a.isn agrisn,a.id, a.datebeg, a.dateend, a.datesign, a.classisn, a.ruleisn, a.deptisn,
                     dr.filterisn ruledept, a.emplisn, a.clientisn, a.currisn, a.premiumsum,
@@ -153,7 +155,8 @@ as
                     -- sts 06.11.2012 - скидка для туристов
                     a.discount,
                     a.dateissue, -- egao 08.05.2013
-                    null createdate
+                    null createdate,
+                    lb.businesslineisn
                from storage_adm.tt_rowid r
                         inner join ais.agreement a
                         on a.isn = r.isn
@@ -179,6 +182,14 @@ as
                         on r.isn = gm.agrisn
                         left join ais.subject_t clnt
                         on a.clientisn = clnt.isn
+                        left join 
+                        (
+				SELECT distinct x.agrisn, first_value(x.x1) over (partition by agrisn order by x.datebeg desc, x.x1 desc) AS businesslineisn
+				FROM storage_adm.tt_rowid r, ais.agrext x
+				WHERE x.agrisn=r.isn
+				AND x.classisn=4421463103
+			) lb
+			on r.isn = lb.agrisn
               where a.discr in ('Д', 'Г')
                 and a.classisn in ( select isn
                                       from ais.dicti_nh

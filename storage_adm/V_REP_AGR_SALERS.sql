@@ -1,4 +1,4 @@
-create or replace view v_rep_agr_salers (
+create or replace view storage_adm.v_rep_agr_salers (
    agrisn,
    salerisn,
    agrsalerclassisn,
@@ -15,159 +15,146 @@ create or replace view v_rep_agr_salers (
 as
 (
     select --+ ordered use_nl(s oa) use_hash(rd)
-    -- sts 24.07.2012 - вьюха по продавцам (аналог tt_agr_salers)
-    -- используется нарезалка по agrisn в tt_rowid и параметры. использование неявное ч/з вьюху v_rep_agr_salers_max_dates
-       --s.ploadisn,
-       s.agrisn,
-       s.salerisn,
-       s.agrsclass as agrsalerclassisn,
-       s.deptisn,
-       rd.dept0isn,
-       rd.dept1isn,
-       rd.doisn,
-       rd.oisn,
-       s.is_salergo,
-       s.is_salerf,
-       -- мотивационная группа. приоритет тем записям, у которых наиболее заполнены даты начала и окончания
-       max(oa.valn) keep (dense_rank first
-                            order by case
-                                   when oa.datebeg is not null and oa.dateend is not null then 2
-                                   else case
-                                          when oa.datebeg is not null then 1
-                                          else case
-                                                 when oa.dateend is not null then 1
-                                                 else 0
-                                               end
-                                        end
-                                 end desc,
-                                 oracompat.nvl(oa.datebeg, s.pmindate) desc,
-                                 oracompat.nvl(oa.dateend, s.pmaxdate) desc
-                       ) as salerclassisn,
-       s.dt as datebeg,
-       s.dte as dateend
-        from
-             (select a.*
-                  from
-                   (select
-                      a.*,
-                      -- определяем конец интервала (как дату начала следующего интервала минус 1 день)
-                      first_value(a.dt) over(partition by a.agrisn, a.salerisn, a.agrsclass
-                        order by a.dt range between 1 following and unbounded following) - 1 as dte
+                distinct
+                -- sts 24.07.2012 - РІСЊСЋС…Р° РїРѕ РїСЂРѕРґР°РІС†Р°Рј (Р°РЅР°Р»РѕРі tt_agr_salers)
+                -- РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РЅР°СЂРµР·Р°Р»РєР° РїРѕ agrisn РІ tt_rowid Рё РїР°СЂР°РјРµС‚СЂС‹. РёСЃРїРѕР»СЊР·РѕРІР°РЅРёРµ РЅРµСЏРІРЅРѕРµ С‡/Р· РІСЊСЋС…Сѓ v_rep_agr_salers_max_dates
+                   --s.ploadisn,
+                   s.agrisn,
+                   s.salerisn,
+                   s.agrsclass as agrsalerclassisn,
+                   s.deptisn,
+                   rd.dept0isn,
+                   rd.dept1isn,
+                   rd.doisn,
+                   rd.oisn,
+                   s.is_salergo,
+                   s.is_salerf,
+                   -- РјРѕС‚РёРІР°С†РёРѕРЅРЅР°СЏ РіСЂСѓРїРїР°. РїСЂРёРѕСЂРёС‚РµС‚ С‚РµРј Р·Р°РїРёСЃСЏРј, Сѓ РєРѕС‚РѕСЂС‹С… РЅР°РёР±РѕР»РµРµ Р·Р°РїРѕР»РЅРµРЅС‹ РґР°С‚С‹ РЅР°С‡Р°Р»Р° Рё РѕРєРѕРЅС‡Р°РЅРёСЏ
+                   first_value(oa.valn) over (order by case
+                                                           when oa.datebeg is not null and oa.dateend is not null then 2
+                                                           else case
+                                                                  when oa.datebeg is not null then 1
+                                                                  else case
+                                                                         when oa.dateend is not null then 1
+                                                                         else 0
+                                                                       end
+                                                                end
+                                                         end desc,
+                                                         oracompat.nvl(oa.datebeg::timestamp, s.pmindate::timestamp) desc,
+                                                         oracompat.nvl(oa.dateend::timestamp, s.pmaxdate::timestamp) desc,
+                                                         oa.valn desc
+                                               ) as salerclassisn,
+                   s.dt as datebeg,
+                   s.dte as dateend
                     from
-                      ( select
-                            distinct
-                              --rol.ploadisn,
-                              rol.pmindate,
-                              rol.pmaxdate,
-                              rol.salerisn,
-                              rol.agrisn,
-                              rol.agrsclass,
-                              rol.role_datebeg,
-                              rol.role_dateend,
-                              rol.deptisn,
-                              rol.is_salergo,
-                              rol.is_salerf,
-                              oa.valn,
-                              oracompat.nvl(oa.datebeg, rol.pmindate) as oa_datebeg,
-                              oracompat.nvl(oa.dateend, rol.pmaxdate) as oa_dateend,
-                              decode(
-                                n.n,
-                                1, rol.role_datebeg,
-                                2, rol.role_dateend + 1,
-                                3, oracompat.nvl(oa.datebeg, rol.pmindate),
-                                4, oracompat.nvl(oa.dateend, rol.pmaxdate) + 1
-                              ) as dt
-                        from
-                           ( select --+ ordered use_nl(s ar)
-                                     distinct
-                                       --s.ploadisn,
-                                       s.pmindate,
-                                       s.pmaxdate,
-                                       ar.agrisn,
-                                       ar.subjisn as salerisn,
-                                       ar.classisn as agrsclass,
-                                       ar.deptisn,
-                                       max(s.is_salergo) over (partition by ar.agrisn) as is_salergo,
-                                       max(s.is_salerf) over (partition by ar.agrisn) as is_salerf,
-                                       oracompat.nvl(oracompat.trunc(ar.datebeg), s.pmindate) as role_datebeg,
-                                       oracompat.nvl(oracompat.trunc(ar.dateend), s.pmaxdate) as role_dateend
-                                 from (-- самое важное место - выделяем 1-го продавца по отделу на период действия.
-                                       -- в принципе, этого всего можно не делать, если данные в базе абсолютно правильные. ;-)
-                                       select --+ ordered use_nl(ra ar) use_hash(slr)
-                                               distinct
-                                                 --ra.ploadisn,
-                                                 ra.pmindate,
-                                                 ra.pmaxdate,
-                                                 first_value(ar.isn)
-                                                   over (partition by ar.agrisn, oracompat.trunc(ar.datebeg), oracompat.trunc(ar.dateend), ar.deptisn -- od 29.10.2010 /*case when sd.shortname like  'сектор%' then sd.parentisn else sd.isn end*/
-                                                     order by
-                                                       (case when ar.classisn in (1738885603, 1738885903, 1738886903) then 1 else 0 end ) desc,
-                                                        decode(ar.classisn, 1738886903, 1, 0), -- кросспродавец имеет преимущество перед го, когда они вместе
-                                                        ar.updated
-                                                   ) arisn,
-                                                 decode(slr.code, 'sales_g', 'y', 'n') as is_salergo,
-                                                 decode(slr.code, 'sales_f', 'y', 'n') as is_salerf
-                                           from
-                                                 v_rep_agr_salers_max_dates ra,
-                                                 agrrole ar,
-                                                (select
-                                                    d.isn, d.code
-                                                  from
-                                                    ais.dicti d
-                                                  where
-                                                    d.parentisn = 402   -- субъекты договора
-                                                    and d.code in ('sales_g', 'sales_f')
-                                                ) slr
-                                           where
-                                             ra.agrisn = ar.agrisn
-                                             and ar.classisn = slr.isn
-                                             and ar.deptisn is not null
-                                    ) s,
-                                      agrrole ar
-                                 where s.arisn = ar.isn
-                            ) rol
-                                left join obj_attrib oa
-                                on rol.salerisn = oa.objisn,
-                              -- формируем четыре строки, чтобы раскидать четыре даты (beg-end из ролей и атрибутов) в одну колонку
-                            generate_series(1,4) n
-                        where oa.classisn = 1428587803
-                              and oa.discr = 'c'
-                         ) a
-                       ) a
-                   where
-                     /*
-                       из полученных отрезков оставляем те роли, которые действуют на середину текущего отрезка
-                       sts - на мой взгляд - не принципиально, на сколько делить, т.к. отрезки разбиты таким образом,
-                       что один отрезок не может действовать на несколько ролей. видимо делят на два,
-                       чтобы исключить "выпадение" отрезков на "граничных" условиях - т.к. дата берется ч/з trunc()
+                         (select a.*
+                              from
+                               (select
+                                  a.*,
+                                  -- РѕРїСЂРµРґРµР»СЏРµРј РєРѕРЅРµС† РёРЅС‚РµСЂРІР°Р»Р° (РєР°Рє РґР°С‚Сѓ РЅР°С‡Р°Р»Р° СЃР»РµРґСѓСЋС‰РµРіРѕ РёРЅС‚РµСЂРІР°Р»Р° РјРёРЅСѓСЃ 1 РґРµРЅСЊ)
+                                  first_value(a.dt) over(partition by a.agrisn, a.salerisn, a.agrsclass
+                                    order by a.dt range between interval '1 day' following and unbounded following) - interval '1 day' as dte
+                                from
+                                  ( select
+                                        distinct
+                                          --rol.ploadisn,
+                                          rol.pmindate,
+                                          rol.pmaxdate,
+                                          rol.salerisn,
+                                          rol.agrisn,
+                                          rol.agrsclass,
+                                          rol.role_datebeg,
+                                          rol.role_dateend,
+                                          rol.deptisn,
+                                          rol.is_salergo,
+                                          rol.is_salerf,
+                                          oa.valn,
+                                          oracompat.nvl(oa.datebeg::timestamp, rol.pmindate::timestamp) as oa_datebeg,
+                                          oracompat.nvl(oa.dateend::timestamp, rol.pmaxdate::timestamp) as oa_dateend,
+                                          decode(
+                                            n.n,
+                                            1, rol.role_datebeg,
+                                            2, rol.role_dateend + interval '1 day',
+                                            3, oracompat.nvl(oa.datebeg::timestamp, rol.pmindate::timestamp),
+                                            4, oracompat.nvl(oa.dateend::timestamp, rol.pmaxdate::timestamp) + interval '1 day'
+                                          ) as dt
+                                    from
+                                       ( select --+ ordered use_nl(s ar)
+                                                 distinct
+                                                   --s.ploadisn,
+                                                   s.pmindate,
+                                                   s.pmaxdate,
+                                                   ar.agrisn,
+                                                   ar.subjisn as salerisn,
+                                                   ar.classisn as agrsclass,
+                                                   ar.deptisn,
+                                                   max(s.is_salergo) over (partition by ar.agrisn) as is_salergo,
+                                                   max(s.is_salerf) over (partition by ar.agrisn) as is_salerf,
+                                                   oracompat.nvl(oracompat.trunc(ar.datebeg)::date, s.pmindate) as role_datebeg,
+                                                   oracompat.nvl(oracompat.trunc(ar.dateend)::date, s.pmaxdate::date) as role_dateend
+                                             from (-- СЃР°РјРѕРµ РІР°Р¶РЅРѕРµ РјРµСЃС‚Рѕ - РІС‹РґРµР»СЏРµРј 1-РіРѕ РїСЂРѕРґР°РІС†Р° РїРѕ РѕС‚РґРµР»Сѓ РЅР° РїРµСЂРёРѕРґ РґРµР№СЃС‚РІРёСЏ.
+                                                   -- РІ РїСЂРёРЅС†РёРїРµ, СЌС‚РѕРіРѕ РІСЃРµРіРѕ РјРѕР¶РЅРѕ РЅРµ РґРµР»Р°С‚СЊ, РµСЃР»Рё РґР°РЅРЅС‹Рµ РІ Р±Р°Р·Рµ Р°Р±СЃРѕР»СЋС‚РЅРѕ РїСЂР°РІРёР»СЊРЅС‹Рµ. ;-)
+                                                   select --+ ordered use_nl(ra ar) use_hash(slr)
+                                                           distinct
+                                                             --ra.ploadisn,
+                                                             ra.pmindate,
+                                                             ra.pmaxdate,
+                                                             first_value(ar.isn)
+                                                               over (partition by ar.agrisn, oracompat.trunc(ar.datebeg), oracompat.trunc(ar.dateend), ar.deptisn -- od 29.10.2010 /*case when sd.shortname like  'СЃРµРєС‚РѕСЂ%' then sd.parentisn else sd.isn end*/
+                                                                 order by
+                                                                   (case when ar.classisn in (1738885603, 1738885903, 1738886903) then 1 else 0 end ) desc,
+                                                                    decode(ar.classisn, 1738886903, 1, 0), -- РєСЂРѕСЃСЃРїСЂРѕРґР°РІРµС† РёРјРµРµС‚ РїСЂРµРёРјСѓС‰РµСЃС‚РІРѕ РїРµСЂРµРґ РіРѕ, РєРѕРіРґР° РѕРЅРё РІРјРµСЃС‚Рµ
+                                                                    ar.updated
+                                                               ) arisn,
+                                                             decode(slr.code, 'sales_g', 'Y', 'N') as is_salergo,
+                                                             decode(slr.code, 'sales_f', 'Y', 'N') as is_salerf
+                                                       from
+                                                             storage_adm.v_rep_agr_salers_max_dates ra,
+                                                             ais.agrrole ar,
+                                                            (select
+                                                                d.isn, d.code
+                                                              from
+                                                                ais.dicti d
+                                                              where
+                                                                d.parentisn = 402   -- СЃСѓР±СЉРµРєС‚С‹ РґРѕРіРѕРІРѕСЂР°
+                                                                and d.code in ('sales_g', 'sales_f')
+                                                            ) slr
+                                                       where
+                                                         ra.agrisn = ar.agrisn
+                                                         and ar.classisn = slr.isn
+                                                         and ar.deptisn is not null
+                                                ) s,
+                                                  ais.agrrole ar
+                                             where s.arisn = ar.isn
+                                        ) rol
+                                            left join ais.obj_attrib oa
+                                            on rol.salerisn = oa.objisn,
+                                          -- С„РѕСЂРјРёСЂСѓРµРј С‡РµС‚С‹СЂРµ СЃС‚СЂРѕРєРё, С‡С‚РѕР±С‹ СЂР°СЃРєРёРґР°С‚СЊ С‡РµС‚С‹СЂРµ РґР°С‚С‹ (beg-end РёР· СЂРѕР»РµР№ Рё Р°С‚СЂРёР±СѓС‚РѕРІ) РІ РѕРґРЅСѓ РєРѕР»РѕРЅРєСѓ
+                                        generate_series(1,4) n
+                                    where oa.classisn = 1428587803
+                                          and oa.discr = 'C'
+                                     ) a
+                                   ) a
+                               where
+                                 /*
+                                   РёР· РїРѕР»СѓС‡РµРЅРЅС‹С… РѕС‚СЂРµР·РєРѕРІ РѕСЃС‚Р°РІР»СЏРµРј С‚Рµ СЂРѕР»Рё, РєРѕС‚РѕСЂС‹Рµ РґРµР№СЃС‚РІСѓСЋС‚ РЅР° СЃРµСЂРµРґРёРЅСѓ С‚РµРєСѓС‰РµРіРѕ РѕС‚СЂРµР·РєР°
+                                   sts - РЅР° РјРѕР№ РІР·РіР»СЏРґ - РЅРµ РїСЂРёРЅС†РёРїРёР°Р»СЊРЅРѕ, РЅР° СЃРєРѕР»СЊРєРѕ РґРµР»РёС‚СЊ, С‚.Рє. РѕС‚СЂРµР·РєРё СЂР°Р·Р±РёС‚С‹ С‚Р°РєРёРј РѕР±СЂР°Р·РѕРј,
+                                   С‡С‚Рѕ РѕРґРёРЅ РѕС‚СЂРµР·РѕРє РЅРµ РјРѕР¶РµС‚ РґРµР№СЃС‚РІРѕРІР°С‚СЊ РЅР° РЅРµСЃРєРѕР»СЊРєРѕ СЂРѕР»РµР№. РІРёРґРёРјРѕ РґРµР»СЏС‚ РЅР° РґРІР°,
+                                   С‡С‚РѕР±С‹ РёСЃРєР»СЋС‡РёС‚СЊ "РІС‹РїР°РґРµРЅРёРµ" РѕС‚СЂРµР·РєРѕРІ РЅР° "РіСЂР°РЅРёС‡РЅС‹С…" СѓСЃР»РѕРІРёСЏС… - С‚.Рє. РґР°С‚Р° Р±РµСЂРµС‚СЃСЏ С‡/Р· trunc()
 
-                       upd 24.07.2012 - а может и принципиально. вариант со строгим равенством по a.dt дает чуть меньше число записей:
-                         200 944 639  -- строгое равенство
-                         200 952 028  -- нестрогое равенство
-                       видимо дело все таки в trunc()-аньи дат - разбираться не стал
-                       a.dt between a.role_datebeg and a.role_dateend
-                     */
-                       a.dt + (a.dte - a.dt) / 2 between a.role_datebeg and a.role_dateend
-               ) s
-                left join ais.obj_attrib oa
-                on s.salerisn = oa.objisn
-                left join rep_dept rd
-                on s.deptisn = rd.deptisn
-          where oa.classisn = 1428587803
-                and oa.discr = 'c'
-                and s.dt between oracompat.nvl(oracompat.trunc(oa.datebeg), s.pmindate) and oracompat.nvl(oracompat.trunc(oa.dateend), s.pmaxdate)
-    group by
-       --s.ploadisn,
-       s.agrisn,
-       s.salerisn,
-       s.agrsclass,
-       s.deptisn,
-       rd.dept0isn,
-       rd.dept1isn,
-       rd.doisn,
-       rd.oisn,
-       s.is_salergo,
-       s.is_salerf,
-       s.dt,
-       s.dte
+                                   upd 24.07.2012 - Р° РјРѕР¶РµС‚ Рё РїСЂРёРЅС†РёРїРёР°Р»СЊРЅРѕ. РІР°СЂРёР°РЅС‚ СЃРѕ СЃС‚СЂРѕРіРёРј СЂР°РІРµРЅСЃС‚РІРѕРј РїРѕ a.dt РґР°РµС‚ С‡СѓС‚СЊ РјРµРЅСЊС€Рµ С‡РёСЃР»Рѕ Р·Р°РїРёСЃРµР№:
+                                     200 944 639  -- СЃС‚СЂРѕРіРѕРµ СЂР°РІРµРЅСЃС‚РІРѕ
+                                     200 952 028  -- РЅРµСЃС‚СЂРѕРіРѕРµ СЂР°РІРµРЅСЃС‚РІРѕ
+                                   РІРёРґРёРјРѕ РґРµР»Рѕ РІСЃРµ С‚Р°РєРё РІ trunc()-Р°РЅСЊРё РґР°С‚ - СЂР°Р·Р±РёСЂР°С‚СЊСЃСЏ РЅРµ СЃС‚Р°Р»
+                                   a.dt between a.role_datebeg and a.role_dateend
+                                 */
+                                   a.dt + (a.dte - a.dt) / 2 between a.role_datebeg and a.role_dateend
+                           ) s
+                            left join ais.obj_attrib oa
+                            on s.salerisn = oa.objisn
+                            left join storage_source.rep_dept rd
+                            on s.deptisn = rd.deptisn
+                      where oa.classisn = 1428587803
+                            and oa.discr = 'C'
+                            and s.dt between oracompat.nvl(oracompat.trunc(oa.datebeg)::timestamp, s.pmindate::timestamp) and oracompat.nvl(oracompat.trunc(oa.dateend)::timestamp, s.pmaxdate::timestamp)
 );

@@ -1,4 +1,4 @@
-create or replace view v_tt_buh_turn (
+create or replace view storage_adm.v_tt_buh_turn (
    subaccisn,
    code,
    subkindisn,
@@ -25,7 +25,7 @@ as
             b.oprisn,
             b.currisn,
             oracompat.trunc(dateval,'month') db ,
-            oracompat.add_months(oracompat.trunc(dateval,'month'),1)-1 de,
+            oracompat.add_months(oracompat.trunc(dateval,'month')::date,1)-1 de,
             --sb.resident,
             sum(b.damount) damount,
             sum(b.damountrub) damountrub,
@@ -35,11 +35,11 @@ as
             sum(b.camountusd) camountusd,
             cast((to_char(oracompat.trunc(dateval,'month'),'yyyymmdd')||cast(subaccisn as varchar)) as numeric) prm_key,
             oracompat.trunc(oracompat.nvl(dateevent,dateval),'month') deb ,
-            oracompat.add_months(oracompat.trunc(oracompat.nvl(dateevent,dateval),'month'),1)-1 dee
-    from tt_rowid t,  ais.buhbody_t b--,subject  sb
+            oracompat.add_months(oracompat.trunc(oracompat.nvl(dateevent,dateval),'month')::date,1)-1 dee
+    from storage_adm.tt_rowid t,  ais.buhbody_t b--,subject  sb
     where b.subaccisn = oracompat.substr(t.isn,9)
             and b.dateval between oracompat.trunc(to_date(oracompat.substr(t.isn,1,8),'yyyymmdd'),'month') and oracompat.add_months(oracompat.trunc(to_date(oracompat.substr(t.isn,1,8),'yyyymmdd'),'month'),1)-1
-            and b.status='‡'
+            and b.status='–ê'
             --and b.subjisn=sb.isn(+)
     group by
                 b.subaccisn,
@@ -48,7 +48,7 @@ as
                 b.oprisn,
                 b.currisn,
                 oracompat.trunc(dateval,'month') ,
-                oracompat.add_months(oracompat.trunc(dateval,'month'),1)-1,
+                oracompat.add_months(oracompat.trunc(dateval,'month')::date,1)-1,
                 oracompat.trunc(oracompat.nvl(dateevent,dateval),'month'),
-                oracompat.add_months(oracompat.trunc(oracompat.nvl(dateevent,dateval),'month'),1)-1
+                oracompat.add_months(oracompat.trunc(oracompat.nvl(dateevent,dateval),'month')::date,1)-1
 );

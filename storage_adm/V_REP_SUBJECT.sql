@@ -122,7 +122,7 @@ as
                           s.isn 
                      end)
     /* не резиденты : совпадают регномера и страна регистрации */
-                when  s.resident = 'n' and s.parentsubj is not null and s.regnm = (select distinct first_value(o.val) over (order by oracompat.nvl(dateend::date,to_date('01-01-3000','dd-mm-yyyy')) asc) 
+                when  s.resident = 'N' and s.parentsubj is not null and s.regnm = (select distinct first_value(o.val) over (order by oracompat.nvl(dateend::date,to_date('01-01-3000','dd-mm-yyyy')) asc) 
                                                                                         from ais.obj_attrib o where o.objisn = psb.isn and o.classisn = 1813887503)
                      and s.countryisn = psb.countryisn
                 then cast(s.parentsubj as numeric)
@@ -132,35 +132,25 @@ as
         from (
                 select  --+ ordered use_nl(sc) use_merge(sa)
                          sb.*,
-                        (select distinct first_value(o.val) over (order by oracompat.nvl(dateend::date,to_date('01-01-3000','dd-mm-yyyy')) asc) 
-                            from ais.obj_attrib o where o.objisn = sb.isn and o.classisn = 1813887503) regnm,
-                        (select max(o.dateend) 
-                            from ais.obj_attrib o where o.objisn = sb.isn and o.classisn = 1813887503) regnmdtend,
-                         sc.shortname sbclass,
+                        o.regnm,
+                        o.regnmdtend,
+                        sc.shortname sbclass,
                         (select oracompat.nvl(min(oracompat.nvl(dateend::date,decode(isn,null,null,to_date('01-01-3000','dd-mm-yyyy')))) ,to_date('01-01-1900','dd-mm-yyyy'))
                             from ais.subdoc where subjisn = sb.isn and classisn = 1735713203) relicend,
                         (select oracompat.nvl(min(oracompat.nvl(dateend::date,decode(isn,null,null,to_date('01-01-3000','dd-mm-yyyy')))) ,to_date('01-01-1900','dd-mm-yyyy'))
                             from ais.subdoc where subjisn = sb.isn and classisn = 974582025) licend,
-                         case  when resident = 'n' 
+                         case  when resident = 'N' 
                             then oracompat.nvl(namelat,sb.fullname) 
                             else sb.fullname 
                          end nrezname,
-                        (select max(o.val) 
-                            from ais.obj_attrib o where o.objisn = sb.isn and o.classisn = 2453825203) likvidstatus,
-                          (select max(o.dateend) 
-                            from ais.obj_attrib o where o.objisn = sb.isn and o.classisn = 2453825203) likvidstatusdtend,
-                         (select distinct first_value(o.val) over (order by oracompat.nvl(datebeg::date,to_date('01-01-1900','dd-mm-yyyy')) desc, o.val desc) 
-                            from ais.obj_attrib o where o.objisn = sb.isn and o.classisn = 1979965303) r_best,
-                         (select distinct first_value(o.val) over (order by oracompat.nvl(datebeg::date,to_date('01-01-1900','dd-mm-yyyy')) desc, o.val desc) 
-                            from ais.obj_attrib o where o.objisn = sb.isn and o.classisn = 1979962403) r_fitch,
-                         (select distinct first_value(o.val) over (order by oracompat.nvl(datebeg::date,to_date('01-01-1900','dd-mm-yyyy')) desc, o.val desc) 
-                            from ais.obj_attrib o where o.objisn = sb.isn and o.classisn = 1979960103) r_moodys,
-                         (select distinct first_value(o.val) over (order by oracompat.nvl(datebeg::date,to_date('01-01-1900','dd-mm-yyyy')) desc, o.val desc) 
-                            from ais.obj_attrib o where o.objisn = sb.isn and o.classisn = 1979958603) r_sp,
-                         (select distinct first_value(o.val) over (order by oracompat.nvl(datebeg::date,to_date('01-01-1900','dd-mm-yyyy')) desc, o.val desc) 
-                            from ais.obj_attrib o where o.objisn = sb.isn and o.classisn = 1979966903) r_weiss,    
-                        (select distinct first_value(o.val) over (order by oracompat.nvl(datebeg::date,to_date('01-01-1900','dd-mm-yyyy')) desc, o.val desc) 
-                            from ais.obj_attrib o where o.objisn=sb.isn and o.classisn = 3019835703) valaam_name,
+                        o.likvidstatus,
+                        o.likvidstatusdtend,
+                        o.r_best,
+                        o.r_fitch,
+                        o.r_moodys,
+                        o.r_sp,
+                        o.r_weiss,    
+                        o.valaam_name,
                         (select distinct first_value(so.humanisn) over (order by so.updated asc, so.humanisn asc)
                             from ais.subowner so, storage_source.rep_dept rd 
                             where so.subjisn = sb.isn and so.deptisn = rd.deptisn
@@ -171,8 +161,7 @@ as
                             where so.subjisn = sb.isn and so.deptisn = rd.deptisn
                                 and (rd.dept1isn = 3381054603 or rd.oisn = 1746865203 or rd.dept2isn in(3381054003,1393203203))
                         ) crdeptisn,
-                        (select distinct first_value(o.valn) over (order by oracompat.nvl(datebeg::date,to_date('01-01-1900','dd-mm-yyyy')) desc, o.valn desc) 
-                            from ais.obj_attrib o where o.objisn = sb.isn and o.classisn = 1693932103) dealer,
+                         o.dealer,
                          sa.addrcode,
                          sa.addrtype,
                          sa.cityisn,
@@ -195,7 +184,7 @@ as
                                                                     sb.resident
                                                                 from ais.subject_t sb) t2
                                                 on t1.unh = t2.parentisn
-                                            where oracompat.nvl(t1.resident,'m') = oracompat.nvl(t2.resident,'m')
+                                            where oracompat.nvl(t1.resident,'M') = oracompat.nvl(t2.resident,'M')
                                                 and t1.parentisn is null
                                         ) as t1
                             on t1.isn = sb.isn            
@@ -225,6 +214,36 @@ as
                                           group by subjisn
                                     ) sa 
                             on sb.isn = sa.subjisn
+                            left join ( select a2.objisn,
+                                            max(decode(a2.classisn,1813887503,a2.val)) as regnm,
+                                            max(decode(a2.classisn,1813887503,a.maxdateend)) as regnmdtend,
+                                            max(decode(a2.classisn,2453825203,a.maxval)) as likvidstatus,
+                                            max(decode(a2.classisn,2453825203,a.maxdateend)) as likvidstatusdtend,
+                                            max(decode(a2.classisn,1979965303,a2.val)) as r_best,
+                                            max(decode(a2.classisn,1979962403,a2.val)) as r_fitch,
+                                            max(decode(a2.classisn,1979960103,a2.val)) as r_moodys,
+                                            max(decode(a2.classisn,1979958603,a2.val)) as r_sp,
+                                            max(decode(a2.classisn,1979966903,a2.val)) as r_weiss,
+                                            max(decode(a2.classisn,3019835703,a2.val)) as valaam_name,
+                                            max(decode(a2.classisn,1693932103,a2.valn)) as dealer
+                                        from  (select   max(coalesce(datebeg, '01-01-1900'))lastdate, 
+                                                        max(val) maxval, 
+                                                        max(dateend) maxdateend, 
+                                                        objisn,
+                                                        classisn
+                                                    from ais.obj_attrib 
+                                                    where classisn in (
+                                                    1813887503, 2453825203, 1979965303, 
+                                                    1979962403, 1979960103, 1979958603,
+                                                    1979966903, 3019835703, 1693932103)
+                                                    group by objisn,classisn
+                                                ) a 
+                                                inner join ais.obj_attrib a2
+                                                    on a.objisn=a2.objisn and a.classisn=a2.classisn and coalesce(a2.datebeg, '01-01-1900')=a.lastdate
+                                                group by a2.objisn
+                                       ) o
+                            on o.objisn = sb.isn
+
          ) s
             left join ais.subject_t psb
             on s.parentsubj = psb.isn

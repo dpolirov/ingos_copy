@@ -109,7 +109,7 @@ as
                                         where statcode in
                                             (select statcode 
                                                 from storages.rep_statcode 
-                                                where grp in ('входящее перестрахование','исходящее перестрахование'))
+                                                where grp in ('Входящее перестрахование','Исходящее перестрахование'))
                                      union 
                                      select isn,cast(oracompat.substr(id,1,3) as numeric) 
                                         from ais.buhsubacc 

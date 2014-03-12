@@ -1,4 +1,4 @@
-create or replace view v_rep_agrext (
+create or replace view storage_adm.v_rep_agrext (
    agrisn,
    classisn,
    x1,
@@ -8,14 +8,14 @@ create or replace view v_rep_agrext (
    x5 )
 as
 (select agrisn,classisn,x1,x2,x3,x4,x5
-  from agrext
-  where agrisn in (select isn from tt_rowid)
-        and x1 in (select 1283165703 isn -- ìåæäóíàğîäíàÿ ïğîãğàììà
+  from ais.agrext a
+  where a.agrisn in (select tt.isn from storage_adm.tt_rowid tt)
+        and a.x1 in (select 1283165703 isn -- Ğ¼ĞµĞ¶Ğ´ÑƒĞ½Ğ°Ñ€Ğ¾Ğ´Ğ½Ğ°Ñ Ğ¿Ñ€Ğ¾Ğ³Ñ€Ğ°Ğ¼Ğ¼Ğ°
                     union all
-                    select isn 
-                      from dicti_nh
-                      where hierarchies.is_subtree(__hier, 1071775625))
-                      --Start With isn=1071775625 -- ÑÒĞÀÕÎÂÀÍÈÅ ÇÀËÎÃÎÂÎÃÎ ÈÌÓÙÅÑÒÂÀ
+                    select nh.isn 
+                      from ais.dicti_nh nh
+                      where shared_system.is_subtree(nh.__hier, 1071775625))
+                      --Start With isn=1071775625 -- Ğ¡Ğ¢Ğ ĞĞ¥ĞĞ’ĞĞĞ˜Ğ• Ğ—ĞĞ›ĞĞ“ĞĞ’ĞĞ“Ğ Ğ˜ĞœĞ£Ğ©Ğ•Ğ¡Ğ¢Ğ’Ğ
                       --connect by prior Isn=Parentisn)
 );
 

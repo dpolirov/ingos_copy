@@ -8,7 +8,9 @@ create or replace view storage_adm.v_tt_buh_turn_corr (
    damountrub,
    camountrub,
    prm_key,
-   subkindisn)
+   subkindisn,
+   deb,
+   dee)
 as
 (
     select 
@@ -25,15 +27,19 @@ as
         nvl(sum(camountrub*nvl(corpc,1)),0) camountrub,
         */
         cast((to_char(db,'yyyymmdd')||cast(subaccisn as varchar)) as numeric) prm_key,
-        subkindisn
+        subkindisn,
+		deb,
+		dee
     from (
             select --+ ordered use_nl(b bc ) index ( b x_buhbody_subacc_date) index (bc x_buhbody_head)
                     b.subaccisn,
                     b.code,
                     b.oprisn,
                     b.subkindisn,
-                    oracompat.trunc(b.dateval,'month') db ,
+                    oracompat.trunc(b.dateval,'month') db,
                     oracompat.add_months(oracompat.trunc(b.dateval,'month')::date,1)-1 de,
+					oracompat.trunc(b.dateevent,'month') deb,
+					oracompat.add_months(oracompat.trunc(B.DATEEVENT,'month')::date,1)-1 dee,
                     case
                     --when nvl(b.damountrub,b.camountrub)=0 then 0
                         when count(*) over (partition by b.isn) = 1 
@@ -57,7 +63,7 @@ as
             where bacc.isn = oracompat.substr(t.isn,9)
                 and bacc.isn = b.subaccisn
                 and b.dateval between oracompat.trunc(to_date(oracompat.substr(t.isn,1,8),'yyyymmdd'),'month') and oracompat.add_months(oracompat.trunc(to_date(oracompat.substr(t.isn,1,8),'yyyymmdd'),'month')::date,1)-1
-                and b.status = 'А'
+                and b.status = 'A'
                 and oracompat.nvl(b.damountrub,b.camountrub) <> 0
                 and b.headisn = bc.headisn
                 and bc.status = 'A'
@@ -71,5 +77,7 @@ as
             oprisn,
             subkindisn,
             db ,
-            de
+            de,
+			dee,
+			deb
 );
